@@ -111,10 +111,10 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
         </Sheet>
       </div>
     </div>
-    <nav aria-label="Campaign sections" className="flex items-center gap-1 border-b border-border">
-      {primary.map((section) => <Button key={section.key} render={<a href={href(section.key)} aria-current={activeTab === section.key ? "page" : undefined} />} variant="ghost" className={`h-11 rounded-none border-b-[3px] px-4 text-base ${activeTab === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{section.label}</Button>)}
+    <nav aria-label="Campaign sections" className="grid grid-cols-2 border-b border-border sm:flex sm:items-center sm:gap-1">
+      {primary.map((section) => <Button key={section.key} render={<a href={href(section.key)} aria-current={activeTab === section.key ? "page" : undefined} />} variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeTab === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{section.label}</Button>)}
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" className={`h-11 rounded-none border-b-[3px] px-4 text-base ${activeMore ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} aria-label={activeMore ? `More: ${activeMore.label}` : "More campaign sections"} />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeMore ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} aria-label={activeMore ? `More: ${activeMore.label}` : "More campaign sections"} />}>
           {activeMore?.label ?? "More"} <ChevronDown />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
