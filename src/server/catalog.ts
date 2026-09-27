@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { and, asc, count, eq, ilike, or, sql } from "drizzle-orm";
-import { catalog_entries, orgs, releases } from "../db/schema";
+import { catalog_entries, orgs, releases, tracks, works } from "../db/schema";
 import { db } from "../lib/db";
 import {
   buildCatalogNumberPlan,
@@ -13,6 +13,19 @@ import { hasOwn, idSchema, nullableText } from "./validation";
 import { observeOperation } from "./observability";
 
 const catalogEntryKinds = ["release", "cd", "lp", "video"] as const;
+
+export async function listCatalogTracks(orgId: string) {
+  return db.select({
+    id: tracks.id, title: tracks.title, release_id: tracks.release_id,
+    position: tracks.position, version: tracks.version, isrc: tracks.isrc,
+    audio_url: tracks.audio_url, duration: tracks.duration,
+    track_ready: tracks.track_ready, track_missing: tracks.track_missing,
+    work_id: works.id, work_title: works.title,
+  }).from(tracks)
+    .leftJoin(works, and(eq(works.id, tracks.work_id), eq(works.org_id, orgId)))
+    .where(eq(tracks.org_id, orgId))
+    .orderBy(asc(tracks.position), asc(tracks.title), asc(tracks.id));
+}
 const catalogEntryStatuses = ["planned", "scheduled", "published", "archived"] as const;
 
 const catalogEntryBaseSchema = {
