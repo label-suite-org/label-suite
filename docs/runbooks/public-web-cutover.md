@@ -2,7 +2,10 @@
 
 This procedure governs promotion of `label-suite-org/label-suite` through
 Dokploy. It supersedes the retained historical deployment instructions for
-this cutover. Production remains on its existing source until verified below.
+this cutover and subsequent public-source releases. The initial cutover completed
+on 27 September 2026 at public main
+`f0b1e2c8360b30453eb93a685ff6f0e26dcfedb4`. Verify current state before acting;
+this checkpoint is not a permanent claim about the running revision.
 The private repository retains backlog, historical provenance and recovery
 evidence. Never import those records or production secrets into public CI.
 
@@ -15,13 +18,15 @@ configuration must continue to fail closed. This rollout does not enable
 APNs, telemetry, outreach, payments or other providers. Calendar acceptance
 remains explicit; passing mocked reconciliation tests is not live acceptance.
 
-## Before switching source
+## Before deployment
 
 1. Verify required checks on the exact reviewed public `main` SHA. Record
    the current deployed SHA and preserve private Dokploy source configuration,
    runtime image identities and database recovery evidence.
 2. Follow the host's resource admission rules. Do not start heavy work while
    admission is red or bypass a frozen batch workload.
+   Dokploy can deploy automatically on merge to `main`, so check admission
+   before a merge that triggers deployment as well as before a manual deploy.
 3. Take a fresh production backup and rehearse the candidate migrations on an
    isolated copy with no worker, scheduler or outbound provider activity.
    Verify the upgraded schema against the private approved drift policy and
@@ -32,8 +37,10 @@ remains explicit; passing mocked reconciliation tests is not live acceptance.
 
 ## Deploy and verify
 
-Switch only the existing Dokploy source to `label-suite-org/label-suite`,
-branch `main`, Compose path `compose.prod.yml`. Use Dokploy's native serialized
+Verify the existing Dokploy source is `label-suite-org/label-suite`,
+branch `main`, Compose path `compose.prod.yml`. The initial source switch is
+complete; do not repeat it or restore the private source as a routine release
+step. Use Dokploy's native serialized
 Compose deployment. Never deploy from a local checkout or import private Git
 history into the public repository.
 
