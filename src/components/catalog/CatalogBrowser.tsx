@@ -89,15 +89,15 @@ export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedA
             {release && <><ChevronRight className="size-3" aria-hidden /><a href={href("release", release.id)} className="hover:underline">{release.title}</a></>}
             {track && <><ChevronRight className="size-3" aria-hidden /><span className="text-foreground">{track.title}</span></>}
           </nav>
-          <div className="mb-8 flex items-start gap-4 sm:gap-6 lg:items-center">
+          <div className="mb-8 flex flex-wrap items-start gap-4 sm:gap-6 lg:items-center">
             <Artwork key={artwork} source={artwork} />
             <div className="min-w-0 flex-1">
               <h1 className="break-words text-2xl font-semibold tracking-tight md:text-3xl lg:text-4xl">{title}</h1>
               <p className="mt-3 text-muted-foreground">{track ? [artist?.name, release?.title, track.version].filter(Boolean).join(" · ") : release ? artist?.name ?? "Artist not linked" : `${artistReleases(artist!.id).length} releases`}</p>
               {track && <p className="mt-3 text-sm text-muted-foreground">{track.position ? `Track ${track.position} · ` : ""}{track.duration == null ? "Duration not entered" : `${Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, "0")}`} · {track.isrc ?? "ISRC not entered"}</p>}
               {recordUrl && <a href={recordUrl} className={`${buttonVariants({ variant: "outline" })} mt-5`}>{canMutate ? track ? "Edit track" : release ? "Open release" : "Open artist" : "View record"}</a>}
-              {track && <Audio key={track.id} source={track.audio_url} title={track.title} />}
             </div>
+            {track && <Audio key={track.id} source={track.audio_url} title={track.title} />}
           </div>
           <Tabs defaultValue="overview" key={track?.id ?? release?.id ?? artist?.id}>
             <TabsList variant="line" aria-label="Record details" className="mb-6 max-w-full border-b border-border">
@@ -136,5 +136,5 @@ function Audio({ source, title }: { source: string | null; title: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => { let active = true; if (source) resolveFileUrl(source).then(value => { if (active) setUrl(value); }).catch(() => { if (active) setFailed(true); }); return () => { active = false; }; }, [source]);
-  return <div className="mt-5">{url && !failed ? <audio controls preload="none" aria-label={`Play ${title}`} src={url} className="w-full" onError={() => setFailed(true)} /> : <p className="text-sm text-muted-foreground">{!source ? "No audio linked yet." : failed ? "Audio preview unavailable. Open the track to review its audio link." : "Loading audio…"}</p>}</div>;
+  return <div className="w-full">{url && !failed ? <audio controls preload="none" aria-label={`Play ${title}`} src={url} className="w-full" onError={() => setFailed(true)} /> : <p className="text-sm text-muted-foreground">{!source ? "No audio linked yet." : failed ? "Audio preview unavailable. Open the track to review its audio link." : "Loading audio…"}</p>}</div>;
 }

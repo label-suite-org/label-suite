@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
 import { CatalogBrowser } from "./CatalogBrowser";
 
-vi.mock("@/lib/storage-client", () => ({ resolveFileUrl: vi.fn().mockResolvedValue("https://example.test/art.png") }));
+vi.mock("@/lib/storage-client", () => ({ resolveFileUrl: vi.fn(async (key: string) => key === "audio-key" ? "https://example.test/audio.wav" : "https://example.test/art.png") }));
 
 const props: ComponentProps<typeof CatalogBrowser> = {
   artists: [{ id: "a", name: "First artist", image_url: null }, { id: "b", name: "Second artist", image_url: null }],
@@ -45,5 +45,20 @@ it("searches tracks outside the open branch without losing the selected record",
     expect(nav.querySelector('a[href="/catalog?track=track-a"]')).not.toBeNull();
     expect(nav.textContent).not.toContain("Track b");
     expect(host.querySelector("h1")?.textContent).toBe("Track b");
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
+it("resolves linked artwork and audio into image and native player elements", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () => root.render(<CatalogBrowser {...props}
+      releases={props.releases.map(item => ({ ...item, cover_art_url: "cover-key" }))}
+      tracks={props.tracks.map(item => ({ ...item, audio_url: "audio-key" }))} />));
+    expect(host.querySelector('section[aria-label="Selected record"] img')?.getAttribute("src")).toBe("https://example.test/art.png");
+    expect(host.querySelector("audio")?.getAttribute("src")).toBe("https://example.test/audio.wav");
+    expect(host.querySelector("audio")?.hasAttribute("controls")).toBe(true);
+    expect(host.textContent).not.toContain("No audio linked yet.");
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });
