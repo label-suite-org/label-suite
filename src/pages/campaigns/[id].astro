@@ -160,11 +160,12 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
 
       {activeTab === "outreach" && (
         <section class="rounded-xl border border-border bg-card p-4 sm:p-5">
+          <h2 class="sr-only">Outreach</h2>
           {campaignOutreachSchemaAvailable && campaignOutreachData ? (
             <CampaignOutreachWorkspace client:load initialData={campaignOutreachData} initialLeadId={Astro.url.searchParams.get("lead")} canMutate={canMutate} canPublish={canPublish} />
           ) : (
             <div class="py-8 text-center">
-              <h2 class="text-lg font-semibold">Outreach workspace is not available yet</h2>
+              <h3 class="text-lg font-semibold">Outreach workspace is not available yet</h3>
               <p class="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">Apply the campaign earned-media migration, then run the Fountain campaign bootstrap. Existing Directory contacts and radio stations will be linked, not duplicated.</p>
             </div>
           )}
@@ -200,6 +201,7 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
       </section>}
 
       {(["creators", "posts", "cost", "report"] as const).includes(activeTab as "creators" | "posts" | "cost" | "report") && <section class="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <h2 class="sr-only">{campaignTabs.find((tab) => tab.key === activeTab)?.label}</h2>
         <CampaignOsWorkspace client:load campaignId={id} section={activeTab as "creators" | "posts" | "cost" | "report"} canMutate={canMutate} contacts={contactRowsForCampaignOs} finalReport={campaign.final_report} finalizedAt={campaign.final_report_finalized_at?.toISOString() ?? null} />
       </section>}
 
