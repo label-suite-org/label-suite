@@ -434,7 +434,8 @@ test("core-surfaces-light-dark-a11y", async ({ page }, testInfo) => {
   const renderLifecycleWarnings = captureRenderLifecycleWarnings(page);
   await login(page);
   const releaseId = requiredFixture("E2E_RELEASE_ID", "Schedule accessibility requires a seeded release.");
-  const surfaces = ["/dashboard", "/analytics", "/artists", "/releases", `/releases/${releaseId}?section=timeline`, "/campaigns", "/events", "/settings"];
+  const trackId = requiredFixture("E2E_TRACK_ID", "Catalog accessibility requires a seeded track.");
+  const surfaces = ["/dashboard", "/analytics", "/artists", "/releases", `/catalog?track=${trackId}`, `/releases/${releaseId}?section=timeline`, "/campaigns", "/events", "/settings"];
 
   for (const path of surfaces) {
     await scanSurface(page, testInfo, path);
