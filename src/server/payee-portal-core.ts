@@ -23,7 +23,8 @@ export function findPayeeContact(
 ): PayeePortalContact | null {
   const normalizedEmail = normalizePayeeEmail(userEmail);
   if (!normalizedEmail) return null;
-  return contacts.find((contact) => normalizePayeeEmail(contact.email) === normalizedEmail) ?? null;
+  const matches = contacts.filter((contact) => normalizePayeeEmail(contact.email) === normalizedEmail);
+  return matches.length === 1 ? matches[0] : null;
 }
 
 export function isPublishedStatementStatus(status: string): boolean {

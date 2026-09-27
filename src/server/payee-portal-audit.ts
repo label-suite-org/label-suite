@@ -1,8 +1,9 @@
 import { getRequestId } from "./request-context";
 import { writeAuditLog } from "./audit";
 import { logEvent } from "./observability";
+import { HttpError } from "./errors";
 
-/** Audit payee reads without allowing telemetry failure to hide approved data. */
+/** Require a durable audit record before releasing sensitive payee data. */
 export async function auditPayeeRead(input: {
   orgId: string;
   userId: string;
@@ -29,5 +30,6 @@ export async function auditPayeeRead(input: {
       operation: input.action,
       errorClass: error instanceof Error ? error.name : "UnknownError",
     });
+    throw new HttpError("Payee data is temporarily unavailable. Please try again.", 503);
   }
 }
