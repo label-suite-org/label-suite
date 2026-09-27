@@ -129,7 +129,7 @@ function SearchResults({ artists, releases, tracks }: Pick<Props, "artists" | "r
 function Artwork({ source, small = false }: { source?: string | null; small?: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => { let active = true; if (source) resolveFileUrl(source, 320).then(value => { if (active) setUrl(value); }).catch(() => { if (active) setUrl(null); }); return () => { active = false; }; }, [source]);
-  return <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted ${small ? "size-8" : "size-20 sm:size-36 lg:size-48"}`}>{url ? <img src={url} alt="" loading="lazy" className="size-full object-cover" onError={() => setUrl(null)} /> : <span className="flex flex-col items-center gap-2 text-xs text-muted-foreground"><Disc3 className={small ? "size-4" : "size-9"} aria-hidden />{!small && (source ? "Artwork unavailable" : "No artwork yet")}</span>}</div>;
+  return <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted ${small ? "size-8" : "size-20 sm:size-36 lg:size-48"}`}>{url ? <img src={url} alt="" loading="lazy" className="size-full object-cover" onError={() => setUrl(null)} /> : <span className="flex flex-col items-center gap-2 text-xs text-foreground"><Disc3 className={small ? "size-4" : "size-9"} aria-hidden />{!small && (source ? "Artwork unavailable" : "No artwork yet")}</span>}</div>;
 }
 
 function Audio({ source, title }: { source: string | null; title: string }) {
