@@ -63,7 +63,7 @@ function CampaignList({ campaigns, selectedId, compact = false }: { campaigns: C
 
 export function CampaignContextRail({ campaigns, selectedId }: { campaigns: CampaignRailItem[]; selectedId: string }) {
   const [collapsed, setCollapsed] = useState(false);
-  return <aside aria-label="Campaign list" className={`hidden shrink-0 overflow-hidden border-r border-border bg-background transition-[width] duration-300 ease-out motion-reduce:transition-none lg:block ${collapsed ? "w-[72px]" : "w-80"}`}>
+  return <aside aria-label="Campaign list" className={`hidden shrink-0 overflow-hidden border-r border-border bg-background transition-[width] duration-300 ease-out motion-reduce:transition-none xl:block ${collapsed ? "w-[72px]" : "w-80"}`}>
     <div className="sticky top-0 max-h-[calc(100vh-3rem)] overflow-y-auto px-2 py-3">
       <div className={`mb-3 flex h-8 items-center ${collapsed ? "justify-center" : "justify-between px-2"}`}>
         {!collapsed && <span className="text-xs font-medium text-muted-foreground">Browse</span>}
@@ -104,7 +104,7 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
       <div className="flex items-center gap-2">
         <Badge variant="ghost" className="capitalize">{status === "active" && <span className="size-1.5 rounded-full bg-emerald-600" />}{status || "planning"}</Badge>
         <Sheet>
-          <SheetTrigger render={<Button variant="outline" size="sm" className="lg:hidden" />}><PanelLeftOpen /> Campaign list</SheetTrigger>
+          <SheetTrigger render={<Button variant="outline" size="sm" className="xl:hidden" />}><PanelLeftOpen /> Campaign list</SheetTrigger>
           <SheetContent side="left" className="w-[min(88vw,22rem)] overflow-y-auto">
             <SheetHeader><SheetTitle>Campaigns</SheetTitle></SheetHeader>
             <div className="px-3"><CampaignList campaigns={campaigns} selectedId={campaignId} /></div>
@@ -113,9 +113,9 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
       </div>
     </div>
     <nav aria-label="Campaign sections" className="grid grid-cols-2 border-b border-border sm:flex sm:items-center sm:gap-1">
-      {primary.map((section) => <Button key={section.key} render={<a href={href(section.key)} aria-current={activeTab === section.key ? "page" : undefined} />} variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeTab === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{section.label}</Button>)}
+      {primary.map((section) => <Button key={section.key} render={<a href={href(section.key)} aria-current={activeTab === section.key ? "page" : undefined} />} variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeTab === section.key ? "border-b-primary text-primary" : "border-b-transparent text-muted-foreground"}`}>{section.label}</Button>)}
       <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeMore ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} aria-label={activeMore ? `More: ${activeMore.label}` : "More campaign sections"} />}>
+        <DropdownMenuTrigger render={<Button variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeMore ? "border-b-primary text-primary" : "border-b-transparent text-muted-foreground"}`} aria-label={activeMore ? `More: ${activeMore.label}` : "More campaign sections"} />}>
           {activeMore?.label ?? "More"} <ChevronDown />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">

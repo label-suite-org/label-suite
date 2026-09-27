@@ -22,6 +22,8 @@ describe("CampaignWorkspaceNavigation", () => {
     expect(html).toContain("/campaigns/campaign-1?tab=outreach");
     expect(html).toContain("/campaigns/campaign-1?tab=content");
     expect(html).toContain('aria-label="More: Budget"');
+    expect(html).toContain("border-b-primary text-primary");
+    expect(html).not.toContain("border-primary text-primary");
     expect(html).toContain('<h1 class="sr-only">Hollow River launch</h1>');
   });
 

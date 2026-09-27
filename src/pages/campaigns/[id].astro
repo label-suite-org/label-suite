@@ -159,7 +159,7 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
       </section>}
 
       {activeTab === "outreach" && (
-        <section class="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <section class="min-w-0">
           <h2 class="sr-only">Outreach</h2>
           {campaignOutreachSchemaAvailable && campaignOutreachData ? (
             <CampaignOutreachWorkspace client:load initialData={campaignOutreachData} initialLeadId={Astro.url.searchParams.get("lead")} canMutate={canMutate} canPublish={canPublish} />
