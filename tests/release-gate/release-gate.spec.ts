@@ -1519,6 +1519,10 @@ test("campaign rich editor keeps AI review local until an explicit save", async 
 
   await login(page);
   await page.goto(`/campaigns/${RADIO_CAMPAIGN_ID}`, { waitUntil: "domcontentloaded" });
+  const moreSections = page.getByRole("button", { name: "More campaign sections", exact: true });
+  await expect(moreSections.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", "");
+  await moreSections.click();
+  await page.getByRole("menuitem", { name: "Details", exact: true }).click();
   const editCampaign = page.getByRole("button", { name: "Edit Fountain Edits — Release Gate Campaign", exact: true });
   await expect(editCampaign.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", "");
   await editCampaign.click();
