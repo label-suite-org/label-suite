@@ -5,6 +5,8 @@ test.beforeAll(() => {
   assertDisposableReleaseGateTarget({
     databaseUrl: process.env.DATABASE_URL, fixtureDisposable: process.env.RELEASE_GATE_FIXTURE_DISPOSABLE,
     userEmail: process.env.E2E_USER_EMAIL, userPassword: process.env.E2E_USER_PASSWORD, ci: process.env.CI,
+    analyticsFixtureDb: process.env.ANALYTICS_FIXTURE_DB,
+    analyticsFixtureDisposable: process.env.ANALYTICS_FIXTURE_DISPOSABLE,
   });
   if (!new Set(["127.0.0.1", "localhost"]).has(new URL(process.env.E2E_BASE_URL!).hostname)) throw new Error("Local browser fixture required");
 });
