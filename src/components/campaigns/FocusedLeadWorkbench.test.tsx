@@ -121,7 +121,7 @@ describe("focused lead workbench", () => {
 
     expect(html).toContain("grid-cols-[var(--queue-width)_minmax(0,1fr)_var(--context-width)]");
     expect(html).toContain('aria-label="Collapse lead queue"');
-    expect(html).toContain('aria-label="Collapse lead context"');
+    expect(html).toContain('aria-label="Expand lead context"');
     expect(html).toContain('<section aria-label="Focused lead workbench"');
     expect(html).not.toContain('<main class="min-w-0 px-0 lg:px-6">');
     expect(html).toContain("text-[11px] text-foreground");
