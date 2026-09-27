@@ -41,6 +41,11 @@ policy and provenance; do not use this empty baseline to approve that upgrade.
 
 ## Acceptance status
 
+The owner approved a web-first rollout on 27 September 2026. Follow the
+[public web cutover procedure](docs/runbooks/public-web-cutover.md). Native
+physical-device testing and the TestFlight pilot remain open independently;
+this sequencing decision does not certify those features or enable providers.
+
 Publication verification and CI results must be checked for the exact public SHA.
 A passing public workflow does not automatically satisfy checks on private PRs,
 authorize production deployment, or prove physical-device/provider acceptance.

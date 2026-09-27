@@ -5,6 +5,8 @@
 - This repository is `https://github.com/label-suite-org/label-suite`.
   The `origin` remote must point here.
 - Read `PUBLIC_SOURCE.md`. This is a fresh-history verification candidate.
+- The owner approved preparing the web release separately from native device
+  acceptance. Follow `docs/runbooks/public-web-cutover.md` for promotion gates.
 - The existing private GitHub repository `label-suite-org/label-suite_neon_r2`
   still owns production and its outstanding backlog. Do not change Dokploy's
   source or deploy this candidate without a separately verified cutover.
