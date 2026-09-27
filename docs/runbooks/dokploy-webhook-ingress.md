@@ -1,6 +1,6 @@
 > Historical deployment reference, not an executable procedure for this public
 > candidate. Do not run legacy private-history fetches, change repository remotes,
-> use Forgejo delivery instructions, or deploy from this document. Follow
+> use retired delivery instructions, or deploy from this document. Follow
 > [PUBLIC_SOURCE.md](../../PUBLIC_SOURCE.md) and [AGENTS.md](../../AGENTS.md).
 > Public CI uses only the fresh database policy and does not fetch private history.
 
