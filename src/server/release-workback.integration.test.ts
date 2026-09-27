@@ -3,9 +3,9 @@ import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { reschedulePreview } from "./release-workback-core";
 
-// This test writes only to the disposable database created by Forgejo CI.
-const target = "postgres://label_suite:label_suite@127.0.0.1:55432/label_suite";
-const enabled = process.env.CI === "true" && process.env.DATABASE_URL === target;
+import { assertDisposableReleaseGateTarget } from "../../scripts/release-gate-fixture-safety";
+const target = process.env.DATABASE_URL ?? "";
+const enabled = process.env.CI === "true";
 const org = `workback-${randomUUID()}`, release = `release-${randomUUID()}`;
 let sql: ReturnType<typeof postgres>;
 let apply: typeof import("./release-workback").applyReleaseWorkback;
@@ -13,6 +13,13 @@ let getTimeline: typeof import("./release-timeline").getReleaseTimeline;
 
 describe.skipIf(!enabled)("workback on disposable PostgreSQL", () => {
   beforeAll(async () => {
+    assertDisposableReleaseGateTarget({
+      databaseUrl: target, ci: process.env.CI,
+      fixtureDisposable: process.env.RELEASE_GATE_FIXTURE_DISPOSABLE,
+      userEmail: process.env.E2E_USER_EMAIL, userPassword: process.env.E2E_USER_PASSWORD,
+      analyticsFixtureDb: process.env.ANALYTICS_FIXTURE_DB,
+      analyticsFixtureDisposable: process.env.ANALYTICS_FIXTURE_DISPOSABLE,
+    });
     sql = postgres(target, { max: 1 });
     ({ applyReleaseWorkback: apply } = await import("./release-workback"));
     ({ getReleaseTimeline: getTimeline } = await import("./release-timeline"));
