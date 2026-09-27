@@ -1,0 +1,47 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import { PersonalDashboard } from "../components/dashboard/PersonalDashboard";
+import { getDashboardData } from "../server/dashboard";
+import { getDashboardPreferences } from "../server/dashboard-preferences";
+import { buildPersonalDashboardModel } from "../server/dashboard-view-model";
+import { listTodayHub } from "../server/analytics";
+import { selectDashboardAnalyticsCards } from "../server/analytics-command-center-core";
+import { getFundingCoverage, summarizeCoverageByCurrency } from "../server/funding-coverage";
+
+import { serializeClientCapabilities } from "../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const userId = Astro.locals.user!.id;
+
+const [dashboard, todayHub, fundingCoverage, preferences] = await Promise.all([
+  getDashboardData(orgId),
+  listTodayHub(orgId),
+  getFundingCoverage(orgId),
+  getDashboardPreferences({ orgId, userId }),
+]);
+
+const analyticsRows = selectDashboardAnalyticsCards(todayHub.cards, 3);
+const analyticsHealthCard = todayHub.cards.some((card) => card.key === "analytics-data-health");
+const model = buildPersonalDashboardModel({
+  artistCount: dashboard.artistCount,
+  analyticsHasData: todayHub.dataHealth.totalRows > 0,
+  releaseRows: dashboard.attentionReleases,
+  attentionBugs: dashboard.attentionBugs,
+  attentionTasks: dashboard.attentionTasks,
+  unpaidRows: dashboard.unpaidRows,
+  fundingRows: summarizeCoverageByCurrency(fundingCoverage.values()),
+  analyticsRows,
+  readyReleaseCount: dashboard.readyReleaseCount,
+  releaseCount: dashboard.releaseRows.length,
+  openBugCount: dashboard.openBugCount,
+  totalNetRevenue: dashboard.totalNetRevenue,
+  unpaidStatements: dashboard.unpaidStatements,
+  openTaskCount: dashboard.openTaskCount,
+  analyticsHealthy: todayHub.dataHealth.totalRows > 0 && !todayHub.dataHealth.evidencePartial && !analyticsHealthCard,
+  analyticsLastSeenAt: todayHub.dataHealth.lastSeenAt,
+}, preferences);
+---
+
+<AppLayout>
+  <PersonalDashboard client:load model={model} initialPreferences={preferences} canMutate={serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"]} />
+</AppLayout>

@@ -1,0 +1,19 @@
+---
+import "../styles/global.css";
+const { title = "Suite" } = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-svh bg-zinc-50 text-zinc-900 antialiased">
+    <main class="flex min-h-svh items-start justify-center px-6 pb-12 pt-28 sm:items-center sm:py-16">
+      <slot />
+    </main>
+  </body>
+</html>

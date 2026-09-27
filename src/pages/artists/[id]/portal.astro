@@ -1,0 +1,9 @@
+---
+import AppLayout from "../../../layouts/AppLayout.astro";
+import { ArtistPortalManager } from "../../../components/artist-portal/ArtistPortalManager";
+import { getArtistPortalManagement } from "../../../server/artist-portal";
+import { requireCapability } from "../../../server/tenant";
+const orgId = requireCapability(Astro.locals, "operations.mutate");
+const initial = await getArtistPortalManagement(orgId, Astro.params.id!);
+---
+<AppLayout><ArtistPortalManager client:load initial={JSON.parse(JSON.stringify(initial))} /></AppLayout>

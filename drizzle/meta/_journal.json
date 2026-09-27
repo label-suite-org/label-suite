@@ -1,0 +1,657 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1782308742862,
+      "tag": "0000_jazzy_nitro",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782401648596,
+      "tag": "0001_curvy_vapor",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782486929646,
+      "tag": "0002_bent_goliath",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782487194200,
+      "tag": "0003_exotic_bloodstorm",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782487699635,
+      "tag": "0004_messy_wrecker",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782494770073,
+      "tag": "0005_optimal_night_thrasher",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782578654098,
+      "tag": "0006_striped_dragon_lord",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782599315169,
+      "tag": "0007_rare_mercury",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782600339723,
+      "tag": "0008_mean_zaran",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782600957861,
+      "tag": "0009_steady_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782602087206,
+      "tag": "0010_illegal_morg",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782603375533,
+      "tag": "0011_eager_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1782603502235,
+      "tag": "0012_great_bulldozer",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1782605418891,
+      "tag": "0013_melodic_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1782652480195,
+      "tag": "0014_sisense_analytics",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1782656943029,
+      "tag": "0015_sisense_analytics_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1782675159068,
+      "tag": "0016_sisense_metric_range",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1783179567464,
+      "tag": "0017_giant_trauma",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783184410941,
+      "tag": "0018_colossal_cyclops",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783185575144,
+      "tag": "0019_flashy_fixer",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783186393624,
+      "tag": "0020_solid_obadiah_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1783251318965,
+      "tag": "0021_sloppy_shinko_yamashiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1783255898104,
+      "tag": "0022_tiresome_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1783266979789,
+      "tag": "0023_sparkling_maestro",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783270000000,
+      "tag": "0024_contacts_image_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1783423966784,
+      "tag": "0025_samply_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1783425000000,
+      "tag": "0026_contact_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1783490400000,
+      "tag": "0027_isrc_workspace_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1783500000000,
+      "tag": "0028_artist_image_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1783503600000,
+      "tag": "0029_gmail_contact_enrichment",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1783693532792,
+      "tag": "0030_job_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1783694142934,
+      "tag": "0031_operational_reporting",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1783695436444,
+      "tag": "0032_finance_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1783695436447,
+      "tag": "0033_audit_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1783862400000,
+      "tag": "0034_release_timeline_families",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1783872000000,
+      "tag": "0035_grants_workspace_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1783954800000,
+      "tag": "0036_secure_org_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1783960000000,
+      "tag": "0045_grant_deadlines_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1783960000001,
+      "tag": "0046_secure_org_invitations_reconcile",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1783980000000,
+      "tag": "0047_grant_money_model_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1783980000001,
+      "tag": "0048_budget_planned_amount_canonical",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1784480000000,
+      "tag": "0049_chronological_shared_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1785080000000,
+      "tag": "0050_durable_background_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1785080000001,
+      "tag": "0051_job_worker_heartbeats",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1785080000002,
+      "tag": "0052_auth_passkeys",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1785890000000,
+      "tag": "0053_campaign_audiences",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1785890000001,
+      "tag": "0054_campaign_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1785890000002,
+      "tag": "0055_artist_relationships",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1785890000003,
+      "tag": "0056_unified_events_restore",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1785970000000,
+      "tag": "0057_email_log_delivery_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1786060000000,
+      "tag": "0058_integration_core_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1786140000000,
+      "tag": "0059_grant_application_owner_membership",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1786140000001,
+      "tag": "0060_grant_document_extractions",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1786140000002,
+      "tag": "0061_analytics_duplicate_reviews",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1786140000003,
+      "tag": "0062_analytics_import_file_storage_provenance",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1786140000004,
+      "tag": "0063_sisense_staging_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1786140000005,
+      "tag": "0064_sisense_staging_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1786140000006,
+      "tag": "0065_ops_tasks_event_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1786140000007,
+      "tag": "0066_campaign_earned_media_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1786140000008,
+      "tag": "0067_campaign_outreach_communicator",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1786140000009,
+      "tag": "0068_campaign_public_radio_updates",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1786140000010,
+      "tag": "0069_campaign_public_page_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1786140000011,
+      "tag": "0070_campaign_public_page_pointer_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1786140000012,
+      "tag": "0071_campaign_rich_text_ai",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1786140000013,
+      "tag": "0072_campaign_revision",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1786140000014,
+      "tag": "0073_campaign_activity_proposal_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1786140000015,
+      "tag": "0074_royalty_decimal_schema_invariants",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1786140000016,
+      "tag": "0075_royalty_lifecycle_integrity",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1786140000017,
+      "tag": "0076_campaign_enrichment_local_tools",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1786140000018,
+      "tag": "0077_analytics_metric_rows_last_seen_membership",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1786140000019,
+      "tag": "0078_local_tool_auth_bootstrap",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1786140000020,
+      "tag": "0079_dashboard_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1786140000021,
+      "tag": "0080_invitation_auth_bootstrap",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1786812000000,
+      "tag": "0081_campaign_discovery_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1786812000001,
+      "tag": "0082_campaign_discovery_reviews",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1786812000002,
+      "tag": "0083_campaign_discovery_promotion",
+      "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1786812000003,
+      "tag": "0084_campaign_os_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1786812000004,
+      "tag": "0085_artist_bio_rich_text",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1786859346994,
+      "tag": "0086_release_delivery_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1786861568488,
+      "tag": "0087_finance_reconciliation",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1787872862000,
+      "tag": "0088_m0_catalog_quarantine",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1787959200000,
+      "tag": "0089_m0_stale_crosswalk_repair",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1789466400000,
+      "tag": "0090_release_workback",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1789466400001,
+      "tag": "0091_task_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1789479000000,
+      "tag": "0092_calendar_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1790424000000,
+      "tag": "0093_artist_portal",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1790424000001,
+      "tag": "0094_native_task_authority",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1790460044945,
+      "tag": "0095_private_resource_uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1790499600000,
+      "tag": "0096_notification_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1790499600001,
+      "tag": "0097_notification_devices",
+      "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1790499600002,
+      "tag": "0098_notification_intents",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1790499600003,
+      "tag": "0099_notification_deliveries",
+      "breakpoints": true
+    },
+    {
+      "idx": 92,
+      "version": "7",
+      "when": 1790499600004,
+      "tag": "0100_notification_device_attempts",
+      "breakpoints": true
+    }
+  ]
+}

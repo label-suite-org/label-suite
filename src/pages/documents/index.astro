@@ -1,0 +1,32 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { DocumentManager } from "../../components/documents/DocumentManager";
+import { listArtistOptions } from "../../server/artists";
+import { listContactOptions } from "../../server/contacts";
+import { listDocuments } from "../../server/documents";
+import { listReleaseOptions } from "../../server/releases";
+import { listProjects } from "../../server/projects";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const documentRows = await listDocuments(orgId);
+const artistRows = await listArtistOptions(orgId);
+const releaseRows = await listReleaseOptions(orgId);
+const contactRows = await listContactOptions(orgId);
+const projectRows = await listProjects(orgId);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    <DocumentManager
+      client:load
+      initialDocuments={documentRows}
+      artists={artistRows}
+      releases={releaseRows}
+      contacts={contactRows}
+      projects={projectRows}
+      canMutate={canMutate}
+    />
+  </div>
+</AppLayout>

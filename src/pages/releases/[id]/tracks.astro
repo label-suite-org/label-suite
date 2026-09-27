@@ -1,0 +1,22 @@
+---
+import AppLayout from "../../../layouts/AppLayout.astro";
+import { getReleaseDetail } from "../../../server/releases";
+import { listTracksForRelease, listWorkOptions } from "../../../server/tracks";
+import { TrackEditorWorkspace } from "../../../components/tracks/TrackEditorWorkspace";
+import { serializeClientCapabilities } from "../../../server/tenant";
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect("/releases");
+
+const orgId = Astro.locals.orgId!;
+const release = await getReleaseDetail(orgId, id);
+const trackRows = await listTracksForRelease(orgId, id);
+const workRows = await listWorkOptions(orgId);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  {!release ? <p class="text-muted-foreground">Release not found.</p> : (
+    <TrackEditorWorkspace client:load release={release} tracks={trackRows} works={workRows} canMutate={canMutate} />
+  )}
+</AppLayout>

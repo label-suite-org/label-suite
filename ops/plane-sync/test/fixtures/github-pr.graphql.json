@@ -1,0 +1,32 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 129,
+        "state": "MERGED",
+        "isDraft": false,
+        "merged": true,
+        "mergedAt": "2026-08-01T12:25:00Z",
+        "closedAt": "2026-08-01T12:25:00Z",
+        "url": "https://github.com/label-suite-org/label-suite_neon_r2/pull/129",
+        "updatedAt": "2026-08-01T12:25:00Z",
+        "closingIssuesReferences": {
+          "totalCount": 2,
+          "pageInfo": { "hasNextPage": false },
+          "nodes": [
+            {
+              "number": 128,
+              "url": "https://github.com/label-suite-org/label-suite_neon_r2/issues/128",
+              "repository": { "nameWithOwner": "label-suite-org/label-suite_neon_r2" }
+            },
+            {
+              "number": 44,
+              "url": "https://github.com/another-org/other-repo/issues/44",
+              "repository": { "nameWithOwner": "another-org/other-repo" }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

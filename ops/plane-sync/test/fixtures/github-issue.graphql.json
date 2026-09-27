@@ -1,0 +1,20 @@
+{
+  "data": {
+    "repository": {
+      "issue": {
+        "number": 128,
+        "title": "Synchronize authoritative GitHub delivery state",
+        "state": "OPEN",
+        "stateReason": null,
+        "labels": {
+          "nodes": [
+            { "name": "status:review" },
+            { "name": "priority:high" }
+          ]
+        },
+        "url": "https://github.com/label-suite-org/label-suite_neon_r2/issues/128",
+        "updatedAt": "2026-08-01T12:15:00Z"
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listArtistOptions } from "../../server/artists";
+import { listMediaAssets } from "../../server/media-assets";
+import { listReleaseOptions } from "../../server/releases";
+import { MediaAssetManager } from "../../components/media-assets/MediaAssetManager";
+import { serializeClientCapabilities } from "../../server/tenant";
+import { listProjects } from "../../server/projects";
+
+const orgId = Astro.locals.orgId!;
+const assetRows = await listMediaAssets(orgId);
+const artistRows = await listArtistOptions(orgId);
+const releaseRows = await listReleaseOptions(orgId);
+const projectRows = await listProjects(orgId);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    <MediaAssetManager
+      client:load
+      initialAssets={assetRows}
+      artists={artistRows}
+      releases={releaseRows}
+      projects={projectRows}
+      canMutate={canMutate}
+    />
+  </div>
+</AppLayout>

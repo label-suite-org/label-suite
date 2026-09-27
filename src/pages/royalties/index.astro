@@ -1,0 +1,37 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listArtistOptions } from "../../server/artists";
+import { listReleaseOptions } from "../../server/releases";
+import { listRoyaltyRecords } from "../../server/royalties";
+import { getMasterPayoutPreview, getRoyaltiesDashboard } from "../../server/royalties-dashboard";
+import { getRoyaltyPipelineSummary } from "../../server/royalty-ledger";
+import { RoyaltyManager } from "../../components/royalties/RoyaltyManager";
+import type { RoyaltyRecord } from "../../components/royalties/RoyaltyForm";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const [royaltyRows, dashboard, payoutPreview, pipeline, artistRows, releaseRows] = await Promise.all([
+  listRoyaltyRecords(orgId),
+  getRoyaltiesDashboard(orgId),
+  getMasterPayoutPreview(orgId),
+  getRoyaltyPipelineSummary(orgId),
+  listArtistOptions(orgId),
+  listReleaseOptions(orgId),
+]);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    <RoyaltyManager
+      client:load
+      dashboard={dashboard}
+      pipeline={pipeline}
+      initialRecords={royaltyRows as Array<RoyaltyRecord & { artist_name?: string | null; release_title?: string | null }>}
+      payoutPreview={payoutPreview}
+      artists={artistRows}
+      releases={releaseRows}
+      canMutate={canMutate}
+    />
+  </div>
+</AppLayout>

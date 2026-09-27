@@ -1,0 +1,18 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import { CatalogWorkspace } from "../components/catalog/CatalogWorkspace";
+import { listCatalogEntries, listCatalogReleaseOptions } from "../server/catalog";
+import { serializeClientCapabilities } from "../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const [entries, releaseOptions] = await Promise.all([
+  listCatalogEntries(orgId),
+  listCatalogReleaseOptions(orgId),
+]);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+
+---
+
+<AppLayout>
+  <CatalogWorkspace client:load initialEntries={entries} releaseOptions={releaseOptions} canMutate={canMutate} />
+</AppLayout>

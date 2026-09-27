@@ -1,0 +1,33 @@
+---
+import "../../styles/global.css";
+import { InvitationGate } from "../../components/auth/InvitationGate";
+
+export const prerender = false;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Label Suite — Workspace invitation</title>
+    <script is:inline>
+      (() => {
+        const token = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+        if (!token) return;
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+        fetch("/invite/exchange", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        }).then((response) => {
+          if (response.ok) window.location.replace("/invite/continue");
+        });
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-background flex items-center justify-center p-4 antialiased">
+    <InvitationGate client:load authenticated={Boolean(Astro.locals.user)} />
+  </body>
+</html>

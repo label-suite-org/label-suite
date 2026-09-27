@@ -1,0 +1,41 @@
+# build output
+dist/
+# generated types
+.astro/
+
+# dependencies
+node_modules/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# generated audit reports
+AIRTABLE_PARITY_REPORT.md
+
+# local ingestion snapshots and browser failure screenshots
+.data/
+
+# environment variables
+.env
+.env.*
+.dburl
+
+# local tooling metadata and generated review artifacts
+.hermes/
+.omc/
+.omx/
+.worktrees/
+outputs/
+
+# macOS-specific files
+.DS_Store
+
+# jetbrains setting folder
+.idea/
+
+# Swift Package Manager build output
+ios/LabelSuite/.build/
+ios/LabelSuite/build/

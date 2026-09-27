@@ -1,0 +1,12 @@
+{
+  "id": "work-item-128",
+  "name": "Curated roadmap title",
+  "description_html": "<p>Manual roadmap note</p><!-- plane-sync:source:start --><p>old source</p><!-- plane-sync:source:end --><p>Manual owner tail</p>",
+  "state": "todo-state",
+  "priority": "urgent",
+  "labels": [
+    { "id": "manual-label", "name": "Manually curated" },
+    { "id": "review-label", "name": "GitHub review" }
+  ],
+  "module_ids": ["product-module"]
+}

@@ -1,0 +1,520 @@
+/* Tailwind v4 imports */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Custom base styles */
+body {
+  font-family: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: 'Geist Variable', sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 18%);
+  --input: oklch(1 0 0 / 24%);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 20%);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+/* Public Fountain radio update: a warm, cardless editorial press sheet. */
+.fountain-press-page {
+  --fountain-paper: #f7f4ec;
+  --fountain-ink: #171818;
+  --fountain-muted: #696963;
+  --fountain-rule: #d8d3c8;
+  --fountain-cobalt: #31518f;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--fountain-paper);
+  color: var(--fountain-ink);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.fountain-press-shell {
+  width: min(100% - 3rem, 72rem);
+  margin: 0 auto;
+  padding: 2rem 0 1.5rem;
+}
+
+.fountain-press-header,
+.fountain-press-footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--fountain-rule);
+  padding-bottom: 1rem;
+}
+
+.fountain-press-kicker,
+.fountain-press-label,
+.fountain-press-footer,
+.fountain-press-facts,
+.fountain-press-contact,
+.fountain-press-duration,
+.fountain-press-credits {
+  font-family: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.fountain-press-kicker {
+  margin: 0;
+  color: var(--fountain-cobalt);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.fountain-press-label {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-align: right;
+}
+
+.fountain-press-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: clamp(2rem, 7vw, 7rem);
+  padding: clamp(3rem, 9vw, 8rem) 0 clamp(5rem, 12vw, 10rem);
+}
+
+.fountain-press-artwork {
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #e8e1d3;
+  aspect-ratio: 1;
+}
+
+.fountain-press-artwork img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.fountain-press-artwork:hover img,
+.fountain-press-artwork:focus-within img {
+  transform: scale(1.025);
+}
+
+.fountain-press-intro-copy {
+  max-width: 34rem;
+}
+
+.fountain-press-intro h1 {
+  max-width: 9ch;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: clamp(3.5rem, 9vw, 8.5rem);
+  font-weight: 400;
+  letter-spacing: -0.07em;
+  line-height: 0.86;
+}
+
+.fountain-press-note {
+  max-width: 31rem;
+  overflow-wrap: anywhere;
+  margin: 2rem 0 2.25rem;
+  font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+  line-height: 1.45;
+}
+
+.fountain-press-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.65rem;
+}
+
+.fountain-press-action {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid var(--fountain-cobalt);
+  padding: 0.75rem 1rem;
+  color: var(--fountain-cobalt);
+  font-family: "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.76rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.fountain-press-action-primary {
+  background: var(--fountain-cobalt);
+  color: var(--fountain-paper);
+}
+
+.fountain-press-action:hover,
+.fountain-press-action:focus-visible {
+  background: #203b70;
+  color: var(--fountain-paper);
+}
+
+.fountain-press-action-arrow {
+  display: inline-block;
+  transition: transform 180ms ease;
+}
+
+.fountain-press-action:hover .fountain-press-action-arrow,
+.fountain-press-action:focus-visible .fountain-press-action-arrow {
+  transform: translate(0.18rem, -0.18rem);
+}
+
+.fountain-press-section {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.35fr) minmax(0, 1fr);
+  gap: clamp(2rem, 8vw, 8rem);
+  border-top: 1px solid var(--fountain-rule);
+  padding: 2rem 0 clamp(5rem, 11vw, 9rem);
+}
+
+.fountain-press-section-heading h2 {
+  margin: 0.6rem 0 0;
+  font-size: clamp(1.75rem, 3vw, 2.8rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+}
+
+.fountain-press-track-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fountain-press-track {
+  border-bottom: 1px solid var(--fountain-rule);
+  padding: 0 0 1.4rem;
+}
+
+.fountain-press-track + .fountain-press-track {
+  padding-top: 1.4rem;
+}
+
+.fountain-press-track-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.fountain-press-track h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: clamp(1.3rem, 2.5vw, 2.15rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.fountain-press-duration {
+  color: var(--fountain-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fountain-press-credits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  color: var(--fountain-muted);
+  font-size: 0.74rem;
+  list-style: none;
+}
+
+.fountain-press-credits li {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.fountain-press-credits li span + span::before {
+  content: "·";
+  margin-right: 0.35rem;
+}
+
+.fountain-press-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 2rem 4rem;
+  margin: 0;
+}
+
+.fountain-press-facts div {
+  min-width: 8rem;
+}
+
+.fountain-press-facts dt,
+.fountain-press-contact span {
+  color: var(--fountain-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fountain-press-facts dd {
+  margin: 0.45rem 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.2rem;
+}
+
+.fountain-press-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.fountain-press-contact a {
+  color: var(--fountain-cobalt);
+  font-size: 1rem;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.fountain-press-footer {
+  border-top: 1px solid var(--fountain-rule);
+  border-bottom: 0;
+  padding: 1rem 0 0;
+  color: var(--fountain-muted);
+  font-size: 0.72rem;
+}
+
+.fountain-press-footer p {
+  margin: 0;
+}
+
+.fountain-press-action:focus-visible,
+.fountain-press-contact a:focus-visible {
+  outline: 3px solid #8da8df;
+  outline-offset: 3px;
+}
+
+.fountain-press-enter {
+  animation: fountain-press-rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.fountain-press-enter-two { animation-delay: 80ms; }
+.fountain-press-enter-three { animation-delay: 160ms; }
+
+@keyframes fountain-press-rise {
+  from { opacity: 0; transform: translateY(0.8rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(*, *::before, *::after) {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .fountain-press-enter,
+  .fountain-press-artwork img,
+  .fountain-press-action-arrow,
+  .fountain-press-action {
+    animation: none;
+    transition: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .fountain-press-shell {
+    width: min(100% - 2rem, 42rem);
+    padding-top: 1.25rem;
+  }
+
+  .fountain-press-intro {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+    padding: 3rem 0 5rem;
+  }
+
+  .fountain-press-artwork {
+    max-width: 34rem;
+  }
+
+  .fountain-press-intro-copy {
+    max-width: none;
+  }
+
+  .fountain-press-intro h1 {
+    max-width: 10ch;
+    font-size: clamp(3.4rem, 17vw, 6.5rem);
+  }
+
+  .fountain-press-section {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    padding-bottom: 5rem;
+  }
+
+  .fountain-press-actions {
+    flex-direction: column;
+  }
+
+  .fountain-press-action {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .fountain-press-shell {
+    width: min(100% - 1.25rem, 24rem);
+  }
+
+  .fountain-press-header,
+  .fountain-press-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .fountain-press-label {
+    text-align: left;
+  }
+
+  .fountain-press-intro {
+    padding-top: 2rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  :where([class*="rounded"]) {
+    border-radius: 0 !important;
+  }
+  :where([class*="rounded"])::before,
+  :where([class*="rounded"])::after {
+    border-radius: 0 !important;
+  }
+}

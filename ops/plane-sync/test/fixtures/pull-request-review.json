@@ -1,0 +1,29 @@
+{
+  "action": "submitted",
+  "pull_request": {
+    "number": 127,
+    "body": "The pull request description is not routing data.",
+    "updated_at": "2026-08-01T20:21:22Z"
+  },
+  "review": {
+    "body": "The review body is private to GitHub and must be discarded.",
+    "submitted_at": "2026-08-01T20:21:22Z"
+  },
+  "installation": {
+    "id": 123456,
+    "token": "installation-token-must-not-be-retained"
+  },
+  "repository": {
+    "name": "label-suite_neon_r2",
+    "full_name": "label-suite-org/label-suite_neon_r2",
+    "owner": {
+      "login": "label-suite-org"
+    },
+    "updated_at": "2026-08-01T20:21:22Z"
+  },
+  "sender": {
+    "login": "reviewer",
+    "name": "Another Sensitive Profile Name",
+    "avatar_url": "https://avatars.example.test/reviewer"
+  }
+}

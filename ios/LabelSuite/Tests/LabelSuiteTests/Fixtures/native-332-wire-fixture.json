@@ -1,0 +1,751 @@
+{
+  "campaign": {
+    "id": "sections-campaign-b872d180-af50-43ba-8131-8af6eb9c591b",
+    "name": "Fixture",
+    "revision": 2,
+    "updated_at": "2026-09-17T02:14:45.013Z"
+  },
+  "content": {
+    "selection": {
+      "reviewed_template_id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-0",
+      "channel": "email",
+      "provider": "brevo",
+      "source_version": 2,
+      "source_references": {
+        "release_id": null,
+        "artist_id": null,
+        "document_ids": [],
+        "media_asset_ids": []
+      },
+      "template": {
+        "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-0",
+        "name": "Template 0",
+        "subject": "Fixture subject",
+        "body": "Fixture body",
+        "channel": "email",
+        "current_version": 1,
+        "review_status": "draft"
+      }
+    },
+    "template_options": {
+      "items": [
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-29",
+          "name": "Template 29",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-28",
+          "name": "Template 28",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-27",
+          "name": "Template 27",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-26",
+          "name": "Template 26",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-25",
+          "name": "Template 25",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-24",
+          "name": "Template 24",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-23",
+          "name": "Template 23",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-22",
+          "name": "Template 22",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-21",
+          "name": "Template 21",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-20",
+          "name": "Template 20",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-19",
+          "name": "Template 19",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-18",
+          "name": "Template 18",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-17",
+          "name": "Template 17",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-16",
+          "name": "Template 16",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-15",
+          "name": "Template 15",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-14",
+          "name": "Template 14",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-13",
+          "name": "Template 13",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-12",
+          "name": "Template 12",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-11",
+          "name": "Template 11",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-10",
+          "name": "Template 10",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-9",
+          "name": "Template 9",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-8",
+          "name": "Template 8",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-7",
+          "name": "Template 7",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-6",
+          "name": "Template 6",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-template-5",
+          "name": "Template 5",
+          "subject": "Fixture subject",
+          "channel": "email",
+          "current_version": 1,
+          "review_status": "draft",
+          "source_version": 2
+        }
+      ],
+      "truncated": true
+    },
+    "rich_content": {
+      "read_only": true,
+      "goal_document": {
+        "available": true,
+        "read_only": true,
+        "document": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Fixture rich text",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "notes_document": {
+        "available": false,
+        "read_only": true,
+        "reason": "invalid_or_oversized_document"
+      },
+      "brief_document": {
+        "available": false,
+        "read_only": true,
+        "reason": "invalid_or_oversized_document"
+      }
+    }
+  },
+  "audience": {
+    "selection": {
+      "campaign_audience_id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-0",
+      "audience_id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-0",
+      "name": "Audience 0",
+      "description": null,
+      "counts": {
+        "available": true,
+        "values": {
+          "explicit_contact_members": 0,
+          "explicit_station_members": 0,
+          "included_contacts": 0,
+          "excluded_contacts": 0,
+          "included_stations": 0,
+          "excluded_stations": 0
+        }
+      },
+      "included_contacts": {
+        "items": [],
+        "truncated": false
+      },
+      "excluded_contacts": {
+        "items": [],
+        "truncated": false
+      },
+      "included_stations": {
+        "items": [],
+        "truncated": false
+      },
+      "excluded_stations": {
+        "items": [],
+        "truncated": false
+      }
+    },
+    "options": {
+      "items": [
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-29",
+          "name": "Audience 29",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.060Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-28",
+          "name": "Audience 28",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.059Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-27",
+          "name": "Audience 27",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.059Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-26",
+          "name": "Audience 26",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.059Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-25",
+          "name": "Audience 25",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.058Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-24",
+          "name": "Audience 24",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.058Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-23",
+          "name": "Audience 23",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.058Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-22",
+          "name": "Audience 22",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.057Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-21",
+          "name": "Audience 21",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.057Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-20",
+          "name": "Audience 20",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.057Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-19",
+          "name": "Audience 19",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.056Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-18",
+          "name": "Audience 18",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.056Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-17",
+          "name": "Audience 17",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.055Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-16",
+          "name": "Audience 16",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.055Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-15",
+          "name": "Audience 15",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.055Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-14",
+          "name": "Audience 14",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.054Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-13",
+          "name": "Audience 13",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.054Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-12",
+          "name": "Audience 12",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.054Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-11",
+          "name": "Audience 11",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.053Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-10",
+          "name": "Audience 10",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.053Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-9",
+          "name": "Audience 9",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.053Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-8",
+          "name": "Audience 8",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.052Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-7",
+          "name": "Audience 7",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.052Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-6",
+          "name": "Audience 6",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.052Z"
+        },
+        {
+          "id": "b872d180-af50-43ba-8131-8af6eb9c591b-audience-5",
+          "name": "Audience 5",
+          "description": null,
+          "membership_rules": {
+            "include_contact_roles": [],
+            "exclude_contact_roles": [],
+            "require_contact_email": true,
+            "exclude_contact_ids": [],
+            "include_station_states": [],
+            "exclude_station_states": [],
+            "require_station_email": true,
+            "exclude_station_ids": []
+          },
+          "updated_at": "2026-09-17T02:14:45.051Z"
+        }
+      ],
+      "truncated": true
+    }
+  },
+  "channels": {
+    "available": false,
+    "reason": "not_configured",
+    "message": "Campaign channel configuration is not available in this API."
+  },
+  "boundaries": {
+    "can_send": false,
+    "send_performed": false,
+    "editable": [
+      "select_template",
+      "attach_audience",
+      "detach_audience"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+---
+import "../styles/global.css";
+import { ArtistPortal } from "../components/artist-portal/ArtistPortal";
+export const prerender = false;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Artist archive — Label Suite</title>
+  </head>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <ArtistPortal client:load />
+    <noscript><p class="p-8">Please enable JavaScript to open your private archive and send details.</p></noscript>
+  </body>
+</html>

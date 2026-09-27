@@ -1,0 +1,15 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import ProjectWorkspace from "../../components/projects/ProjectWorkspace";
+import { getProjectWorkspaceDetail } from "../../server/project-workspace";
+
+const orgId = Astro.locals.orgId!;
+const id = Astro.params.id;
+if (!id) return Astro.redirect("/projects");
+const detail = await getProjectWorkspaceDetail(orgId, id);
+if (!detail) return Astro.redirect("/projects");
+---
+
+<AppLayout title={detail.workspace.name}>
+  <ProjectWorkspace client:load workspace={detail.workspace} options={detail.options} initialTab={Astro.url.searchParams.get("tab")} />
+</AppLayout>

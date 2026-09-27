@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+const url = new URL(process.env.DATABASE_URL ?? "http://invalid");
+assert.equal(process.env.NATIVE_PROVIDER_DISPOSABLE_TEST, "1");
+assert.ok(["localhost", "127.0.0.1"].includes(url.hostname));
+assert.equal(url.pathname, "/native_provider_fixture");
+const { getNativeReleaseProviderContext } = await import("../src/server/native-release-provider-context");
+const { getReleaseSamplyProviderContext } = await import("../src/server/samply-release");
+const { listDspPitchesForRelease } = await import("../src/server/dsp-pitches");
+const { pool } = await import("../src/lib/db");
+try {
+  const own = await getReleaseSamplyProviderContext("own", "release-a");
+  assert.equal(own.fileCount, 2);
+  assert.equal(own.unresolvedFileCount, 1);
+  assert.equal(own.connectionStatus, "verified");
+  assert.equal(own.lastSyncedAt, "2026-09-01T00:00:00.000Z");
+  const foreign = await getReleaseSamplyProviderContext("own", "release-foreign");
+  assert.equal(foreign.projectLinked, false);
+  assert.equal(foreign.fileCount, 0);
+  assert.deepEqual(await listDspPitchesForRelease("own", "release-foreign"), []);
+  const pitches = await listDspPitchesForRelease("own", "release-a");
+  assert.equal(pitches.length, 50, "Existing web contract must not truncate at twenty");
+  assert.ok(pitches.every(p => p.platform === "Fixture DSP"));
+  const context = await getNativeReleaseProviderContext("own", "release-a");
+  assert.equal(context.audio.state, "partial");
+  assert.equal(context.audio.freshness.state, "unknown");
+  assert.equal(context.audio.access.state, "metadata_only");
+  assert.equal(context.dsp.pitches.length, 20);
+  assert.equal(context.dsp.has_more, true);
+  assert.ok(context.dsp.pitches.every(p => p.sent_date !== null), "Unsent drafts must not displace dated pitches in the bounded native list");
+  assert.equal(context.dsp.freshness.observed_at, "2026-09-26T00:00:00.000Z");
+  assert.ok(context.dsp.pitches.every(p => p.platform === "Fixture DSP"));
+  assert.ok(!JSON.stringify(context).includes("http"));
+  const failed = await getNativeReleaseProviderContext("failed-org", "unlinked");
+  assert.equal(failed.audio.state, "failure");
+  console.log("PASS actual PostgreSQL: foreign project/files/pitches excluded, cross-tenant DSP join excluded, web >20 records preserved, native bounded, failed/unlinked state truthful");
+} finally { await pool.end(); }

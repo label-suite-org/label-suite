@@ -1,0 +1,226 @@
+---
+import type { AnalyticsSummaryResult } from "../../server/analytics";
+import { widgetTitle } from "../../server/analytics";
+
+interface Props {
+  analytics: AnalyticsSummaryResult;
+  emptyLabel?: string;
+  emptyHref?: string;
+  emptyActionLabel?: string;
+}
+
+const {
+  analytics,
+  emptyLabel = "No linked analytics yet.",
+  emptyHref,
+  emptyActionLabel = "Open analytics",
+} = Astro.props;
+
+const summaryCards = [
+  { label: "Rows", value: analytics.totalRows.toLocaleString(), meta: "Imported metric rows" },
+  { label: "Widgets", value: analytics.totalWidgets.toLocaleString(), meta: "Linked CSV exports" },
+  { label: "Tracks", value: analytics.totalLinkedTracks.toLocaleString(), meta: "Matched app tracks" },
+  { label: "Last Sync", value: shortDate(analytics.lastSeenAt), meta: longDate(analytics.lastSeenAt) },
+];
+const tracksByGrowth = analytics.tracksByGrowth;
+const trackGrowthCards = tracksByGrowth
+  ? [
+      { label: "Combined streams", value: tracksByGrowth.streamTotals.combinedStreams },
+      { label: "Spotify", value: tracksByGrowth.streamTotals.spotifyStreams },
+      { label: "Apple", value: tracksByGrowth.streamTotals.appleStreams },
+      { label: "Amazon", value: tracksByGrowth.streamTotals.amazonStreams },
+      { label: "Pandora", value: tracksByGrowth.streamTotals.pandoraStreams },
+    ].filter((card) => card.value > 0 || card.label === "Combined streams")
+  : [];
+const trackGrowthMeta = tracksByGrowth
+  ? [
+      tracksByGrowth.aggregationLabel,
+      tracksByGrowth.rangeLabel,
+      tracksByGrowth.lastSeenAt ? `Synced ${longDate(tracksByGrowth.lastSeenAt)}` : null,
+    ].filter(Boolean)
+  : [];
+const trackGrowthRangeCards = tracksByGrowth?.availableRanges ?? [];
+
+function shortDate(value: Date | string | null): string {
+  const date = toDate(value);
+  if (!date) return "—";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function longDate(value: Date | string | null): string {
+  const date = toDate(value);
+  if (!date) return "Waiting for import";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function toDate(value: Date | string | null): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString();
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) return "—";
+  return value.toLocaleString(undefined, {
+    style: "percent",
+    maximumFractionDigits: 1,
+  });
+}
+
+function growthClass(value: number | null): string {
+  if (value === null) return "text-muted-foreground";
+  if (value < 0) return "text-red-600";
+  if (value > 0) return "text-emerald-700";
+  return "text-muted-foreground";
+}
+---
+
+<section class="space-y-4">
+  <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 class="text-lg font-semibold">Distributor Analytics</h2>
+    </div>
+  </div>
+
+  {!analytics.widgets.length ? (
+    <div class="flex flex-col gap-2 text-sm text-muted-foreground">
+      <p>{emptyLabel}</p>
+      {emptyHref && (
+        <a href={emptyHref} class="text-xs font-medium text-foreground hover:text-muted-foreground">
+          {emptyActionLabel} →
+        </a>
+      )}
+    </div>
+  ) : (
+    <div class="space-y-4">
+      {tracksByGrowth && (
+        <div class="space-y-3">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h3 class="text-sm font-semibold">Tracks by Growth</h3>
+              <p class="text-xs text-muted-foreground">{trackGrowthMeta.join(" · ")}</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card md:grid-cols-3 xl:grid-cols-5">
+            {trackGrowthCards.map((card) => (
+              <div class="border-b border-r border-border p-3 last:border-r-0 md:[&:nth-child(3)]:border-r-0 xl:border-b-0 xl:[&:nth-child(3)]:border-r xl:last:border-r-0">
+                <p class="text-xs font-medium uppercase tracking-normal text-muted-foreground">{card.label}</p>
+                <p class="mt-1 text-2xl font-semibold leading-tight tabular-nums">{formatNumber(card.value)}</p>
+              </div>
+            ))}
+          </div>
+
+          {trackGrowthRangeCards.length > 1 && (
+            <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+              {trackGrowthRangeCards.map((range) => (
+                <div class="rounded-lg border border-border p-3">
+                  <p class="text-xs font-medium uppercase tracking-normal text-muted-foreground">
+                    {range.aggregationLabel} · {range.rangeLabel}
+                  </p>
+                  <div class="mt-1 flex items-baseline justify-between gap-3">
+                    <p class="text-xl font-semibold tabular-nums">{formatNumber(range.streamTotals.combinedStreams)}</p>
+                    <p class="text-xs text-muted-foreground">{range.rowCount.toLocaleString()} rows</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div class="overflow-x-auto rounded-lg border border-border">
+            <table class="min-w-full text-sm">
+              <thead class="bg-muted/50 text-xs font-medium text-muted-foreground">
+                <tr>
+                  <th class="px-3 py-2 text-left font-medium">Track</th>
+                  <th class="px-3 py-2 text-right font-medium">Combined</th>
+                  <th class="px-3 py-2 text-right font-medium">Growth</th>
+                  <th class="px-3 py-2 text-right font-medium">Spotify</th>
+                  <th class="px-3 py-2 text-right font-medium">Apple</th>
+                  <th class="px-3 py-2 text-right font-medium">Views</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border">
+                {tracksByGrowth.rows.map((row) => (
+                  <tr>
+                    <td class="max-w-[18rem] px-3 py-2">
+                      <p class="font-medium">{row.trackTitle}</p>
+                      <p class="truncate text-xs text-muted-foreground">
+                        {[row.primaryArtist, row.releaseTitle, row.appTrackTitle && row.appTrackTitle !== row.trackTitle ? row.appTrackTitle : null].filter(Boolean).join(" · ")}
+                      </p>
+                    </td>
+                    <td class="px-3 py-2 text-right font-semibold tabular-nums">{formatNumber(row.combinedStreams)}</td>
+                    <td class={`px-3 py-2 text-right font-medium tabular-nums ${growthClass(row.streamsGrowth)}`}>{formatPercent(row.streamsGrowth)}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{formatNumber(row.spotifyStreams)}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{formatNumber(row.appleStreams)}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">
+                      <p>{formatNumber(row.combinedViews)}</p>
+                      <p class={`text-xs ${growthClass(row.viewsGrowth)}`}>{formatPercent(row.viewsGrowth)}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        {summaryCards.map((card) => (
+          <div class="border border-border rounded-lg p-3 bg-card">
+            <p class="text-xs font-medium uppercase tracking-normal text-muted-foreground">{card.label}</p>
+            <p class="mt-1 text-2xl font-semibold leading-tight">{card.value}</p>
+            <p class="mt-1 text-xs text-muted-foreground truncate">{card.meta}</p>
+          </div>
+        ))}
+      </div>
+
+      <div class="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {analytics.widgets.map((widget) => (
+          <div class="border border-border rounded-lg p-3 bg-card">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-medium truncate">{widgetTitle(widget.widgetKey)}</p>
+                <p class="text-xs text-muted-foreground truncate">{widget.widgetKey}</p>
+              </div>
+              <p class="text-sm font-semibold tabular-nums">{widget.rowCount.toLocaleString()}</p>
+            </div>
+            <div class="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span>{widget.trackCount ? `${widget.trackCount.toLocaleString()} linked tracks` : "Record-level rows"}</span>
+              <span>{shortDate(widget.lastSeenAt)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div class="overflow-hidden border border-border rounded-lg">
+        <div class="hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)] gap-3 px-3 py-2 bg-muted/50 text-xs font-medium text-muted-foreground">
+          <span>Row</span>
+          <span>Dimensions</span>
+          <span>Metrics</span>
+        </div>
+        <div class="divide-y divide-border">
+          {analytics.recentRows.map((row) => (
+            <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_minmax(0,1fr)] gap-2 md:gap-3 p-3">
+              <div class="min-w-0">
+                <p class="text-sm font-medium truncate">{row.label}</p>
+                <p class="text-xs text-muted-foreground truncate">{widgetTitle(row.widgetKey)}</p>
+              </div>
+              <p class="text-xs text-muted-foreground md:truncate">{row.dimensionsPreview || "No dimensions"}</p>
+              <p class="text-xs font-medium md:truncate">{row.metricsPreview || "No metrics"}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+</section>

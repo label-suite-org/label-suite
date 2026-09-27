@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "entries": [
+    { "planeWorkItemId": "a3ebd828-0e4d-48b2-b63f-e9cf5edb68b2", "issueNumbers": [128], "moduleName": "Product Confidence & Delivery", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "af1bf65b-84f4-4e5f-8a06-85f282b36e34", "issueNumbers": [126], "moduleName": "Product Confidence & Delivery", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "3fefa416-afa2-4a0f-9c88-42a347f6625f", "issueNumbers": [120], "moduleName": "Product Confidence & Delivery", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "3120d015-2249-428e-ac8d-01f4e5aabf95", "issueNumbers": [125], "moduleName": "Product Confidence & Delivery", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "e935d1d1-2987-4704-9ac5-5d753a224ffc", "issueNumbers": [89], "moduleName": "Events, Tasks & Search", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "86be8fbc-272b-499a-88f1-bb8a6bfd0aa4", "issueNumbers": [88], "moduleName": "Content, Assets & Budgets", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "76d72360-65db-4d69-a7a9-16a229ddbb92", "issueNumbers": [87], "moduleName": "Content, Assets & Budgets", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "897c9812-aa27-4964-b0be-383c2fde3e8d", "issueNumbers": [10, 56, 57, 59], "moduleName": "Directory & Campaigns", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "2504e333-d4e2-471c-9da5-4728d6bf2abe", "issueNumbers": [84, 86], "moduleName": "Directory & Campaigns", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "88d37935-f54a-4664-b45f-1cfa934db21f", "issueNumbers": [25, 85], "moduleName": "Artists, Releases & Rights", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "10b19450-0ec3-43b6-b3ff-0ebcc92a4afe", "issueNumbers": [62, 81, 105, 106], "moduleName": "Product Confidence & Delivery", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "039ca0e2-1603-4da3-bfd5-61fcbec9b0b2", "issueNumbers": [83], "moduleName": "Analytics & Forecasting", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "7291d7a2-259d-4605-b2fe-abac7b1257ab", "issueNumbers": [82, 106], "moduleName": "Analytics & Forecasting", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "41b1711a-8f18-433a-9609-143871b9ada0", "issueNumbers": [101, 115], "moduleName": "Product Confidence & Delivery", "managedFields": ["state", "milestones"], "curatedTitle": true },
+    { "planeWorkItemId": "d2c1f1e8-c690-434c-b5a2-7359b2388f4b", "issueNumbers": [81, 82, 90, 120, 125, 126], "moduleName": "Product Confidence & Delivery", "managedFields": ["state", "milestones"], "curatedTitle": true }
+  ]
+}

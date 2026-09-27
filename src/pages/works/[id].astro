@@ -1,0 +1,19 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { getWorkDetail } from "../../server/works";
+import { WorkClearanceWorkspace } from "../../components/works/WorkClearanceWorkspace";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect("/works");
+
+const orgId = Astro.locals.orgId!;
+const { work, roles: roleRows, contacts: contactRows, tracks: trackRows } = await getWorkDetail(orgId, id);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  {!work ? <p class="text-muted-foreground">Work not found.</p> : (
+    <WorkClearanceWorkspace client:load work={work} roles={roleRows} contacts={contactRows} tracks={trackRows} canMutate={canMutate} />
+  )}
+</AppLayout>

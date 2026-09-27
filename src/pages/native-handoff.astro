@@ -1,0 +1,54 @@
+---
+import "../styles/global.css";
+import { getNativeHandoff } from "../server/native-settings";
+import { HttpError } from "../server/errors";
+import { ZodError } from "zod";
+import { ACTIVE_ORG_COOKIE } from "../server/tenant";
+import { requireSameOrigin } from "../server/request-security";
+
+export const prerender = false;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
+let handoff: Awaited<ReturnType<typeof getNativeHandoff>> | undefined;
+let error = "";
+const user = Astro.locals.user;
+try {
+  if (!["GET", "POST"].includes(Astro.request.method)) throw new HttpError("Method not allowed", 405);
+  if (Astro.request.method === "POST") requireSameOrigin(Astro.request);
+  if (user) {
+    handoff = await getNativeHandoff(user.id, Object.fromEntries(Astro.url.searchParams));
+    if (Astro.request.method === "POST") {
+      Astro.cookies.set(ACTIVE_ORG_COOKIE, handoff.workspaceId, { httpOnly: true, sameSite: "lax", secure: Astro.url.protocol === "https:", path: "/" });
+      return Astro.redirect(handoff.destination, 303);
+    }
+  } else Astro.response.status = 401;
+} catch (cause) {
+  if (!(cause instanceof HttpError) && !(cause instanceof ZodError)) throw cause;
+  Astro.response.status = cause instanceof HttpError ? cause.status : 400;
+  error = cause instanceof HttpError ? cause.message : "Unable to open this destination. Return to Label Suite and try again.";
+}
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width" /><title>Continue in Label Suite</title></head>
+  <body class="min-h-screen bg-background text-foreground p-6">
+    <main class="mx-auto max-w-lg space-y-5 py-12">
+      <h1 class="text-2xl font-semibold">Continue in Label Suite</h1>
+      {error ? <p role="alert">{error}</p> : !user ? <>
+        <p>Sign in to the website, then return to the app and reopen this action. Your app session is not shared with the browser.</p>
+        <a class="underline" href="/login">Sign in</a>
+      </> : handoff && <>
+        <h2 class="text-xl font-semibold">{handoff.title}</h2>
+        <p>Workspace: <strong>{handoff.workspaceName}</strong></p>
+        <p>Signed in as {user.name}</p>
+        <p>{handoff.reason}</p><p>{handoff.risk}</p>
+        <details><summary>Why this stays on the web</summary><p>{handoff.reconsiderWhen}</p></details>
+        <p>Destination: <code>{handoff.destination}</code></p>
+        <p>This changes the website’s selected workspace. Check the workspace name before continuing.</p>
+        <form method="post"><button class="rounded bg-primary text-primary-foreground px-4 py-2" type="submit">Continue to this workspace</button></form>
+      </>}
+      <p class="text-sm">Return to the Label Suite app when finished. Opening a web page does not confirm that an operation succeeded.</p>
+    </main>
+  </body>
+</html>

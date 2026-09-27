@@ -1,0 +1,55 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listArtistOptions } from "../../server/artists";
+import { listBudgetProjects } from "../../server/budget-dashboard";
+import { listCampaignOptions } from "../../server/campaigns";
+import { listContactOptions } from "../../server/contacts";
+import { listOpsTasks, listTaskPlanningOptions } from "../../server/ops-tasks";
+import { listProjectEvents } from "../../server/project-events";
+import { listReleaseOptions } from "../../server/releases";
+import { OpsTaskManager } from "../../components/ops-tasks/OpsTaskManager";
+import type { OpsTask } from "../../components/ops-tasks/OpsTaskForm";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const [taskRows, artistRows, releaseRows, campaignRows, contactRows, projectRows, eventRows] = await Promise.all([
+  listOpsTasks(orgId),
+  listArtistOptions(orgId),
+  listReleaseOptions(orgId),
+  listCampaignOptions(orgId),
+  listContactOptions(orgId),
+  listBudgetProjects(orgId),
+  listProjectEvents(orgId),
+]);
+const planningOptions = await listTaskPlanningOptions(orgId);
+const initialTaskId = Astro.url.searchParams.get("task");
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    <OpsTaskManager
+      client:load
+      planningOptions={planningOptions}
+      initialTaskId={initialTaskId}
+      initialTasks={taskRows as Array<OpsTask & {
+        id: string;
+        artist_name?: string | null;
+        release_title?: string | null;
+        campaign_name?: string | null;
+        contact_name?: string | null;
+        owner_contact_name?: string | null;
+        project_name?: string | null;
+        event_title?: string | null;
+        event_start_date?: string | null;
+      }>}
+      artists={artistRows}
+      releases={releaseRows}
+      campaigns={campaignRows}
+      contacts={contactRows}
+      projects={projectRows.map((project) => ({ id: project.id, name: project.name }))}
+      events={eventRows.map((event) => ({ id: event.id, title: event.title, start_date: event.start_date }))}
+      canMutate={canMutate}
+    />
+  </div>
+</AppLayout>

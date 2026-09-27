@@ -1,0 +1,57 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import BudgetDepartment from "../components/budget/BudgetDepartment";
+import { listBudgetProjects, listBudgetGrantGuidance } from "../server/budget-dashboard";
+import { listBudgetItems } from "../server/budget-items";
+import { listArtistOptions } from "../server/artists";
+import { listReleaseOptions } from "../server/releases";
+import { serializeClientCapabilities } from "../server/tenant";
+import { formatCoverageMoney } from "../components/funding/money";
+
+const orgId = Astro.locals.orgId!;
+const capabilities = serializeClientCapabilities(Astro.locals.membershipRole ?? "member");
+const projects = await listBudgetProjects(orgId);
+const grantGuidance = await listBudgetGrantGuidance(orgId);
+const artistOptions = await listArtistOptions(orgId);
+const releaseOptions = await listReleaseOptions(orgId);
+
+// Legacy lines not attached to any project (kept visible, read-only)
+const legacyItems = await listBudgetItems(orgId);
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    <BudgetDepartment
+      client:load
+      workspaceId={orgId}
+      projects={projects}
+      grantGuidance={grantGuidance}
+      initialProjectId={Astro.url.searchParams.get("project")}
+      hasLegacyItems={legacyItems.length > 0}
+      artistOptions={artistOptions}
+      releaseOptions={releaseOptions}
+      canMutate={capabilities["budgets.mutate"]}
+      canDecideVariance={capabilities["variance.decide"]}
+    />
+
+    {legacyItems.length > 0 && (
+      <details class="rounded-lg border border-border bg-card p-4">
+        <summary class="text-sm font-medium cursor-pointer">Legacy / unassigned budget items ({legacyItems.length})</summary>
+        <div class="mt-3 space-y-2">
+          {legacyItems.map((i) => (
+            <div class="flex items-center justify-between text-sm">
+              <div class="min-w-0 flex-1">
+                <p class="font-medium truncate">{i.name}</p>
+                <p class="text-xs text-muted-foreground truncate">{i.release_title ?? "—"} · {i.category_name ?? "Uncategorized"}</p>
+              </div>
+              <div class="flex items-center gap-3 ml-4">
+                <span class="font-medium">{formatCoverageMoney(i.amount ?? 0, "DKK")}</span>
+                <span class="text-xs px-2 py-0.5 rounded bg-muted">{i.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </details>
+    )}
+  </div>
+</AppLayout>

@@ -1,0 +1,26 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listWorkPriorities } from "../../server/works";
+import { WorkCreateDialog } from "../../components/works/WorkActionButtons";
+import { WorksList } from "../../components/works/WorksList";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const workRows = await listWorkPriorities(orgId);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    {!workRows.length ? (
+      <div class="p-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
+        <p class="text-lg">No works yet.</p>
+        <div class="mt-5 flex justify-center">
+          {canMutate ? <WorkCreateDialog client:load /> : <p class="text-sm">Read-only for fundraiser</p>}
+        </div>
+      </div>
+    ) : (
+      <WorksList client:load works={workRows} canMutate={canMutate} />
+    )}
+  </div>
+</AppLayout>

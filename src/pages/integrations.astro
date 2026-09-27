@@ -1,0 +1,44 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import IntegrationsWorkspace, { type IntegrationsWorkspaceData } from "../components/integrations/IntegrationsWorkspace";
+import {
+  listIntegrationConnections,
+  listIntegrationErrors,
+  listIntegrationProviders,
+  listSyncJobs,
+} from "../server/integrations";
+import { requireCapability } from "../server/tenant";
+
+const orgId = requireCapability(Astro.locals, "integrations.manage");
+const [providers, connections, syncJobs, errors] = await Promise.all([
+  listIntegrationProviders(orgId),
+  listIntegrationConnections(orgId),
+  listSyncJobs(orgId),
+  listIntegrationErrors(orgId),
+]);
+
+const initialData: IntegrationsWorkspaceData = {
+  providers,
+  connections: connections.map(({ auth_ref: _authRef, ...connection }) => ({
+    ...connection,
+    status: connection.status as IntegrationsWorkspaceData["connections"][number]["status"],
+    last_checked_at: connection.last_checked_at?.toISOString() ?? null,
+    last_successful_sync_at: connection.last_successful_sync_at?.toISOString() ?? null,
+  })),
+  syncJobs: syncJobs.slice(0, 25).map((job) => ({
+    ...job,
+    status: job.status as IntegrationsWorkspaceData["syncJobs"][number]["status"],
+    created_at: job.created_at?.toISOString() ?? new Date(0).toISOString(),
+    finished_at: job.finished_at?.toISOString() ?? null,
+  })),
+  errors: errors.slice(0, 25).map((item) => ({
+    ...item,
+    severity: item.severity as IntegrationsWorkspaceData["errors"][number]["severity"],
+    created_at: item.created_at?.toISOString() ?? new Date(0).toISOString(),
+  })),
+};
+---
+
+<AppLayout>
+  <IntegrationsWorkspace client:load initialData={initialData} />
+</AppLayout>

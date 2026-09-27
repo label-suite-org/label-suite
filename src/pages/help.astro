@@ -1,0 +1,67 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+
+const priorityTerms = [
+  ["P0 — Critical", "Immediate blocker with serious operational consequence. Address before routine work."],
+  ["P1 — High", "Important work that should be handled next, but is not an immediate stop."],
+  ["P2 — Normal", "Standard operational work in the current queue."],
+  ["P3 — Low", "Useful follow-up that can wait behind higher-priority work."],
+] as const;
+
+const catalogTerms = [
+  ["PRO", "Performance rights organization. The society that administers performance rights, such as KODA."],
+  ["IPI", "Interested Party Information number. It identifies a songwriter or publisher in rights systems."],
+  ["ISRC", "International Standard Recording Code. It identifies one specific sound recording, not the composition."],
+] as const;
+
+const evidenceTerms = [
+  ["Sisense", "An analytics evidence source. Its imports can be current, stale, partial, or failed; provider data does not silently replace canonical Label Suite records."],
+  ["Airtable mapping", "A migration or reference link between a historical Airtable record and a Label Suite record. It is not proof that Airtable is the current source of truth."],
+  ["Readiness", "Whether the required linked records and evidence are complete enough for the stated next step."],
+  ["Stale", "Previously observed information that is too old to present as current without refresh or review."],
+  ["Partial", "Evidence with known gaps. It may be useful, but it must not be presented as complete."],
+  ["Proposed", "A suggestion or prepared change that has not been accepted into canonical state."],
+  ["Reviewed", "A human has checked the stated version or evidence. Later edits or fresher evidence may require another review."],
+] as const;
+
+const sections = [
+  { id: "priorities", title: "Priority levels", description: "Priority expresses consequence and order, not completion.", terms: priorityTerms },
+  { id: "catalog", title: "Catalog and rights", description: "Identifiers describe different parts of a recording and its rights.", terms: catalogTerms },
+  { id: "evidence", title: "Evidence and workflow state", description: "Label Suite keeps evidence, proposals, and canonical records visibly distinct.", terms: evidenceTerms },
+] as const;
+---
+
+<AppLayout>
+  <main class="mx-auto w-full max-w-4xl space-y-8">
+    <header class="border-b border-border pb-6">
+      <p class="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Operator reference</p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight">Help & glossary</h1>
+      <p class="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+        Plain-language definitions for the terms that affect daily decisions, catalog identity, and evidence quality.
+      </p>
+    </header>
+
+    <nav aria-label="Glossary sections" class="flex flex-wrap gap-2">
+      {sections.map((section) => (
+        <a class="min-h-11 border border-border bg-background px-3 py-2.5 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href={`#${section.id}`}>
+          {section.title}
+        </a>
+      ))}
+    </nav>
+
+    {sections.map((section) => (
+      <section id={section.id} aria-labelledby={`${section.id}-title`} class="scroll-mt-6 border-t border-border pt-6">
+        <h2 id={`${section.id}-title`} class="text-xl font-semibold">{section.title}</h2>
+        <p class="mt-1 text-sm text-muted-foreground">{section.description}</p>
+        <dl class="mt-4 divide-y divide-border border-y border-border">
+          {section.terms.map(([term, definition]) => (
+            <div class="grid gap-2 py-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-6">
+              <dt class="font-semibold">{term}</dt>
+              <dd class="text-sm leading-6 text-muted-foreground">{definition}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    ))}
+  </main>
+</AppLayout>

@@ -1,0 +1,23 @@
+node_modules
+# Keep .git in the production build context so the image can embed its checkout SHA.
+dist
+**/dist
+.astro
+.data
+.superpowers
+.env
+.env.production
+# The delivery verifier injects a cryptographic canary at this exact path.
+ops/plane-sync/runtime-private-key.pem
+# Dokploy can preprocess this deployment control file and materialize its direct
+# sibling runtime .env with protected values. Both remain available to Dokploy,
+# but must never enter Docker COPY.
+ops/plane-sync/compose.yml
+ops/plane-sync/.env
+.sisense-worker-image.pin
+.dburl
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+AIRTABLE_PARITY_REPORT.md

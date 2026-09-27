@@ -1,0 +1,79 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import { SettingsShell } from "../components/settings/SettingsShell";
+import { listWorkspaceInvitations, listWorkspaceMembers } from "../server/member-invitations";
+import { listLocalToolTokens } from "../server/local-tool-tokens";
+import { serializeClientCapabilities } from "../server/tenant";
+
+const user = Astro.locals.user!;
+const org = Astro.locals.org ?? {
+  id: "workspace",
+  name: "Workspace",
+  slug: "workspace",
+  plan: "internal",
+};
+const role = Astro.locals.membershipRole ?? "member";
+const capabilities = serializeClientCapabilities(role);
+const [workspaceMembers, workspaceInvitations, localToolTokens] = await Promise.all([
+  listWorkspaceMembers(String(org.id)),
+  capabilities["workspace.manage_members"] ? listWorkspaceInvitations(String(org.id)) : Promise.resolve([]),
+  capabilities["operations.mutate"] ? listLocalToolTokens(String(org.id)) : Promise.resolve([]),
+]);
+const sectionIds = ["profile", "workspace", "members", "preferences", "operations", "codex-tools"] as const;
+type SectionId = (typeof sectionIds)[number];
+const requestedSection = Astro.url.searchParams.get("section");
+const initialSection: SectionId = sectionIds.includes(requestedSection as SectionId)
+  && (requestedSection !== "codex-tools" || capabilities["operations.mutate"])
+  ? (requestedSection as SectionId)
+  : "profile";
+const settingsUser = {
+  id: String(user.id),
+  name: user.name ?? null,
+  email: user.email ?? null,
+};
+const settingsOrg = {
+  id: String(org.id),
+  name: org.name,
+  slug: org.slug,
+  plan: org.plan ?? null,
+};
+const initialMembers = workspaceMembers.map((member) => ({
+  ...member,
+  joinedAt: member.joinedAt.toISOString(),
+}));
+const initialInvitations = workspaceInvitations.map((invitation) => ({
+  ...invitation,
+  expiresAt: invitation.expiresAt.toISOString(),
+  acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
+  revokedAt: invitation.revokedAt?.toISOString() ?? null,
+  lastSentAt: invitation.lastSentAt?.toISOString() ?? null,
+  createdAt: invitation.createdAt.toISOString(),
+}));
+const initialLocalToolTokens = localToolTokens.map((token) => ({
+  id: token.id,
+  org_id: token.org_id,
+  user_id: token.user_id,
+  name: token.name,
+  token_prefix: token.token_prefix,
+  scopes: [...token.scopes],
+  expires_at: token.expires_at.toISOString(),
+  revoked_at: token.revoked_at?.toISOString() ?? null,
+  last_used_at: token.last_used_at?.toISOString() ?? null,
+  created_at: token.created_at.toISOString(),
+  updated_at: token.updated_at.toISOString(),
+}));
+---
+
+<AppLayout>
+  <SettingsShell
+    client:load
+    user={settingsUser}
+    org={settingsOrg}
+    role={role}
+    capabilities={capabilities}
+    initialMembers={initialMembers}
+    initialInvitations={initialInvitations}
+    initialLocalToolTokens={initialLocalToolTokens}
+    initialSection={initialSection}
+  />
+</AppLayout>

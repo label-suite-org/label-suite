@@ -1,0 +1,1 @@
+ALTER TABLE "label_suite"."works" ADD COLUMN "alt_isrcs" text;

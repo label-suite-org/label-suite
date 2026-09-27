@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+if [[ "$branch" == "main" ]]; then
+  printf '%s\n' \
+    "Direct commits to main are blocked." \
+    "Create a clean feature branch from origin/main and open a pull request." >&2
+  exit 1
+fi

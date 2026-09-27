@@ -1,0 +1,21 @@
+{
+  "action": "opened",
+  "issue": {
+    "number": 128,
+    "body": "Private implementation notes must never reach the Plane sync inbox.",
+    "updated_at": "2026-08-01T19:20:30Z"
+  },
+  "repository": {
+    "name": "label-suite_neon_r2",
+    "full_name": "label-suite-org/label-suite_neon_r2",
+    "owner": {
+      "login": "label-suite-org"
+    },
+    "updated_at": "2026-08-01T19:20:30Z"
+  },
+  "sender": {
+    "login": "nature-boy",
+    "name": "Sensitive Sender Profile Name",
+    "avatar_url": "https://avatars.example.test/nature-boy"
+  }
+}

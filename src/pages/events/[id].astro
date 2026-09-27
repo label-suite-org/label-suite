@@ -1,0 +1,82 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import ProjectEventDetail from "../../components/projects/ProjectEventDetail";
+import type { EventDetailRecord, EventProjectContext } from "../../components/projects/ProjectEventDetail";
+import { listArtistOptions } from "../../server/artists";
+import { listContactOptions } from "../../server/contacts";
+import { listCampaignsForEventSeams } from "../../server/campaigns";
+import { listDocuments } from "../../server/documents";
+import { getProjectEvent } from "../../server/project-events";
+import { listMediaAssets } from "../../server/media-assets";
+import { listOpsTasks } from "../../server/ops-tasks";
+import { listProjects } from "../../server/projects";
+import { listReleaseOptions } from "../../server/releases";
+import { buildEventSharedContext, getProjectWorkspaceDetail, hasEventSharedContext, mergeProjectAndSeamContext } from "../../server/project-workspace";
+
+const orgId = Astro.locals.orgId!;
+const id = Astro.params.id;
+if (!id) return Astro.redirect("/events");
+const event = await getProjectEvent(orgId, id);
+if (!event) return Astro.redirect("/events");
+const [projects, artists, releases, contacts] = await Promise.all([
+  listProjects(orgId), listArtistOptions(orgId), listReleaseOptions(orgId), listContactOptions(orgId),
+]);
+const project = projects.find((candidate) => candidate.id === event.project_id);
+const owner = contacts.find((candidate) => candidate.id === event.owner_contact_id);
+const artist = artists.find((candidate) => candidate.id === event.artist_id);
+const release = releases.find((candidate) => candidate.id === event.release_id);
+const contact = contacts.find((candidate) => candidate.id === event.contact_id);
+const projectDetail = event.project_id ? await getProjectWorkspaceDetail(orgId, event.project_id) : null;
+const [allCampaigns, allDocuments, allMediaAssets, allTasks] = await Promise.all([
+  listCampaignsForEventSeams(orgId, { artistId: event.artist_id, releaseId: event.release_id }),
+  listDocuments(orgId),
+  listMediaAssets(orgId),
+  listOpsTasks(orgId),
+]);
+const sharedContext = buildEventSharedContext({
+  event: {
+    id: event.id,
+    artist_id: event.artist_id,
+    release_id: event.release_id,
+    contact_id: event.contact_id,
+  },
+  campaignRows: allCampaigns,
+  taskRows: allTasks,
+  documentRows: allDocuments,
+  mediaAssetRows: allMediaAssets,
+});
+const mergedContext = projectDetail?.workspace ? mergeProjectAndSeamContext(projectDetail.workspace, sharedContext) : null;
+const projectContext: EventProjectContext | null = mergedContext
+  ? {
+      id: mergedContext.id,
+      name: mergedContext.name,
+      events: mergedContext.events ?? [],
+      tasks: mergedContext.tasks ?? [],
+      documents: mergedContext.documents ?? [],
+      mediaAssets: mergedContext.mediaAssets ?? [],
+      shared_campaigns: mergedContext.shared_campaigns,
+    }
+  : hasEventSharedContext(sharedContext)
+    ? {
+        events: [],
+        tasks: sharedContext.tasks,
+        documents: sharedContext.documents,
+        mediaAssets: sharedContext.mediaAssets,
+        shared_campaigns: sharedContext.shared_campaigns,
+      }
+    : null;
+
+const detail: EventDetailRecord & { project_context: EventProjectContext | null } = {
+  ...event,
+  project_name: project?.name ?? null,
+  owner_name: owner?.name ?? null,
+  artist_name: artist?.name ?? null,
+  release_title: release?.title ?? null,
+  contact_name: contact?.name ?? null,
+  project_context: projectContext,
+};
+---
+
+<AppLayout title={event.title}>
+<ProjectEventDetail client:load event={detail} projects={projects} artists={artists} releases={releases} contacts={contacts} project_context={detail.project_context} />
+</AppLayout>

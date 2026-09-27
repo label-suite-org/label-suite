@@ -1,0 +1,74 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listContactDirectory } from "../../server/contacts";
+import { listContactEnrichmentSuggestions, listGmailConnections } from "../../server/gmail-enrichment";
+import { ContactsBook } from "../../components/contacts/ContactsBook";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const user = Astro.locals.user!;
+const capabilities = serializeClientCapabilities(Astro.locals.membershipRole ?? "member");
+const [directory, enrichmentSuggestions, gmailConnections] = await Promise.all([
+  listContactDirectory(orgId),
+  capabilities["operations.mutate"] ? listContactEnrichmentSuggestions(orgId) : Promise.resolve([]),
+  capabilities["operations.mutate"] ? listGmailConnections(orgId, user.id) : Promise.resolve([]),
+]);
+
+const contacts = directory.contacts.map((contact) => ({
+  id: contact.id,
+  name: contact.name,
+  email: contact.email,
+  phone: contact.phone,
+  image_url: contact.image_url,
+  website: contact.website,
+  linkedin_url: contact.linkedin_url,
+  address: contact.address,
+  role: contact.role,
+  company: contact.company,
+  notes: contact.notes,
+  created_at: contact.created_at?.toISOString() ?? null,
+  updated_at: contact.updated_at?.toISOString() ?? null,
+  organization_links: contact.organization_links,
+}));
+
+const organizations = directory.organizations.map((organization) => ({
+  id: organization.id,
+  name: organization.name,
+  type: organization.type,
+  email: organization.email,
+  phone: organization.phone,
+  website: organization.website,
+  linkedin_url: organization.linkedin_url,
+  address: organization.address,
+  image_url: organization.image_url,
+  notes: organization.notes,
+  source: organization.source,
+  contact_count: organization.contact_count,
+  created_at: organization.created_at?.toISOString() ?? null,
+  updated_at: organization.updated_at?.toISOString() ?? null,
+}));
+
+const suggestions = enrichmentSuggestions.map((suggestion) => ({
+  ...suggestion,
+  created_at: suggestion.created_at?.toISOString() ?? null,
+}));
+const activeGmailConnection = gmailConnections.find((connection) => connection.status === "connected");
+---
+
+<AppLayout>
+  <ContactsBook
+    client:load
+    initialContactId={Astro.url.searchParams.get("contact")}
+    contacts={contacts}
+    organizations={organizations}
+    enrichmentSuggestions={suggestions}
+    gmailConnected={!!activeGmailConnection}
+    gmailConnection={activeGmailConnection ? {
+      email: activeGmailConnection.email,
+      status: activeGmailConnection.status,
+      last_scan_at: activeGmailConnection.last_scan_at?.toISOString() ?? null,
+    } : null}
+    canMutate={capabilities["contacts.mutate"]}
+    canEnrichContacts={capabilities["operations.mutate"]}
+  />
+</AppLayout>

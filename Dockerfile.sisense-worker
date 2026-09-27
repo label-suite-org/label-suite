@@ -1,0 +1,20 @@
+FROM node:22-alpine AS revision
+WORKDIR /source
+RUN apk add --no-cache git
+COPY . .
+RUN sh scripts/write-build-revision.sh .release-revision
+
+FROM mcr.microsoft.com/playwright:v1.62.0-noble
+
+WORKDIR /app
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1
+
+COPY --from=revision /source/package.json /source/package-lock.json ./
+RUN npm ci
+
+COPY --from=revision /source/ ./
+RUN rm -rf .git
+ENV APP_REVISION_FILE=/app/.release-revision
+
+CMD ["sh", "-c", "while :; do sleep 3600; done"]

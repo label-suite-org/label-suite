@@ -1,0 +1,76 @@
+---
+import "../../styles/global.css";
+import { InvitationGate } from "../../components/auth/InvitationGate";
+import { HttpError } from "../../server/errors";
+import {
+  clearInvitationCookie,
+  INVITATION_CONTINUATION_COOKIE,
+} from "../../server/invitation-continuation";
+import { acceptInvitation } from "../../server/member-invitations";
+import { requireSameOrigin } from "../../server/request-security";
+import { ACTIVE_ORG_COOKIE } from "../../server/tenant";
+
+export const prerender = false;
+
+const pathToken = Astro.params.token ?? "";
+
+if (pathToken !== "continue") {
+  return Astro.redirect("/invite", 303);
+}
+
+const token = Astro.cookies.get(INVITATION_CONTINUATION_COOKIE)?.value;
+let error = token ? "" : "This invitation is invalid or expired.";
+
+if (Astro.request.method === "POST") {
+  try {
+    requireSameOrigin(Astro.request);
+  } catch {
+    return new Response("Forbidden", {
+      status: 403,
+      headers: { "Cache-Control": "private, no-store", "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+  if (!Astro.locals.user?.id || !Astro.locals.user.email) {
+    error = "Sign in to accept this invitation.";
+  } else if (!token) {
+    error = "This invitation is invalid or expired.";
+  } else {
+    try {
+      const accepted = await acceptInvitation({
+        token,
+        userId: Astro.locals.user.id,
+        userEmail: Astro.locals.user.email,
+        requestId: Astro.locals.requestId,
+      });
+      Astro.cookies.set(ACTIVE_ORG_COOKIE, accepted.orgId, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: Astro.url.protocol === "https:",
+        path: "/",
+      });
+      clearInvitationCookie(Astro.cookies);
+      return Astro.redirect("/grants", 303);
+    } catch (caught) {
+      if (caught instanceof HttpError && caught.status === 403) {
+        error = caught.message;
+      } else {
+        error = "This invitation is invalid or expired.";
+        clearInvitationCookie(Astro.cookies);
+      }
+    }
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Label Suite — Workspace invitation</title>
+  </head>
+  <body class="min-h-screen bg-background flex items-center justify-center p-4 antialiased">
+    <InvitationGate client:load authenticated={Boolean(Astro.locals.user)} error={error} />
+  </body>
+</html>

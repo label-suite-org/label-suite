@@ -1,0 +1,376 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { getCampaignDetail, renderCampaignDocumentForDisplay } from "../../server/campaigns";
+import {
+  type CampaignAudienceContact,
+  type CampaignAudienceOption,
+  type CampaignAudienceSelection,
+  type CampaignAudienceStation,
+  getCampaignAudienceForCampaign,
+  getCampaignAudienceFeatureAvailability,
+  isCampaignAudienceSchemaUnavailable,
+  listCampaignAudiences,
+  listCampaignAudienceContactOptions,
+  listCampaignAudienceStationOptions,
+} from "../../server/campaign-audiences";
+import CampaignContentManager from "../../components/campaigns/CampaignContentManager";
+import CampaignChannelsManager from "../../components/campaigns/CampaignChannelsManager";
+import { listArtistOptions } from "../../server/artists";
+import { listContactOptions } from "../../server/contacts";
+import { listReleaseOptions } from "../../server/releases";
+import { listEmailLogsByCampaign } from "../../server/email";
+import CampaignAudienceManager from "../../components/campaigns/CampaignAudienceManager";
+import { CampaignEditButton, CampaignDeleteButton } from "../../components/campaigns/CampaignActionButtons";
+import { getRadioPluggingCampaign } from "../../server/radio-plugging";
+import { listRadioStations } from "../../server/radio-stations";
+import { serializeClientCapabilities } from "../../server/tenant";
+import CampaignOutreachWorkspace from "../../components/campaigns/CampaignOutreachWorkspace";
+import CampaignOsWorkspace from "../../components/campaigns/CampaignOsWorkspace";
+import {
+  getCampaignOutreachFeatureAvailability,
+  getCampaignOutreachWorkspace,
+  isCampaignOutreachSchemaUnavailable,
+  type CampaignOutreachWorkspaceData,
+} from "../../server/campaign-outreach";
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect("/campaigns");
+
+const orgId = Astro.locals.orgId!;
+const campaign = await getCampaignDetail(orgId, id);
+const goalDisplay = campaign
+  ? renderCampaignDocumentForDisplay(campaign.goal_document, campaign.goal)
+  : null;
+const notesDisplay = campaign
+  ? renderCampaignDocumentForDisplay(campaign.notes_document, campaign.notes)
+  : null;
+const artistRowsForForm = await listArtistOptions(orgId);
+const releaseRowsForForm = await listReleaseOptions(orgId);
+const contactRowsForCampaignOs = campaign ? await listContactOptions(orgId) : [];
+const emailLogs = await listEmailLogsByCampaign(orgId, id);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+const canPublish = Astro.locals.membershipRole === "owner";
+let campaignOutreachSchemaAvailable = campaign ? await getCampaignOutreachFeatureAvailability(orgId) : false;
+let campaignOutreachData: CampaignOutreachWorkspaceData | null = null;
+let campaignAudienceSchemaAvailable = false;
+let campaignAudienceSelection: CampaignAudienceSelection | null = null;
+let audienceOptions: CampaignAudienceOption[] = [];
+let audienceContactOptions: CampaignAudienceContact[] = [];
+let audienceStationOptions: CampaignAudienceStation[] = [];
+if (campaign) {
+  campaignAudienceSchemaAvailable = await getCampaignAudienceFeatureAvailability(orgId);
+}
+if (campaign && campaignAudienceSchemaAvailable) {
+  try {
+    campaignAudienceSelection = await getCampaignAudienceForCampaign(orgId, id);
+    if (canMutate) {
+      [audienceOptions, audienceContactOptions, audienceStationOptions] = await Promise.all([
+        listCampaignAudiences(orgId),
+        listCampaignAudienceContactOptions(orgId),
+        listCampaignAudienceStationOptions(orgId),
+      ]);
+    }
+  } catch (error) {
+    if (!isCampaignAudienceSchemaUnavailable(error)) {
+      throw error;
+    }
+    campaignAudienceSchemaAvailable = false;
+  }
+}
+const campaignTabs = [
+  { key: "overview", label: "Overview" },
+  { key: "outreach", label: "Outreach" },
+  { key: "creators", label: "Creators" },
+  ...(campaign && canMutate && campaignAudienceSchemaAvailable ? [{ key: "audience", label: "Audience" }] : []),
+  ...(campaign && !canMutate ? [{ key: "audience", label: "Audience" }] : []),
+  { key: "content", label: "Content" },
+  { key: "channels", label: "Channels" },
+  { key: "budget", label: "Budget" },
+  { key: "cost", label: "Cost" },
+  { key: "posts", label: "Posts" },
+  { key: "report", label: "Report" },
+  { key: "activity", label: "Activity" },
+] as const;
+const requestedTab = Astro.url.searchParams.get("tab");
+const activeTab = campaignTabs.some((tab) => tab.key === requestedTab) ? requestedTab! : "overview";
+const tabHref = (tab: string) => `/campaigns/${id}?tab=${tab}`;
+const radioCampaign = campaign && activeTab === "channels" ? await getRadioPluggingCampaign(orgId, id) : null;
+const radioStations = campaign && activeTab === "channels" ? await listRadioStations(orgId) : [];
+if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
+  try {
+    campaignOutreachData = await getCampaignOutreachWorkspace(orgId, id);
+  } catch (error) {
+    if (!isCampaignOutreachSchemaUnavailable(error)) throw error;
+    campaignOutreachSchemaAvailable = false;
+  }
+}
+---
+
+<AppLayout>
+  {!campaign ? <p class="text-muted-foreground">Campaign not found.</p> : (
+    <div class="space-y-8">
+      <!-- Header -->
+      <div>
+        <div class="flex items-center gap-3">
+          <h1 class="text-3xl font-bold tracking-tight">{campaign.campaign_name}</h1>
+          <span class={`text-xs px-2 py-1 rounded-md font-medium ${
+            campaign.status === "active" ? "bg-green-100 text-green-700" :
+            campaign.status === "planning" ? "bg-blue-100 text-blue-700" :
+            campaign.status === "completed" ? "bg-muted text-muted-foreground" :
+            "bg-muted text-muted-foreground"
+          }`}>
+            {campaign.status || "planning"}
+          </span>
+        </div>
+        <p class="text-muted-foreground mt-1">
+          {campaign.campaign_type || "—"}
+          {campaign.main_platform ? ` · ${campaign.main_platform}` : ""}
+          {campaign.start_date ? ` · ${campaign.start_date}` : ""}
+          {campaign.end_date ? ` → ${campaign.end_date}` : ""}
+        </p>
+        {canMutate ? <div class="mt-3 flex gap-2">
+          <CampaignEditButton client:load campaign={campaign} releases={releaseRowsForForm} artists={artistRowsForForm} />
+          <CampaignDeleteButton client:load campaign={campaign} />
+        </div> : <p class="mt-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
+      </div>
+
+      <nav class="sticky top-2 z-20 overflow-x-auto rounded-xl border border-border bg-background/95 p-1 shadow-sm backdrop-blur" aria-label="Campaign sections">
+        <div class="flex min-w-max gap-1">
+          {campaignTabs.map((tab) => (
+            <a href={tabHref(tab.key)} aria-current={activeTab === tab.key ? "page" : undefined} class={`rounded-lg px-3 py-2 text-xs font-medium transition ${activeTab === tab.key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
+              {tab.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      {activeTab === "overview" && <>
+        <!-- Linked Release & Artist -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="p-4 border border-border rounded-xl bg-card">
+          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Linked Release</h2>
+          {campaign.release_title ? (
+            <a href={`/releases/${campaign.linked_release_id}`} class="font-medium text-sm hover:underline">
+              {campaign.release_title}
+            </a>
+          ) : (
+            <p class="text-sm text-muted-foreground">No linked release</p>
+          )}
+        </div>
+        <div class="p-4 border border-border rounded-xl bg-card">
+          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Linked Artist</h2>
+          {campaign.artist_name ? (
+            <a href={`/artists/${campaign.linked_artist_id}`} class="font-medium text-sm hover:underline">
+              {campaign.artist_name}
+            </a>
+          ) : (
+            <p class="text-sm text-muted-foreground">No linked artist</p>
+          )}
+        </div>
+        </div>
+
+        <!-- Goal -->
+        {goalDisplay?.plainText && (
+          <section>
+            <h2 class="text-lg font-semibold mb-2">Goal</h2>
+            <div
+              class="max-w-2xl whitespace-pre-wrap text-muted-foreground [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:mb-2 [&_ul]:list-disc"
+              set:html={goalDisplay.html}
+            />
+          </section>
+        )}
+      </>}
+
+      {activeTab === "outreach" && (
+        <section class="rounded-xl border border-border bg-card p-4 sm:p-5">
+          {campaignOutreachSchemaAvailable && campaignOutreachData ? (
+            <CampaignOutreachWorkspace client:load initialData={campaignOutreachData} initialLeadId={Astro.url.searchParams.get("lead")} canMutate={canMutate} canPublish={canPublish} />
+          ) : (
+            <div class="py-8 text-center">
+              <h2 class="text-lg font-semibold">Outreach workspace is not available yet</h2>
+              <p class="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">Apply the campaign earned-media migration, then run the Fountain campaign bootstrap. Existing Directory contacts and radio stations will be linked, not duplicated.</p>
+            </div>
+          )}
+        </section>
+      )}
+
+      {activeTab === "budget" && <section>
+        <h2 class="text-lg font-semibold mb-3">Budget</h2>
+        <div class="p-4 border border-border rounded-xl bg-card space-y-3">
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-muted-foreground">Planned</span>
+            <span class="font-medium">{campaign.budget_planned?.toLocaleString() ?? "—"} DKK</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-muted-foreground">Actual</span>
+            <span class="font-medium">{campaign.budget_actual?.toLocaleString() ?? "—"} DKK</span>
+          </div>
+          {campaign.budget_planned && campaign.budget_planned > 0 && (
+            <>
+              <div class="w-full h-3 bg-muted rounded-full overflow-hidden">
+                <div
+                  class="h-full rounded-full transition-all"
+                  style={`width: ${Math.min((campaign.budget_actual ?? 0) / campaign.budget_planned * 100, 100)}%; background-color: ${(campaign.budget_actual ?? 0) > campaign.budget_planned ? "#ef4444" : (campaign.budget_actual ?? 0) > campaign.budget_planned * 0.9 ? "#f59e0b" : "#22c55e"}`}
+                />
+              </div>
+              <p class="text-xs text-muted-foreground">
+                {Math.round((campaign.budget_actual ?? 0) / campaign.budget_planned * 100)}% of planned budget used
+                {(campaign.budget_actual ?? 0) > campaign.budget_planned ? " (over budget)" : ""}
+              </p>
+            </>
+          )}
+        </div>
+      </section>}
+
+      {(["creators", "posts", "cost", "report"] as const).includes(activeTab as "creators" | "posts" | "cost" | "report") && <section class="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <CampaignOsWorkspace client:load campaignId={id} section={activeTab as "creators" | "posts" | "cost" | "report"} canMutate={canMutate} contacts={contactRowsForCampaignOs} finalReport={campaign.final_report} finalizedAt={campaign.final_report_finalized_at?.toISOString() ?? null} />
+      </section>}
+
+      {activeTab === "content" && <>
+        {canMutate && (
+          <section class="rounded-xl border border-border bg-card p-5">
+            <h2 class="text-lg font-semibold">Reviewed template preview</h2>
+            <CampaignContentManager client:load campaignId={id} canMutate={canMutate} />
+          </section>
+        )}
+
+        <section>
+          <h2 class="text-lg font-semibold mb-3">KPI Summary</h2>
+          {campaign.kpi_summary || campaign.performance_rating ? (
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {campaign.performance_rating && (
+                <div class="p-4 border border-border rounded-xl bg-card text-center">
+                  <p class="text-3xl font-bold">{campaign.performance_rating}/10</p>
+                  <p class="text-xs text-muted-foreground mt-1">Performance Rating</p>
+                </div>
+              )}
+              {campaign.kpi_summary && (
+                <div class="p-4 border border-border rounded-xl bg-card">
+                  <p class="text-sm font-medium">Summary</p>
+                  <p class="text-sm text-muted-foreground mt-1">{campaign.kpi_summary}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p class="text-sm text-muted-foreground">No KPI data available.</p>
+          )}
+        </section>
+      </>}
+
+      {activeTab === "content" && campaign.owner && (
+        <section>
+          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Owner</h2>
+          <p class="text-sm">{campaign.owner}</p>
+        </section>
+      )}
+
+      {activeTab === "content" && notesDisplay?.plainText && (
+        <section>
+          <h2 class="text-lg font-semibold mb-2">Notes</h2>
+          <div
+            class="max-w-2xl whitespace-pre-wrap text-muted-foreground [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-4 [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:font-semibold [&_li]:ml-5 [&_ol]:list-decimal [&_p]:mb-2 [&_ul]:list-disc"
+            set:html={notesDisplay.html}
+          />
+        </section>
+      )}
+
+      {activeTab === "activity" && <section>
+        <h2 class="text-lg font-semibold mb-3">Email Log</h2>
+        {emailLogs.length === 0 ? (
+          <p class="text-sm text-muted-foreground">No emails sent yet.</p>
+        ) : (
+          <div class="border border-border rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="bg-muted/50 text-left">
+                  <th class="px-4 py-2 font-medium text-xs text-muted-foreground uppercase tracking-wider">Date</th>
+                  <th class="px-4 py-2 font-medium text-xs text-muted-foreground uppercase tracking-wider">Station</th>
+                  <th class="px-4 py-2 font-medium text-xs text-muted-foreground uppercase tracking-wider">Subject</th>
+                  <th class="px-4 py-2 font-medium text-xs text-muted-foreground uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border">
+                {emailLogs.map((log) => (
+                  <tr class="hover:bg-muted/30 transition-colors">
+                    <td class="px-4 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                      {(log.sent_at ? new Date(log.sent_at).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—")}
+                    </td>
+                    <td class="px-4 py-2">
+                      <span class="font-medium">{log.station_name || "—"}</span>
+                      {log.station_email && (
+                        <span class="text-xs text-muted-foreground block">{log.station_email}</span>
+                      )}
+                    </td>
+                    <td class="px-4 py-2 max-w-xs truncate">{log.subject}</td>
+                    <td class="px-4 py-2">
+                      <span class={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                        log.status === "sent" ? "bg-green-100 text-green-700" :
+                        log.status === "failed" ? "bg-red-100 text-red-700" :
+                        "bg-muted text-muted-foreground"
+                      }`}>
+                        {log.status}
+                      </span>
+                      <span class="text-xs text-muted-foreground block mt-1">
+                        Provider: {log.provider || "brevo"}
+                        {log.operator_name ? ` · Operator: ${log.operator_name}` : log.operator_id ? ` · Operator: ${log.operator_id}` : ""}
+                      </span>
+                      {log.error_message && (
+                        <span class="text-xs text-red-600 block mt-0.5 truncate max-w-[150px]" title={log.error_message}>
+                          {log.error_message}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>}
+
+      {activeTab === "audience" && (
+        <section class="rounded-xl border border-border bg-card p-5">
+          <h2 class="text-lg font-semibold">Audience</h2>
+          <p class="mt-1 text-sm text-muted-foreground mb-4">Saved recipient groups are tenant-scoped and keep current transport logic untouched. Preview rules apply before campaign targeting only.</p>
+          {campaignAudienceSchemaAvailable ? (
+            canMutate ? (
+            <CampaignAudienceManager
+              client:load
+              campaignId={id}
+              options={audienceOptions}
+              contactOptions={audienceContactOptions}
+              stationOptions={audienceStationOptions}
+              currentSelection={campaignAudienceSelection}
+              canMutate={canMutate}
+            />
+            ) : (
+              <p class="rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                Saved audience previews include recipient identities, so this tab is limited to operators and owners.
+              </p>
+            )
+          ) : (
+            <p class="rounded-lg border border-border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              Audience features are unavailable until the campaign audience migration is applied to this database.
+            </p>
+          )}
+          <a href={`/radio-plugging/${encodeURIComponent(id)}`} class="mt-4 inline-flex rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-muted">Open radio target workflow</a>
+        </section>
+      )}
+
+      {activeTab === "channels" && (
+        <section class="rounded-xl border border-border bg-card p-5">
+          <h2 class="text-lg font-semibold">Channels</h2>
+          <p class="mt-1 text-sm text-muted-foreground mb-4">Radio targeting now stays inside the campaign workspace. Preview and send remain separate operator-controlled actions.</p>
+          <CampaignChannelsManager
+            client:load
+            campaignId={id}
+            radioCampaign={radioCampaign}
+            allStations={radioStations}
+            audienceSelection={campaignAudienceSelection}
+            canMutate={canMutate}
+          />
+        </section>
+      )}
+    </div>
+  )}
+</AppLayout>

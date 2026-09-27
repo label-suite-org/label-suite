@@ -1,0 +1,122 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { getPayeePortalData } from "../../server/payee-portal";
+import { auditPayeeRead } from "../../server/payee-portal-audit";
+import { HttpError } from "../../server/errors";
+import { requirePayeePortal } from "../../server/tenant";
+
+const identity = requirePayeePortal(Astro.locals);
+const portal = await getPayeePortalData(identity.orgId, identity.email);
+if (!portal) {
+  throw new HttpError("Payee contact is not configured", 403);
+}
+await auditPayeeRead({
+  orgId: identity.orgId,
+  userId: identity.userId,
+  action: "payee_portal.read",
+  entityType: "payee_portal",
+  entityId: portal.contact.id,
+  metadata: {
+    statementCount: portal.statements.length,
+    payoutCount: portal.payouts.length,
+    balanceCount: portal.balances.length,
+  },
+});
+
+const formatMoney = (value: string | number, currency: string) => new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency,
+  maximumFractionDigits: 2,
+}).format(Number(value));
+const formatDate = (value: Date | string | null) => value ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(value)) : "—";
+---
+
+<AppLayout>
+  <div class="mx-auto max-w-5xl space-y-8">
+    <header class="border-b border-border pb-6">
+      <p class="text-sm font-medium uppercase tracking-[0.18em] text-muted-foreground">Payee portal</p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight">Welcome, {portal.contact.name}</h1>
+      <p class="mt-2 max-w-2xl text-sm text-muted-foreground">
+        Published statements, current balances, and recorded payout history for your account. This portal is read-only.
+      </p>
+    </header>
+
+    <section aria-labelledby="balances-heading" class="space-y-3">
+      <div>
+        <h2 id="balances-heading" class="text-lg font-semibold">Current balances</h2>
+        <p class="text-sm text-muted-foreground">Only ledger entries belonging to your payee contact are shown.</p>
+      </div>
+      {portal.balances.length ? (
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {portal.balances.map((balance) => (
+            <div class="rounded-xl border border-border bg-card p-4 shadow-sm">
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">{balance.currency}</p>
+              <p class="mt-2 text-2xl font-semibold">{formatMoney(balance.balance, balance.currency)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p class="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No published balance yet.</p>
+      )}
+    </section>
+
+    <section aria-labelledby="statements-heading" class="space-y-3">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 id="statements-heading" class="text-lg font-semibold">Published statements</h2>
+          <p class="text-sm text-muted-foreground">Draft and internal review statements are never exposed here.</p>
+        </div>
+      </div>
+      {portal.statements.length ? (
+        <div class="space-y-4">
+          {portal.statements.map((statement) => (
+            <article class="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h3 class="font-semibold">{formatDate(statement.periodStart)} – {formatDate(statement.periodEnd)}</h3>
+                  <p class="mt-1 text-sm text-muted-foreground">Issued {formatDate(statement.issuedAt)} · {statement.status}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <p class="text-lg font-semibold">{formatMoney(statement.closingBalance, statement.currency)}</p>
+                  <a class="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent" href={`/api/payee/statements/${statement.id}/download`}>Download</a>
+                </div>
+              </div>
+              <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-3">
+                <div><dt class="text-muted-foreground">Earnings</dt><dd class="font-medium">{formatMoney(statement.earningsAmount, statement.currency)}</dd></div>
+                <div><dt class="text-muted-foreground">Adjustments</dt><dd class="font-medium">{formatMoney(statement.adjustmentsAmount, statement.currency)}</dd></div>
+                <div><dt class="text-muted-foreground">Payouts</dt><dd class="font-medium">{formatMoney(statement.payoutAmount, statement.currency)}</dd></div>
+              </dl>
+              {statement.lines.length ? (
+                <div class="mt-5 overflow-x-auto rounded-lg border border-border">
+                  <table class="w-full min-w-[32rem] text-left text-sm">
+                    <thead class="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground"><tr><th class="px-3 py-2">Description</th><th class="px-3 py-2">Share</th><th class="px-3 py-2 text-right">Amount</th></tr></thead>
+                    <tbody>{statement.lines.map((line) => <tr class="border-t border-border"><td class="px-3 py-2">{line.description ?? "Royalty earning"}</td><td class="px-3 py-2">{line.sharePercent == null ? "—" : `${line.sharePercent}%`}</td><td class="px-3 py-2 text-right">{formatMoney(line.amount, statement.currency)}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p class="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No published statements yet.</p>
+      )}
+    </section>
+
+    <section aria-labelledby="payouts-heading" class="space-y-3">
+      <div>
+        <h2 id="payouts-heading" class="text-lg font-semibold">Payout history</h2>
+        <p class="text-sm text-muted-foreground">Only recorded payouts are included.</p>
+      </div>
+      {portal.payouts.length ? (
+        <div class="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+          <table class="w-full min-w-[40rem] text-left text-sm">
+            <thead class="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground"><tr><th class="px-4 py-3">Date</th><th class="px-4 py-3">Reference</th><th class="px-4 py-3">Status</th><th class="px-4 py-3 text-right">Amount</th></tr></thead>
+            <tbody>{portal.payouts.map((payout) => <tr class="border-t border-border"><td class="px-4 py-3">{formatDate(payout.paidAt ?? payout.scheduledFor)}</td><td class="px-4 py-3">{payout.reference ?? "—"}</td><td class="px-4 py-3 capitalize">{payout.status}</td><td class="px-4 py-3 text-right font-medium">{formatMoney(payout.amount, payout.currency)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      ) : (
+        <p class="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No recorded payouts yet.</p>
+      )}
+    </section>
+  </div>
+</AppLayout>

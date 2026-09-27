@@ -1,0 +1,236 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import { Ban, Calendar, CalendarRange, Landmark, PhoneCall } from "lucide-react";
+import { getTodayHubData } from "../server/today";
+import { listTodayHub } from "../server/analytics";
+import { listUpcomingGrantDeadlines } from "../server/grants";
+import { getGrantsWorklist } from "../server/grants-worklist";
+import { getFundingCoverage, summarizeCoverageByCurrency } from "../server/funding-coverage";
+import { BugInbox } from "../components/BugInbox";
+import TodayDecisionCards from "../components/analytics/TodayDecisionCards";
+import { formatCoverageMoney } from "../components/funding/money";
+
+const orgId = Astro.locals.orgId!;
+const [{ callRows, taskRows, bugRows, blockedRows, reportingWeekRows, eventRows }, todayHubData, grantDeadlines, grantsWorklist, fundingCoverage] = await Promise.all([
+  getTodayHubData(orgId),
+  listTodayHub(orgId),
+  listUpcomingGrantDeadlines(orgId),
+  getGrantsWorklist(orgId, { horizonDays: 7, limit: 6 }),
+  getFundingCoverage(orgId),
+]);
+const coverageSummary = summarizeCoverageByCurrency(fundingCoverage.values());
+---
+
+<AppLayout>
+  <div class="space-y-8">
+    <TodayDecisionCards client:load data={todayHubData} />
+
+    <section class="space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold">Funding coverage</h2>
+        <a href="/budget" class="text-xs text-muted-foreground hover:text-foreground">Open budget</a>
+      </div>
+      {!coverageSummary.length ? (
+        <p class="text-sm text-muted-foreground">No budget projects have funding coverage yet.</p>
+      ) : (
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {coverageSummary.map((coverage) => (
+            <div class="border border-border bg-card p-4">
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-sm font-semibold">{coverage.currency}</p>
+                <p class="text-xs text-muted-foreground">{formatCoverageMoney(coverage.confirmed, coverage.currency)} confirmed</p>
+              </div>
+              <p class="mt-2 text-2xl font-semibold tabular-nums">{formatCoverageMoney(coverage.gap, coverage.currency)}</p>
+              <p class="mt-1 text-xs text-muted-foreground">hard gap · {formatCoverageMoney(coverage.pipelineWeighted, coverage.currency)} weighted pipeline</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+
+      <section class="space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="flex items-center gap-2 text-lg font-semibold">
+            <Calendar className="h-4 w-4" />
+            Upcoming events ({eventRows.length})
+          </h2>
+          <a href="/events" class="text-xs text-muted-foreground hover:text-foreground">Open schedule</a>
+        </div>
+        <div class="grid gap-2">
+          {!eventRows.length && <p class="text-sm text-muted-foreground">No upcoming events in this workspace.</p>}
+          {eventRows.map((event) => (
+            <a href={`/events/${event.id}`} class="block rounded border border-border bg-muted/20 p-4 transition-colors hover:bg-muted/35">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-sm font-medium">{event.title}</h3>
+                <span class="text-[11px] text-muted-foreground">{event.status}</span>
+              </div>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {event.event_type.replace("_", " ")}
+                {event.project_name ? ` · ${event.project_name}` : ""}
+                {event.venue_name ? ` · ${event.venue_name}` : ""}
+                {event.city ? ` · ${event.city}` : ""}
+              </p>
+              <p class="mt-1 text-xs text-muted-foreground">
+                {new Date(`${event.start_date}T00:00:00`).toLocaleDateString()}
+              </p>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section class="space-y-3">
+        <h2 class="flex items-center gap-2 text-lg font-semibold">
+          <CalendarRange className="h-4 w-4" />
+          Reporting calendar
+        </h2>
+      {!reportingWeekRows.length ? (
+        <p class="text-sm text-muted-foreground">No current or upcoming reporting weeks.</p>
+      ) : (
+        <div class="grid gap-3 md:grid-cols-2">
+          {reportingWeekRows.map((week) => (
+            <div class={`p-4 ${week.is_current ? "bg-blue-50/60 dark:bg-blue-950/20" : "bg-muted/20"}`}>
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold">{week.label}</p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {new Date(`${week.start_date}T00:00:00`).toLocaleDateString()}–{new Date(`${week.end_date}T00:00:00`).toLocaleDateString()}
+                  </p>
+                </div>
+                <span class="text-xs text-muted-foreground">{week.release_count} releases</span>
+              </div>
+              <p class="mt-2 text-xs text-muted-foreground">{week.is_current ? "Current week" : "Upcoming"} · {week.status}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="flex items-center gap-2 text-lg font-semibold">
+          <Landmark className="h-4 w-4" />
+          Funding worklist
+        </h2>
+        <a href="/grants" class="text-xs text-muted-foreground hover:text-foreground">Open full queue</a>
+      </div>
+      {!grantsWorklist.length ? (
+        <p class="text-sm text-muted-foreground">No grant work is due in the next 7 days.</p>
+      ) : (
+        <div class="divide-y divide-border border border-border">
+          {grantsWorklist.map((item) => (
+            <a href={item.href} class="grid gap-2 px-4 py-3 transition hover:bg-muted/20 sm:grid-cols-[minmax(0,1fr)_150px_140px] sm:items-center">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-[11px] uppercase tracking-wide text-amber-700 dark:text-amber-300">{item.kind}</span>
+                  <p class="truncate text-sm font-medium">{item.title}</p>
+                </div>
+                <p class="mt-1 truncate text-xs text-muted-foreground">{item.projectName || "No project linked"}{item.ownerName ? ` · ${item.ownerName}` : " · Unassigned"}</p>
+              </div>
+              <p class="text-xs text-muted-foreground">{item.dueDate ? `Due ${new Date(`${item.dueDate}T00:00:00`).toLocaleDateString()}` : "No date"}</p>
+              <p class="text-right text-xs font-medium tabular-nums">{formatCoverageMoney(item.amountAtStake, item.currency)} at stake</p>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="flex items-center gap-2 text-lg font-semibold">
+        <Landmark className="h-4 w-4" />
+        Funding deadlines
+      </h2>
+      {!grantDeadlines.length ? (
+        <p class="text-sm text-muted-foreground">No grant deadlines in the next 90 days.</p>
+      ) : (
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {grantDeadlines.map((deadline) => (
+            <div class="bg-amber-50/55 p-4 dark:bg-amber-950/20">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold">{deadline.title || "Grant application"}</p>
+                  {deadline.context && <p class="mt-1 text-xs text-muted-foreground">{deadline.context}</p>}
+                </div>
+                <span class="text-[11px] uppercase tracking-wide text-amber-700 dark:text-amber-300">{deadline.kind}</span>
+              </div>
+              <p class="mt-3 text-xs text-muted-foreground">
+                Due {new Date(`${deadline.deadline}T00:00:00`).toLocaleDateString()} · {deadline.status}
+                {deadline.amount ? ` · ${deadline.currency} ${Number(deadline.amount).toLocaleString()}` : ""}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+      <section>
+        <h2 class="mb-3 flex items-center gap-2 text-lg font-semibold">
+          <PhoneCall className="h-4 w-4" />
+          Calls ({callRows.length})
+        </h2>
+        <div class="space-y-2">
+          {!callRows.length && <p class="text-sm text-muted-foreground">No upcoming calls.</p>}
+          {callRows.map((c) => (
+            <div class="bg-muted/20 p-4">
+              <div class="flex items-start justify-between gap-2">
+                <h3 class="font-medium text-sm">{c.title}</h3>
+                {c.call_type && <span class="text-[11px] text-muted-foreground">{c.call_type}</span>}
+              </div>
+              <p class="text-xs text-muted-foreground mt-1">{[c.contact_name, c.release_title, c.project_name].filter(Boolean).join(" · ")}</p>
+              {c.start && <p class="text-xs text-muted-foreground mt-1">{new Date(c.start).toLocaleDateString()} · {new Date(c.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div class="flex items-center justify-between mb-3 gap-3">
+          <h2 class="text-lg font-semibold">Tasks ({taskRows.length})</h2>
+          <a href="/ops-tasks" class="text-xs text-muted-foreground hover:text-foreground">Manage</a>
+        </div>
+        <div class="space-y-2">
+          {!taskRows.length && <p class="text-sm text-muted-foreground">No open tasks.</p>}
+          {taskRows.map((task) => {
+            const context = [task.artist_name, task.release_title, task.campaign_name, task.contact_name, task.project_name].filter(Boolean).join(" · ");
+            const owner = task.owner_contact_name || task.owner || "Unassigned";
+            return (
+              <a href="/ops-tasks" class={`block p-4 transition-colors ${task.is_overdue ? "bg-red-50/45 hover:bg-red-50/70" : "bg-muted/20 hover:bg-muted/35"}`}>
+                <div class="flex items-start justify-between gap-3">
+                  <h3 class="font-medium text-sm min-w-0">{task.task_name}</h3>
+                  {task.priority && <span class="shrink-0 text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground">{task.priority}</span>}
+                </div>
+                <p class="text-xs text-muted-foreground mt-1">{owner}{context ? ` · ${context}` : ""}</p>
+                {task.due_date && (
+                  <p class={`text-xs mt-1 ${task.is_overdue ? "text-red-700" : "text-muted-foreground"}`}>
+                    Due {new Date(`${task.due_date}T00:00:00`).toLocaleDateString()}
+                  </p>
+                )}
+                {task.next_action && <p class="text-xs text-muted-foreground mt-2">{task.next_action}</p>}
+              </a>
+            );
+          })}
+        </div>
+      </section>
+
+      <section>
+        <h2 class="mb-3 flex items-center gap-2 text-lg font-semibold">
+          <Ban className="h-4 w-4" />
+          Blocked ({blockedRows.length})
+        </h2>
+        <div class="space-y-2">
+          {!blockedRows.length && <p class="text-sm text-muted-foreground">All clear.</p>}
+          {blockedRows.map((r) => (
+            <a href={`/releases/${r.id}?section=overview&returnTo=today#release-readiness`} class="block bg-red-50/45 p-4 transition-colors hover:bg-red-50/70">
+              <h3 class="font-medium text-sm">{r.title}</h3>
+              <p class="text-xs text-muted-foreground mt-1">{r.artist_name} · {r.release_date || "No date"}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <BugInbox client:load initialBugs={bugRows} />
+      </section>
+    </div>
+  </div>
+</AppLayout>

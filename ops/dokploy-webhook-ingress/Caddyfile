@@ -1,0 +1,16 @@
+# Canonical Label Suite-owned fragment for the shared Winona Caddyfile.
+# Cloudflare terminates public TLS; the Caddy origin site intentionally uses HTTP.
+http://label-suite-deploy.truenature.online {
+	@dokploy_github_webhook {
+		method POST
+		path /api/deploy/github
+	}
+
+	handle @dokploy_github_webhook {
+		reverse_proxy dokploy:3000
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+}

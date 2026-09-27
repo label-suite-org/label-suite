@@ -1,0 +1,32 @@
+---
+import "../../styles/global.css";
+import { FountainRadioUpdatePage } from "../../components/press/FountainRadioUpdatePage";
+import { resolvePublishedCampaignPageRoute } from "../../server/campaign-public-page-public-route";
+
+export const prerender = false;
+
+const slug = Astro.params.slug;
+const resolved = await resolvePublishedCampaignPageRoute(slug);
+if ("response" in resolved) return resolved.response;
+const { page, metadata } = resolved;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{metadata.title}</title>
+    <meta name="description" content={metadata.description} />
+    <link rel="canonical" href={metadata.canonical} />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content={metadata.title} />
+    <meta property="og:description" content={metadata.description} />
+    <meta property="og:url" content={metadata.canonical} />
+    <meta property="og:image" content={metadata.artworkUrl} />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <FountainRadioUpdatePage page={page} />
+  </body>
+</html>

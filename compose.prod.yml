@@ -1,0 +1,138 @@
+# Production stack owned by Dokploy.
+# Dokploy writes its Environment tab to .env before running this file.
+# Configure the public domain against service `label-suite`, container port 4321.
+
+services:
+  label-suite-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+      target: worker
+    image: ${APP_NAME:-label-suite}-worker:local
+    command: ["npm", "run", "db:migrate:runtime-safe"]
+    env_file:
+      - ${LABEL_SUITE_RUNTIME_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?required}
+      MIGRATION_DATABASE_URL: ${MIGRATION_DATABASE_URL:?required}
+    networks:
+      - default
+      - dokploy-network
+    restart: "no"
+
+  label-suite:
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+      target: web
+    image: ${APP_NAME:-label-suite}-web:local
+    env_file:
+      - ${LABEL_SUITE_RUNTIME_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: ""
+      HOST: 0.0.0.0
+      PORT: "4321"
+      REQUIRE_WORKER_HEALTH: ${REQUIRE_WORKER_HEALTH:-true}
+    depends_on:
+      label-suite-migrate:
+        condition: service_completed_successfully
+      label-suite-worker:
+        condition: service_healthy
+    expose:
+      - "4321"
+    networks:
+      - default
+      - dokploy-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4321/api/health').then(async (res) => { const health = await res.json().catch(() => null); process.exit(res.ok && typeof health?.revision === 'string' && /^[0-9a-f]{40}$/.test(health.revision) ? 0 : 1); }).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  label-suite-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+      target: worker
+    image: ${APP_NAME:-label-suite}-worker:local
+    command: ["./node_modules/.bin/tsx", "scripts/run-job-worker.ts"]
+    env_file:
+      - ${LABEL_SUITE_RUNTIME_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: ""
+      LABEL_SUITE_WORKER_ID: ${LABEL_SUITE_WORKER_ID:-label-suite-worker}
+      PGOPTIONS: "-c app.current_org_id=${LABEL_SUITE_WORKER_ORG_ID:-true-nature}"
+    depends_on:
+      label-suite-migrate:
+        condition: service_completed_successfully
+    networks:
+      - default
+      - dokploy-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - ./node_modules/.bin/tsx
+        - scripts/worker-healthcheck.ts
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  label-suite-scheduler:
+    image: ${APP_NAME:-label-suite}-worker:local
+    profiles:
+      - scheduler
+    command: ["./node_modules/.bin/tsx", "scripts/enqueue-scheduled-jobs.ts"]
+    env_file:
+      - ${LABEL_SUITE_RUNTIME_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: ""
+      PGOPTIONS: "-c app.current_org_id=${LABEL_SUITE_WORKER_ORG_ID:-true-nature}"
+    networks:
+      - default
+      - dokploy-network
+    restart: "no"
+    # Configure this as a Dokploy scheduled task; do not keep a second host timer.
+
+  label-suite-sisense-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile.sisense-worker
+    image: ${APP_NAME:-label-suite}-sisense-worker:local
+    command: ["sh", "-c", "while :; do sleep 3600; done"]
+    env_file:
+      - ${LABEL_SUITE_RUNTIME_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: production
+      MIGRATION_DATABASE_URL: ""
+    networks:
+      - default
+      - dokploy-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const fs=require('node:fs'); const revision=fs.readFileSync('/app/.release-revision','utf8').trim(); process.exit(/^[0-9a-f]{40}$/.test(revision) ? 0 : 1);"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  dokploy-network:
+    external: true
+    # Dokploy schedules exec explicit, reviewed commands in this idle Playwright runner.
+    # The Compose default must never scrape, import, upload, or apply on its own.

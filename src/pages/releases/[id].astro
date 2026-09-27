@@ -1,0 +1,68 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listArtistOptions } from "../../server/artists";
+import { listBudgetItemsForRelease } from "../../server/budget-items";
+import { listDspPitchesForRelease } from "../../server/dsp-pitches";
+import { getReleaseReadinessSnapshot } from "../../server/release-correction";
+import { getReleaseDetail, listReleases } from "../../server/releases";
+import { getReleaseSamplyReview } from "../../server/samply-release";
+import { listTracksForRelease, listWorkOptions } from "../../server/tracks";
+import { listReleaseCockpit } from "../../server/analytics";
+import { getReleaseTimeline } from "../../server/release-timeline";
+import { listCampaignsForRelease } from "../../server/campaigns";
+import { listDocumentsForRelease } from "../../server/documents";
+import { listMediaAssetsForRelease } from "../../server/media-assets";
+import { ReleaseWorkspace } from "../../components/releases/ReleaseWorkspace";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const { id } = Astro.params;
+if (!id) return Astro.redirect("/releases");
+
+const orgId = Astro.locals.orgId!;
+const release = await getReleaseDetail(orgId, id);
+const trackRows = await listTracksForRelease(orgId, id);
+const budgetRows = await listBudgetItemsForRelease(orgId, id);
+const pitchRows = await listDspPitchesForRelease(orgId, id);
+const workRows = await listWorkOptions(orgId);
+const artistRowsForForm = await listArtistOptions(orgId);
+const parentReleaseRows = await listReleases(orgId);
+const cockpit = release ? await listReleaseCockpit(orgId, id) : null;
+const samplyReview = release ? await getReleaseSamplyReview(orgId, id) : null;
+const timeline = release ? await getReleaseTimeline(orgId, id).catch(() => null) : null;
+const campaigns = release ? await listCampaignsForRelease(orgId, id) : [];
+const documents = release ? await listDocumentsForRelease(orgId, id) : [];
+const mediaAssets = release ? await listMediaAssetsForRelease(orgId, id) : [];
+const readiness = release ? await getReleaseReadinessSnapshot(orgId, id).catch(error => {
+  // Keep record tools available, but never substitute cached readiness for failed checks.
+  console.error("Release readiness snapshot unavailable", { errorType: error instanceof Error ? error.name : "Unknown" });
+  return null;
+}) : null;
+const canManage = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+const pitchRowsForClient = pitchRows.map((pitch) => ({
+  ...pitch,
+  sent_date: pitch.sent_date ? pitch.sent_date.toISOString() : null,
+}));
+---
+
+<AppLayout>
+  {!release ? <p class="text-muted-foreground">Release not found.</p> : (
+    <ReleaseWorkspace
+      client:load
+      release={release}
+      readiness={readiness}
+      tracks={trackRows}
+      budgetItems={budgetRows}
+      pitches={pitchRowsForClient}
+      works={workRows}
+      artists={artistRowsForForm}
+      cockpit={cockpit}
+      samplyReview={samplyReview}
+      canManage={canManage}
+      timeline={timeline}
+      parentReleases={parentReleaseRows}
+      campaigns={campaigns}
+      documents={documents}
+      mediaAssets={mediaAssets}
+    />
+  )}
+</AppLayout>

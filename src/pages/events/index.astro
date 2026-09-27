@@ -1,0 +1,19 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import ProjectsEventsWorkspace from "../../components/projects/ProjectsEventsWorkspace";
+import { listArtistOptions } from "../../server/artists";
+import { listContactOptions } from "../../server/contacts";
+import { listProjectEvents } from "../../server/project-events";
+import { listProjects } from "../../server/projects";
+import { listReleaseOptions } from "../../server/releases";
+
+const orgId = Astro.locals.orgId!;
+const [projects, events, artists, releases, contacts] = await Promise.all([
+  listProjects(orgId), listProjectEvents(orgId, {}), listArtistOptions(orgId), listReleaseOptions(orgId), listContactOptions(orgId),
+]);
+const initialView = Astro.url.searchParams.get("view") === "projects" ? "projects" : "events";
+---
+
+<AppLayout title="Events">
+  <ProjectsEventsWorkspace client:load projects={projects} events={events} artists={artists} releases={releases} contacts={contacts} initialView={initialView} workspaceRoute="events" />
+</AppLayout>

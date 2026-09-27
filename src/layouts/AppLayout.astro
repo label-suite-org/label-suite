@@ -1,0 +1,38 @@
+---
+import { AppShell } from "../components/AppShell";
+import { serializeClientCapabilities } from "../server/tenant";
+import "../styles/global.css";
+
+const orgName = Astro.locals.org?.name ?? "Workspace";
+const membershipRole = Astro.locals.membershipRole ?? "member";
+const capabilities = serializeClientCapabilities(membershipRole);
+const isPayee = membershipRole === "payee";
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <title>Label Suite</title>
+    <meta name="description" content="Independent music label operations" />
+    <script is:inline>
+      (() => {
+        const stored = localStorage.getItem("dark-mode");
+        const dark =
+          stored === "true" ||
+          (stored === null && window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <AppShell client:load orgName={orgName} membershipRole={membershipRole} capabilities={capabilities} isPayee={isPayee}>
+      <slot />
+    </AppShell>
+  </body>
+</html>

@@ -1,0 +1,217 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import AnalyticsCommandCenterView from "../components/analytics/AnalyticsCommandCenter";
+import CampaignBreakdown from "../components/analytics/CampaignBreakdown";
+import OpsTasksBreakdownView from "../components/analytics/OpsTasksBreakdownView";
+import { TopArtistsByNet, TopReleasesByNet } from "../components/analytics/RevenueRankings";
+import RoyaltiesTimeseries from "../components/analytics/RoyaltiesTimeseries";
+import DatedTrackSnapshotTable from "../components/analytics/DatedTrackSnapshotTable";
+import CitiesByStreams from "../components/analytics/CitiesByStreams";
+import SpotifySourceBreakdown from "../components/analytics/SpotifySourceBreakdown";
+import DemographicsTable from "../components/analytics/DemographicsTable";
+import PlaylistListings from "../components/analytics/PlaylistListings";
+import GenreBenchmarks from "../components/analytics/GenreBenchmarks";
+import SyncRunsLog from "../components/analytics/SyncRunsLog";
+import AnalyticsDataQuality from "../components/analytics/AnalyticsDataQuality";
+import SpotifyCsvImport from "../components/analytics/SpotifyCsvImport";
+import SisenseTrackSnapshotImport from "../components/analytics/SisenseTrackSnapshotImport";
+import TrueBlueForecast from "../components/forecast/TrueBlueForecast";
+import AnalyticsWorkspaceNav from "../components/analytics/AnalyticsWorkspaceNav.astro";
+import AnalyticsSandboxBanner from "../components/analytics/AnalyticsSandboxBanner.astro";
+import {
+  listAnalyticsCommandCenter,
+  listDatedTrackSnapshotWorkspace,
+  listAnalyticsCities,
+  listAnalyticsStreamSources,
+  listAnalyticsWidgetRows,
+  listAnalyticsRunHistory,
+} from "../server/analytics";
+import {
+  listCampaignStatusBreakdown,
+  listOpsTasksBreakdown,
+  listRoyaltiesTimeseries,
+  listTopArtistsByNet,
+  listTopReleasesByNet,
+} from "../server/analytics-extra";
+import { listAnalyticsDataQuality } from "../server/analytics-data-quality";
+import { listArtists } from "../server/artists";
+import { createSpotifyAnalyticsImportService } from "../server/spotify-analytics-import";
+import { createProductionSisenseTrackSnapshotService } from "../server/sisense-track-snapshot-import";
+import { parseAnalyticsSection } from "../lib/analytics-workspace";
+import { resolveAnalyticsSandboxRuntimeState } from "../lib/analytics-sandbox";
+
+const orgId = Astro.locals.orgId!;
+const spotifyImportService = createSpotifyAnalyticsImportService();
+const sandboxState = resolveAnalyticsSandboxRuntimeState({ env: process.env, isDev: import.meta.env.DEV, orgId: Astro.locals.orgId! });
+
+const url = new URL(Astro.request.url);
+const activeSection = parseAnalyticsSection(url.searchParams.get("section"));
+const artistParam = url.searchParams.get("artist") || undefined;
+const releaseParam = url.searchParams.get("release") || undefined;
+const platformParam = url.searchParams.get("platform");
+const platforms = platformParam
+  ? platformParam.split(",").filter((p): p is "spotify" | "apple" => p === "spotify" || p === "apple")
+  : undefined;
+const filter = artistParam || releaseParam || platforms
+  ? { artistId: artistParam, releaseId: releaseParam, platforms }
+  : undefined;
+
+const [
+  commandCenter,
+  datedTrackSnapshotWorkspace,
+  cities,
+  streamSources,
+  demographicsRows,
+  playlistRows,
+  genreRows,
+  runHistory,
+  royaltiesTimeseries,
+  topArtists,
+  topReleases,
+  campaignBreakdown,
+  opsBreakdown,
+  dataQuality,
+  artists,
+  latestSpotifyAudienceImports,
+  latestSisenseTrackSnapshotImports,
+] = await Promise.all([
+  listAnalyticsCommandCenter(orgId, filter),
+  artistParam ? listDatedTrackSnapshotWorkspace(orgId, artistParam) : Promise.resolve(null),
+  listAnalyticsCities(orgId, 50),
+  listAnalyticsStreamSources(orgId),
+  listAnalyticsWidgetRows(orgId, "spotify-demographics-passion-indicators", 100),
+  listAnalyticsWidgetRows(orgId, "spotify-playlist-listings", 100),
+  listAnalyticsWidgetRows(orgId, "passion-indicator-benchmarks-genre", 100),
+  listAnalyticsRunHistory(orgId, 50),
+  listRoyaltiesTimeseries(orgId),
+  listTopArtistsByNet(orgId, 10),
+  listTopReleasesByNet(orgId, 10),
+  listCampaignStatusBreakdown(orgId),
+  listOpsTasksBreakdown(orgId),
+  listAnalyticsDataQuality(orgId),
+  listArtists(orgId),
+  spotifyImportService.listLatestSpotifyAudienceImports(orgId),
+  createProductionSisenseTrackSnapshotService().listLatestByArtist(orgId),
+]);
+---
+
+<AppLayout>
+  <div class="space-y-10">
+    <div class="space-y-3">
+      <h1 class="text-3xl font-semibold tracking-tight text-[var(--foreground)]">Analytics workspace</h1>
+      {sandboxState.enabled && <AnalyticsSandboxBanner />}
+      <AnalyticsWorkspaceNav activeSection={activeSection} currentUrl={url} />
+    </div>
+
+    {activeSection === "overview" && (
+      <>
+        <AnalyticsCommandCenterView client:only="react" command={commandCenter} section="overview" />
+        <details class="group border-t border-[var(--border)] pt-5">
+          <summary class="cursor-pointer list-none">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Ops layer</p>
+                <h2 class="mt-1 text-xl font-semibold tracking-tight">Royalties, campaigns, and tasks</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Review revenue, campaign progress, and open tasks.</p>
+              </div>
+              <span class="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-muted-foreground group-open:hidden">Show</span>
+              <span class="hidden rounded-full border border-[var(--border)] px-3 py-1 text-xs text-muted-foreground group-open:inline">Hide</span>
+            </div>
+          </summary>
+          <div class="mt-6 space-y-6">
+            <RoyaltiesTimeseries client:only="react" data={royaltiesTimeseries} />
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <TopArtistsByNet client:only="react" rows={topArtists} />
+              <TopReleasesByNet client:only="react" rows={topReleases} />
+            </div>
+
+            <CampaignBreakdown client:only="react" rows={campaignBreakdown} />
+
+            <OpsTasksBreakdownView client:only="react" data={opsBreakdown} />
+          </div>
+        </details>
+      </>
+    )}
+
+    {activeSection === "trends" && (
+      <>
+        <AnalyticsCommandCenterView client:only="react" command={commandCenter} section="trends" />
+      </>
+    )}
+
+    {activeSection === "audience" && (
+      <>
+        <AnalyticsCommandCenterView client:only="react" command={commandCenter} section="audience" />
+      </>
+    )}
+
+    {activeSection === "discovery" && (
+      <>
+        <AnalyticsCommandCenterView client:only="react" command={commandCenter} section="discovery" />
+      </>
+    )}
+
+    {activeSection === "forecast" && (
+      <section aria-labelledby="analytics-forecast-heading" class="space-y-6">
+        <div>
+          <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Scenario planning</p>
+          <h2 id="analytics-forecast-heading" class="mt-1 text-2xl font-semibold tracking-tight">Forecast</h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Local planning scenarios based on the displayed historical baseline. Forecasts are editable projections, not imported source truth.
+          </p>
+        </div>
+        <TrueBlueForecast client:only="react" />
+      </section>
+    )}
+
+    {activeSection === "data-health" && (
+      <section aria-labelledby="analytics-data-health-heading" class="space-y-8">
+        <div>
+          <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Trust and remediation</p>
+          <h2 id="analytics-data-health-heading" class="mt-1 text-2xl font-semibold tracking-tight">Data Health</h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Review source coverage, freshness, duplicate candidates, unmatched rows, and sync outcomes. Missing or unmatched data remains visible until reviewed.
+          </p>
+        </div>
+        <SpotifyCsvImport client:only="react" artists={artists} latestImports={latestSpotifyAudienceImports} />
+        <SisenseTrackSnapshotImport client:only="react" artists={artists} latestImports={latestSisenseTrackSnapshotImports} />
+        <AnalyticsDataQuality client:only="react" report={dataQuality} />
+        <div id="analytics-sync-runs">
+          <SyncRunsLog client:only="react" runs={runHistory} />
+        </div>
+        <details class="group border-t border-[var(--border)] pt-5">
+          <summary class="cursor-pointer list-none">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Raw drilldown</p>
+                <h3 class="mt-1 text-xl font-semibold tracking-tight">Inspect imported tables</h3>
+                <p class="mt-1 text-sm text-muted-foreground">Bounded source tables for QA and deeper investigation.</p>
+              </div>
+              <span class="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-muted-foreground group-open:hidden">Show</span>
+              <span class="hidden rounded-full border border-[var(--border)] px-3 py-1 text-xs text-muted-foreground group-open:inline">Hide</span>
+            </div>
+          </summary>
+          <div class="mt-6 space-y-8">
+            {artistParam && datedTrackSnapshotWorkspace ? (
+              <DatedTrackSnapshotTable
+                client:only="react"
+                workspace={datedTrackSnapshotWorkspace}
+                selectedArtistId={artistParam}
+              />
+            ) : (
+              <p class="border border-[var(--border)] p-4 text-sm text-muted-foreground">
+                Select an artist to inspect dated track snapshot evidence.
+              </p>
+            )}
+            <CitiesByStreams client:only="react" rows={cities} />
+            <SpotifySourceBreakdown client:only="react" spotify={streamSources.spotify} apple={streamSources.apple} />
+            <DemographicsTable client:only="react" rows={demographicsRows} />
+            <PlaylistListings client:only="react" rows={playlistRows} />
+            <GenreBenchmarks client:only="react" rows={genreRows} />
+          </div>
+        </details>
+      </section>
+    )}
+  </div>
+</AppLayout>

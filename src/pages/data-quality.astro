@@ -1,0 +1,28 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import DataQualityWorkspace, { type DataQualityIssue, type DataQualityTargetOptions } from "../components/integrations/DataQualityWorkspace";
+import {
+  listDataQualityIssues,
+  listDataQualityTargetOptions,
+  listIntegrationConnections,
+} from "../server/integrations";
+import { requireCapability } from "../server/tenant";
+
+const orgId = requireCapability(Astro.locals, "integrations.manage");
+const [issueRows, connections, targetOptions] = await Promise.all([
+  listDataQualityIssues(orgId),
+  listIntegrationConnections(orgId),
+  listDataQualityTargetOptions(orgId),
+]);
+
+const initialIssues = issueRows.map((issue) => ({
+  ...issue,
+  created_at: issue.created_at?.toISOString() ?? new Date(0).toISOString(),
+  updated_at: issue.updated_at?.toISOString() ?? new Date(0).toISOString(),
+})) as DataQualityIssue[];
+const initialTargetOptions = targetOptions as DataQualityTargetOptions;
+---
+
+<AppLayout>
+  <DataQualityWorkspace client:load initialIssues={initialIssues} connections={connections.map(({ auth_ref: _authRef, ...connection }) => connection)} targetOptions={initialTargetOptions} />
+</AppLayout>

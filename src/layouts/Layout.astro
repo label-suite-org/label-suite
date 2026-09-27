@@ -1,0 +1,41 @@
+---
+import "../styles/global.css";
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <title>Label Suite</title>
+    <meta name="description" content="Independent music label operations" />
+    <script is:inline>
+      (() => {
+        const stored = localStorage.getItem("dark-mode");
+        const dark =
+          stored === "true" ||
+          (stored === null && window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+        document.documentElement.classList.toggle("dark", dark);
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-background text-foreground antialiased">
+    <header class="border-b border-border px-6 py-4">
+      <nav class="max-w-7xl mx-auto flex items-center justify-between">
+        <a href="/" class="text-lg font-semibold tracking-tight">Label Suite</a>
+        <div class="flex items-center gap-4 text-sm text-muted-foreground">
+          <a href="/releases" class="hover:text-foreground transition-colors">Releases</a>
+          <a href="/artists" class="hover:text-foreground transition-colors">Artists</a>
+          <a href="/today" class="hover:text-foreground transition-colors">Today</a>
+        </div>
+      </nav>
+    </header>
+    <main class="max-w-7xl mx-auto px-6 py-12">
+      <slot />
+    </main>
+  </body>
+</html>

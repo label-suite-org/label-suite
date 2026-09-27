@@ -1,0 +1,55 @@
+name: LabelSuite
+options:
+  deploymentTarget:
+    iOS: "18.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+targets:
+  LabelSuite:
+    type: framework
+    platform: iOS
+    sources: Sources/LabelSuite
+    scheme:
+      testTargets:
+        - LabelSuiteTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: online.truenature.labelsuite.framework
+  LabelSuiteApp:
+    type: application
+    platform: iOS
+    sources: Sources/LabelSuiteApp
+    resources: Resources
+    dependencies:
+      - target: LabelSuite
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 9H6QZUFDPM
+        PRODUCT_BUNDLE_IDENTIFIER: online.truenature.labelsuite
+    info:
+      path: Supporting/Info.plist
+      properties:
+        CFBundleDisplayName: Label Suite
+        NSCameraUsageDescription: Capture photos and scan documents for your workspace resources.
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        LabelSuiteAPIURL: https://suite.truenature.online
+  LabelSuiteTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: Tests/LabelSuiteTests
+    dependencies:
+      - target: LabelSuite
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: online.truenature.labelsuite.tests
+        GENERATE_INFOPLIST_FILE: YES

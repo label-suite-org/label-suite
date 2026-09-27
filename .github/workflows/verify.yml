@@ -1,0 +1,116 @@
+name: Verify
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plane-sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify the Plane sync delivery contract
+        run: |
+          npm run deps:ci
+          npm run plane-sync:test
+          npm run plane-sync:build
+          npm run plane-sync:delivery-contract
+
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    services:
+      database:
+        image: postgres:17
+        env:
+          POSTGRES_DB: label_suite
+          POSTGRES_USER: label_suite
+          POSTGRES_PASSWORD: label_suite
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U label_suite -d label_suite"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CI: "true"
+      DATABASE_URL: postgres://label_suite:label_suite@127.0.0.1:5432/label_suite
+      DASHBOARD_PREFERENCES_RLS_TEST: "1"
+      INVITATION_AUTH_RLS_TEST: "1"
+      ANALYTICS_FIXTURE_DB_URL: postgres://label_suite:label_suite@127.0.0.1:5432/analytics_fixture_ci
+      ANALYTICS_FIXTURE_DB: "1"
+      ANALYTICS_FIXTURE_DISPOSABLE: "1"
+      RELEASE_GATE_FIXTURE_DISPOSABLE: "1"
+      CAMPAIGN_ENRICHMENT_TOOL_INTEGRATION: "1"
+      CAMPAIGN_ENRICHMENT_TOOL_INTEGRATION_DISPOSABLE: "1"
+      PUBLIC_SITE_URL: http://127.0.0.1:4321
+      HOST: 0.0.0.0
+      PORT: "4321"
+      E2E_USER_EMAIL: release-gate@example.test
+      E2E_USER_PASSWORD: ReleaseGatePass123!
+      E2E_ARTIST_ID: e2e-artist-release-gate
+      E2E_RELEASE_ID: e2e-release-release-gate
+      E2E_TRACK_ID: e2e-track-release-gate
+      E2E_EVENT_ID: e2e-event-release-gate
+      SHARP_IGNORE_GLOBAL_LIBVIPS: "1"
+      PGHOST: 127.0.0.1
+      PGUSER: label_suite
+      PGPASSWORD: label_suite
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install release-gate system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client curl
+      - name: Set the checked-out revision artifact
+        run: |
+          sh scripts/write-build-revision.sh "$GITHUB_WORKSPACE/.release-revision"
+          echo "APP_REVISION_FILE=$GITHUB_WORKSPACE/.release-revision" >> "$GITHUB_ENV"
+          echo "RELEASE_GATE_EXPECTED_REVISION=${{ github.sha }}" >> "$GITHUB_ENV"
+      - name: Generate disposable authentication secret
+        run: |
+          secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$secret"
+          echo "BETTER_AUTH_SECRET=$secret" >> "$GITHUB_ENV"
+      - name: Run the clean release gate
+        env:
+          # Astro type checking exceeds Node's default 2 GB heap on standard runners.
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: bash scripts/run-ci-release-gate.sh
+      - name: Verify analytics source imports on migrated disposable PostgreSQL
+        run: |
+          fixture_database=analytics_fixture_ci
+          cleanup_fixture() {
+            dropdb -h "${PGHOST}" -U "${PGUSER}" --if-exists "${fixture_database}" >/dev/null 2>&1 || true
+          }
+          trap cleanup_fixture EXIT
+          cleanup_fixture
+          createdb -h "${PGHOST}" -U "${PGUSER}" "${fixture_database}"
+          DATABASE_URL="$ANALYTICS_FIXTURE_DB_URL" npm run db:migrate
+          npm run test:spotify-analytics-import
+          npm run test:sisense-track-snapshot-import

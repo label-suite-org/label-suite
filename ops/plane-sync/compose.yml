@@ -1,0 +1,34 @@
+# Separate Dokploy application; it is not part of the Label Suite web stack.
+services:
+  plane-sync:
+    build:
+      context: ../..
+      dockerfile: ops/plane-sync/Dockerfile
+    image: ${PLANE_SYNC_APP_NAME:-label-suite-plane-sync}:local
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8787"
+      HTTP_BODY_LIMIT_BYTES: ${HTTP_BODY_LIMIT_BYTES:-1048576}
+      PLANE_SYNC_DB_PATH: /data/plane-sync.sqlite
+      RECONCILE_INTERVAL_MS: ${RECONCILE_INTERVAL_MS:-900000}
+      ENVELOPE_RETENTION_MS: ${ENVELOPE_RETENTION_MS:-604800000}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:?GITHUB_REPOSITORY must be set}
+      SYNC_WRITE_MODE: ${SYNC_WRITE_MODE:?SYNC_WRITE_MODE must be set}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:?GITHUB_APP_ID must be set}
+      GITHUB_APP_INSTALLATION_ID: ${GITHUB_APP_INSTALLATION_ID:?GITHUB_APP_INSTALLATION_ID must be set}
+      GITHUB_APP_PRIVATE_KEY_B64: ${GITHUB_APP_PRIVATE_KEY_B64:?GITHUB_APP_PRIVATE_KEY_B64 must be set}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:?GITHUB_WEBHOOK_SECRET must be set}
+      PLANE_BASE_URL: ${PLANE_BASE_URL:?PLANE_BASE_URL must be set}
+      PLANE_API_TOKEN: ${PLANE_API_TOKEN:?PLANE_API_TOKEN must be set}
+      PLANE_WORKSPACE: ${PLANE_WORKSPACE:?PLANE_WORKSPACE must be set}
+      PLANE_PROJECT_ID: ${PLANE_PROJECT_ID:?PLANE_PROJECT_ID must be set}
+      SERVICE_REVISION_FILE: /app/.release-revision
+    expose:
+      - "8787"
+    volumes:
+      - plane-sync-data:/data
+    restart: unless-stopped
+
+volumes:
+  plane-sync-data:

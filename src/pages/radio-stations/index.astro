@@ -1,0 +1,31 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listRadioStations } from "../../server/radio-stations";
+import { listEmailTemplates } from "../../server/email";
+import { listCampaigns } from "../../server/campaigns";
+import { RadioStationManager } from "../../components/radio-stations/RadioStationManager";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const stationRows = await listRadioStations(orgId);
+const templates = await listEmailTemplates(orgId);
+const campaigns = await listCampaigns(orgId);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    <div class="flex items-center gap-3 text-xs text-muted-foreground">
+      <span>{stationRows.length} stations loaded</span>
+      <a href="/radio-plugging" class="text-foreground hover:underline">Open campaign cockpit →</a>
+    </div>
+
+    <RadioStationManager
+      client:load
+      initialStations={stationRows}
+      emailTemplates={templates}
+      campaigns={campaigns}
+      canMutate={canMutate}
+    />
+  </div>
+</AppLayout>

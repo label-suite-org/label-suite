@@ -1,0 +1,11 @@
+import { bearerToken, getNativeSession } from "../../../lib/native-session";
+import type { APIRoute } from "astro";
+import { runWithDatabaseContext } from "../../../lib/db";
+import { resolveNativeActor } from "../../../lib/native-workspace";
+import { createNativeEvent, listNativeEvents, nativeCreateEventSchema } from "../../../server/native-events-projects";
+import { handleApiError, json, parseJson } from "../../../server/api";
+import { hasCapability } from "../../../server/native-capabilities";
+import { HttpError } from "../../../server/errors";
+export const prerender = false;
+export const GET: APIRoute = async ({ request }) => { try { const actor = await resolveNativeActor(request); if (!actor) { const token = bearerToken(request); const session = token ? await getNativeSession(token) : null; return session ? json({ error: "Workspace access removed", code: "workspace_access_removed" }, 403) : json({ error: "Authentication required" }, 401); } if (actor.workspace.role === "payee") throw new HttpError("Insufficient permissions", 403); const q = new URL(request.url).searchParams; return await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, () => listNativeEvents(actor.workspace.org.id, { limit: q.get("limit"), cursor: q.get("cursor") }).then(json)); } catch (error) { return handleApiError(error); } };
+export const POST: APIRoute = async ({ request }) => { try { const actor = await resolveNativeActor(request); if (!actor) { const token = bearerToken(request); const session = token ? await getNativeSession(token) : null; return session ? json({ error: "Workspace access removed", code: "workspace_access_removed" }, 403) : json({ error: "Authentication required" }, 401); } if (!hasCapability(actor.workspace.role, "projects.mutate")) throw new HttpError("Insufficient permissions", 403); const input = await parseJson(request, nativeCreateEventSchema); const row = await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, () => createNativeEvent(actor.workspace.org.id, input, actor.userId)); return json(row, 201); } catch (error) { return handleApiError(error); } };

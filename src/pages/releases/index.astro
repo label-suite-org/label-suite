@@ -1,0 +1,35 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { listArtistOptions } from "../../server/artists";
+import { listReleaseRoster } from "../../server/releases";
+import { ReleaseCreateDialog } from "../../components/releases/ReleaseCreateDialog";
+import { ReleaseRoster } from "../../components/releases/ReleaseRoster";
+import { serializeClientCapabilities } from "../../server/tenant";
+
+const orgId = Astro.locals.orgId!;
+const releaseRows = await listReleaseRoster(orgId);
+const artistRowsForForm = await listArtistOptions(orgId);
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
+---
+
+<AppLayout>
+  <div class="space-y-6">
+    <section class="space-y-2 border-b border-[var(--border)] pb-6">
+      <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Releases</p>
+      <h1 class="text-3xl font-semibold tracking-tight">Release roster</h1>
+      <p class="max-w-3xl text-sm text-muted-foreground">Track release readiness, catalogue status, budgets, and delivery gaps from one shared roster view.</p>
+    </section>
+
+    {!releaseRows.length ? (
+      <div class="rounded-lg border-2 border-dashed border-border p-12 text-center text-muted-foreground">
+        <p class="text-lg font-medium text-foreground">No releases yet.</p>
+        <p class="mt-1 text-sm">Create the first release to connect tracks, budgets, DSP pitches, and royalty records.</p>
+        <div class="mt-5 flex justify-center">
+          {canMutate ? <ReleaseCreateDialog client:load artists={artistRowsForForm} /> : <p class="text-sm">Read-only for fundraiser</p>}
+        </div>
+      </div>
+    ) : (
+      <ReleaseRoster client:load releases={releaseRows} artists={artistRowsForForm} canMutate={canMutate} />
+    )}
+  </div>
+</AppLayout>
