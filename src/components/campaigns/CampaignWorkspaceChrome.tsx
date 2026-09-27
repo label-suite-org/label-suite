@@ -54,8 +54,8 @@ function CampaignList({ campaigns, selectedId, compact = false }: { campaigns: C
       <ItemMedia className={`${compact ? "size-12" : "size-16"} shrink-0 overflow-hidden rounded-md bg-muted/70`} variant="image"><CampaignArtwork cover={campaign.cover} name={campaign.name} /></ItemMedia>
       {!compact && <ItemContent className="min-w-0 gap-0.5">
         <ItemTitle className="truncate">{campaign.name}</ItemTitle>
-        {campaign.artist && <span className="truncate text-xs text-muted-foreground">{campaign.artist}</span>}
-        {campaign.purpose && <span className="truncate text-xs text-muted-foreground">{campaign.purpose}</span>}
+        {campaign.artist && <span className={`truncate text-xs ${campaign.id === selectedId ? "text-accent-foreground" : "text-muted-foreground"}`}>{campaign.artist}</span>}
+        {campaign.purpose && <span className={`truncate text-xs ${campaign.id === selectedId ? "text-accent-foreground" : "text-muted-foreground"}`}>{campaign.purpose}</span>}
       </ItemContent>}
     </Item>)}
   </nav>;
@@ -92,6 +92,7 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
   const href = (key: string) => `/campaigns/${campaignId}?tab=${key}`;
 
   return <div className="space-y-4">
+    <h1 className="sr-only">{campaignName}</h1>
     <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
       <Breadcrumb>
         <BreadcrumbList>
