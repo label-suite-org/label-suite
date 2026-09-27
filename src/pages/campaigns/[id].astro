@@ -1,6 +1,6 @@
 ---
 import AppLayout from "../../layouts/AppLayout.astro";
-import { getCampaignDetail, renderCampaignDocumentForDisplay } from "../../server/campaigns";
+import { getCampaignDetail, listCampaigns, renderCampaignDocumentForDisplay } from "../../server/campaigns";
 import {
   type CampaignAudienceContact,
   type CampaignAudienceOption,
@@ -26,6 +26,9 @@ import { listRadioStations } from "../../server/radio-stations";
 import { serializeClientCapabilities } from "../../server/tenant";
 import CampaignOutreachWorkspace from "../../components/campaigns/CampaignOutreachWorkspace";
 import CampaignOsWorkspace from "../../components/campaigns/CampaignOsWorkspace";
+import { CampaignContextRail, CampaignWorkingTasks, CampaignWorkspaceNavigation } from "../../components/campaigns/CampaignWorkspaceChrome";
+import { listOpsTasks } from "../../server/ops-tasks";
+import { openStatus } from "../../server/release-timeline-core";
 import {
   getCampaignOutreachFeatureAvailability,
   getCampaignOutreachWorkspace,
@@ -38,6 +41,14 @@ if (!id) return Astro.redirect("/campaigns");
 
 const orgId = Astro.locals.orgId!;
 const campaign = await getCampaignDetail(orgId, id);
+const campaignRows = campaign ? await listCampaigns(orgId) : [];
+const campaignRailItems = campaignRows.map((row) => ({
+  id: row.id,
+  name: row.campaign_name,
+  artist: row.artist_name,
+  purpose: row.campaign_type || row.release_title,
+  cover: row.cover_art_url,
+}));
 const goalDisplay = campaign
   ? renderCampaignDocumentForDisplay(campaign.goal_document, campaign.goal)
   : null;
@@ -84,6 +95,7 @@ const campaignTabs = [
   ...(campaign && canMutate && campaignAudienceSchemaAvailable ? [{ key: "audience", label: "Audience" }] : []),
   ...(campaign && !canMutate ? [{ key: "audience", label: "Audience" }] : []),
   { key: "content", label: "Content" },
+  { key: "details", label: "Details" },
   { key: "channels", label: "Channels" },
   { key: "budget", label: "Budget" },
   { key: "cost", label: "Cost" },
@@ -93,7 +105,9 @@ const campaignTabs = [
 ] as const;
 const requestedTab = Astro.url.searchParams.get("tab");
 const activeTab = campaignTabs.some((tab) => tab.key === requestedTab) ? requestedTab! : "overview";
-const tabHref = (tab: string) => `/campaigns/${id}?tab=${tab}`;
+const campaignWorkingTasks = campaign && activeTab === "overview"
+  ? (await listOpsTasks(orgId)).filter((task) => task.linked_campaign_id === id && openStatus(task.status)).slice(0, 3)
+  : [];
 const radioCampaign = campaign && activeTab === "channels" ? await getRadioPluggingCampaign(orgId, id) : null;
 const radioStations = campaign && activeTab === "channels" ? await listRadioStations(orgId) : [];
 if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
@@ -108,68 +122,13 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
 
 <AppLayout>
   {!campaign ? <p class="text-muted-foreground">Campaign not found.</p> : (
-    <div class="space-y-8">
-      <!-- Header -->
-      <div>
-        <div class="flex items-center gap-3">
-          <h1 class="text-3xl font-bold tracking-tight">{campaign.campaign_name}</h1>
-          <span class={`text-xs px-2 py-1 rounded-md font-medium ${
-            campaign.status === "active" ? "bg-green-100 text-green-700" :
-            campaign.status === "planning" ? "bg-blue-100 text-blue-700" :
-            campaign.status === "completed" ? "bg-muted text-muted-foreground" :
-            "bg-muted text-muted-foreground"
-          }`}>
-            {campaign.status || "planning"}
-          </span>
-        </div>
-        <p class="text-muted-foreground mt-1">
-          {campaign.campaign_type || "—"}
-          {campaign.main_platform ? ` · ${campaign.main_platform}` : ""}
-          {campaign.start_date ? ` · ${campaign.start_date}` : ""}
-          {campaign.end_date ? ` → ${campaign.end_date}` : ""}
-        </p>
-        {canMutate ? <div class="mt-3 flex gap-2">
-          <CampaignEditButton client:load campaign={campaign} releases={releaseRowsForForm} artists={artistRowsForForm} />
-          <CampaignDeleteButton client:load campaign={campaign} />
-        </div> : <p class="mt-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
-      </div>
-
-      <nav class="sticky top-2 z-20 overflow-x-auto rounded-xl border border-border bg-background/95 p-1 shadow-sm backdrop-blur" aria-label="Campaign sections">
-        <div class="flex min-w-max gap-1">
-          {campaignTabs.map((tab) => (
-            <a href={tabHref(tab.key)} aria-current={activeTab === tab.key ? "page" : undefined} class={`rounded-lg px-3 py-2 text-xs font-medium transition ${activeTab === tab.key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-              {tab.label}
-            </a>
-          ))}
-        </div>
-      </nav>
+    <div class="campaign-workspace flex min-w-0 border-y border-border bg-background lg:-mx-6 lg:min-h-[calc(100vh-3rem)]">
+      <CampaignContextRail client:load campaigns={campaignRailItems} selectedId={id} />
+      <div class="min-w-0 flex-1 space-y-8 px-4 py-5 sm:px-6">
+        <CampaignWorkspaceNavigation client:load campaignId={id} campaignName={campaign.campaign_name} status={campaign.status} activeTab={activeTab} sections={campaignTabs.map((tab) => ({ key: tab.key, label: tab.label }))} campaigns={campaignRailItems} />
 
       {activeTab === "overview" && <>
-        <!-- Linked Release & Artist -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="p-4 border border-border rounded-xl bg-card">
-          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Linked Release</h2>
-          {campaign.release_title ? (
-            <a href={`/releases/${campaign.linked_release_id}`} class="font-medium text-sm hover:underline">
-              {campaign.release_title}
-            </a>
-          ) : (
-            <p class="text-sm text-muted-foreground">No linked release</p>
-          )}
-        </div>
-        <div class="p-4 border border-border rounded-xl bg-card">
-          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Linked Artist</h2>
-          {campaign.artist_name ? (
-            <a href={`/artists/${campaign.linked_artist_id}`} class="font-medium text-sm hover:underline">
-              {campaign.artist_name}
-            </a>
-          ) : (
-            <p class="text-sm text-muted-foreground">No linked artist</p>
-          )}
-        </div>
-        </div>
-
-        <!-- Goal -->
+        <CampaignWorkingTasks tasks={campaignWorkingTasks.map((task) => ({ id: task.id, title: task.task_name || "Untitled task", nextAction: task.next_action, dueDate: task.due_date }))} />
         {goalDisplay?.plainText && (
           <section>
             <h2 class="text-lg font-semibold mb-2">Goal</h2>
@@ -179,7 +138,25 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
             />
           </section>
         )}
+        {!goalDisplay?.plainText && <p class="text-sm text-muted-foreground">No campaign goal has been added yet.</p>}
       </>}
+
+      {activeTab === "details" && <section class="max-w-3xl space-y-6">
+        <h2 class="text-lg font-semibold">Campaign details</h2>
+        <dl class="divide-y divide-border border-y border-border text-sm">
+          <div class="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]"><dt class="text-muted-foreground">Type</dt><dd>{campaign.campaign_type || "—"}</dd></div>
+          <div class="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]"><dt class="text-muted-foreground">Release</dt><dd>{campaign.release_title ? <a href={`/releases/${campaign.linked_release_id}`} class="font-medium hover:underline">{campaign.release_title}</a> : "No linked release"}</dd></div>
+          <div class="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]"><dt class="text-muted-foreground">Artist</dt><dd>{campaign.artist_name ? <a href={`/artists/${campaign.linked_artist_id}`} class="font-medium hover:underline">{campaign.artist_name}</a> : "No linked artist"}</dd></div>
+          <div class="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]"><dt class="text-muted-foreground">Platform</dt><dd>{campaign.main_platform || "—"}</dd></div>
+          <div class="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]"><dt class="text-muted-foreground">Starts</dt><dd>{campaign.start_date || "—"}</dd></div>
+          <div class="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]"><dt class="text-muted-foreground">Ends</dt><dd>{campaign.end_date || "—"}</dd></div>
+          <div class="grid gap-1 py-3 sm:grid-cols-[10rem_1fr]"><dt class="text-muted-foreground">Owner</dt><dd>{campaign.owner || "—"}</dd></div>
+        </dl>
+        {canMutate ? <div class="flex gap-2">
+          <CampaignEditButton client:load campaign={campaign} releases={releaseRowsForForm} artists={artistRowsForForm} />
+          <CampaignDeleteButton client:load campaign={campaign} />
+        </div> : <p class="text-sm text-muted-foreground">Read-only for fundraiser</p>}
+      </section>}
 
       {activeTab === "outreach" && (
         <section class="rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -371,6 +348,7 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
           />
         </section>
       )}
+      </div>
     </div>
   )}
 </AppLayout>
