@@ -94,11 +94,11 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
   return <div className="space-y-4">
     <h1 className="sr-only">{campaignName}</h1>
     <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-      <Breadcrumb>
-        <BreadcrumbList>
+      <Breadcrumb className="min-w-0 max-w-full">
+        <BreadcrumbList className="min-w-0">
           <BreadcrumbItem><BreadcrumbLink href="/campaigns">Campaigns</BreadcrumbLink></BreadcrumbItem>
           <BreadcrumbSeparator><ChevronRight /></BreadcrumbSeparator>
-          <BreadcrumbItem><BreadcrumbPage className="max-w-[18rem] truncate">{campaignName}</BreadcrumbPage></BreadcrumbItem>
+          <BreadcrumbItem className="min-w-0 max-w-full"><BreadcrumbPage className="min-w-0 max-w-[calc(100vw-4rem)] truncate sm:max-w-72">{campaignName}</BreadcrumbPage></BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
       <div className="flex items-center gap-2">
