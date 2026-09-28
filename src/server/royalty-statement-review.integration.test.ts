@@ -81,6 +81,11 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
     const savedBatch = await readScoped(() => getPayoutBatch(org,repeats[0].batch_id));
     expect(savedBatch.lines).toHaveLength(1);
     expect(savedBatch.lines[0]).toMatchObject({amount:'-0.60000000',currency:'USD',statement_id:issued[0].id});
+    const finance = await import('./finance-reconciliation');
+    const bank = await finance.importFinanceTransaction(org,{source_provider:'fixture',account_label:'Synthetic bank',occurred_at:'2026-09-01',amount:'0.6',currency:'USD',direction:'debit',raw_evidence:{reference:'fixture payout'}},org);
+    const bankView = await finance.getFinanceReconciliationView(org,finance.financeViewSchema.parse({transaction:bank.id}));
+    expect(bankView.candidates.some(row=>row.id===repeats[0].batch_id && row.type==='payout_batch')).toBe(true);
+    expect((await finance.matchFinanceTransaction(org,bank.id,{match_type:'payout_batch',target_id:repeats[0].batch_id,allocated_amount:'0.6',rationale:'Synthetic bank evidence'},org)).status).toBe('active');
     await expect(readScoped(() => getPayoutBatch('foreign',repeats[0].batch_id))).rejects.toMatchObject({status:404});
     const {getNativeRoyaltyStatement} = await import('./native-royalties');
     const beforeReversal = await readScoped(() => getNativeRoyaltyStatement(org,issued[0].id));
