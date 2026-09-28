@@ -1,7 +1,7 @@
 import { ReleaseCalendar } from "./ReleaseCalendar";
 import { TaskLabels, emptyPlanningOptions } from "../ops-tasks/TaskPlanningFields";
 import { Check, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { openStatus, type ReleaseTimeline as ReleaseTimelineData, type ReleaseTimelineMilestone, type ReleaseTimelineTask } from "../../server/release-timeline-core";
 import { daysBetween, reschedulePreview, workBucket } from "../../server/release-workback-core";
 import { ReleaseWorkbackBuilder } from "./ReleaseWorkbackBuilder";
@@ -29,7 +29,28 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  if (!timeline) return <section className="border border-border p-3"><h2 className="text-sm font-semibold">Release timeline</h2><p className="mt-1 text-sm text-muted-foreground">Timeline data is unavailable right now. The rest of this release workspace is still available.</p></section>;
+  const [refreshing, setRefreshing] = useState(true);
+  const [refreshError, setRefreshError] = useState("");
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setRefreshing(true); setRefreshError("");
+    void (async () => {
+      try {
+        const response = await fetch(`/api/release-milestones?release_id=${encodeURIComponent(releaseId)}`, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Could not refresh the release schedule. Try again before making changes.");
+        const current = await response.json();
+        if (!controller.signal.aborted) setTimeline(current);
+      } catch (cause) {
+        if (!controller.signal.aborted) setRefreshError(cause instanceof Error ? cause.message : "Could not refresh the release schedule.");
+      } finally {
+        if (!controller.signal.aborted) setRefreshing(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [releaseId, refreshAttempt]);
+
+  if (refreshing || refreshError || !timeline) return <section className="border border-border p-3" aria-label="Release schedule"><h2 className="text-sm font-semibold">Release schedule</h2><p role={refreshError ? "alert" : "status"} className="mt-1 text-sm text-muted-foreground">{refreshing ? "Refreshing release schedule…" : refreshError || "Schedule data is unavailable."}</p>{!refreshing && <Button type="button" onClick={() => setRefreshAttempt((attempt) => attempt + 1)}>Retry</Button>}</section>;
 
   const tasks = [...timeline.phases.flatMap((entry) => entry.tasks), ...(timeline.unphasedTasks ?? [])];
   const milestones = timeline.phases.flatMap((entry) => entry.milestones);
