@@ -39,6 +39,29 @@ describe("release-linked ops tasks", () => {
     vi.clearAllMocks();
   });
 
+  test.each(["linked_artist_id", "linked_release_id", "linked_campaign_id", "linked_contact_id", "owner_contact_id", "project_id"] as const)("rejects foreign %s links on create and update", async (field) => {
+    mocks.selectRows.push([]);
+    await expect(createOpsTask("org-1", { task_name: "Local task", [field]: "foreign-record" })).rejects.toThrow("not found in active workspace");
+    mocks.selectRows.push([{ id: "task-1", revision: 0 }], []);
+    await expect(updateOpsTask("org-1", { id: "task-1", [field]: "foreign-record" })).rejects.toThrow("not found in active workspace");
+    expect(mocks.inserted).toHaveLength(0);
+    expect(mocks.updated).toHaveLength(0);
+  });
+
+  test("preserves valid workspace links and allows clearing them", async () => {
+    const links = { linked_artist_id: "artist", linked_release_id: "release", linked_campaign_id: "campaign", linked_contact_id: "contact", owner_contact_id: "owner", project_id: "project" };
+    mocks.selectRows.push(...Object.values(links).map((id) => [{ id }]));
+    await createOpsTask("org-1", { task_name: "Linked task", ...links });
+    expect(mocks.inserted[0]).toMatchObject(links);
+    mocks.selectRows.push([{ id: "task-1", revision: 0 }], ...Object.values(links).map((id) => [{ id }]), [{ id: "task-1", revision: 0 }]);
+    await updateOpsTask("org-1", { id: "task-1", ...links });
+    expect(mocks.updated.at(-1)).toMatchObject(links);
+    const cleared = Object.fromEntries(Object.keys(links).map((key) => [key, null]));
+    mocks.selectRows.push([{ id: "task-1", revision: 0 }], [{ id: "task-1", revision: 0 }]);
+    await updateOpsTask("org-1", { id: "task-1", ...cleared });
+    expect(mocks.updated.at(-1)).toMatchObject(cleared);
+  });
+
   test("rejects a milestone belonging to another release", async () => {
     mocks.selectRows.push([{ id: "milestone-1", release_id: "release-2" }]);
     await expect(createOpsTask("org-1", { task_name: "Send delivery", linked_release_id: "release-1", release_milestone_id: "milestone-1" })).rejects.toThrow("Release milestone not found");
@@ -46,7 +69,7 @@ describe("release-linked ops tasks", () => {
   });
 
   test("persists a milestone link when it belongs to the task release", async () => {
-    mocks.selectRows.push([{ id: "milestone-1", release_id: "release-1" }]);
+    mocks.selectRows.push([{ id: "milestone-1", release_id: "release-1" }], [{ id: "release-1" }]);
     const result = await createOpsTask("org-1", { task_name: "Send delivery", linked_release_id: "release-1", release_milestone_id: "milestone-1" });
     expect(result.ok).toBe(true);
     expect(mocks.inserted[0]).toMatchObject({ linked_release_id: "release-1", release_milestone_id: "milestone-1" });
