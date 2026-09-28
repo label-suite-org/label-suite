@@ -163,6 +163,8 @@ export function RoyaltyManager({
         {tabs.map((tab) => (
           <Button
             key={tab.id}
+            variant="ghost"
+            aria-pressed={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
               activeTab === tab.id
