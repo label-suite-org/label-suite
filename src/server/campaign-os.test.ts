@@ -40,5 +40,8 @@ describe("Campaign OS input contract", () => {
     expect(setCampaignTerritoriesSchema.parse({ country_codes: ["DK", "DE"] }).country_codes).toEqual(["DK", "DE"]);
     expect(() => setCampaignTerritoriesSchema.parse({ country_codes: ["Denmark"] })).toThrow("two-letter ISO");
     expect(createCampaignPostSchema.parse({ url: "https://example.test/post", platform: "TikTok", manual_metrics: { views: 120 } })).toMatchObject({ platform: "TikTok" });
+    expect(createCampaignPostSchema.parse({ url: "http://example.test/post", platform: "TikTok" })).toMatchObject({ platform: "TikTok" });
+    expect(() => createCampaignPostSchema.parse({ url: "javascript:alert(1)", platform: "TikTok" })).toThrow();
+    expect(() => createCampaignPostSchema.parse({ url: "data:text/html,hello", platform: "TikTok" })).toThrow();
   });
 });

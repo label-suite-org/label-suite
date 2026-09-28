@@ -15,7 +15,7 @@ import { idSchema, nullableNumber, nullableText } from "./validation";
 
 const isoCountryCode = z.string().regex(/^[A-Z]{2}$/, "Use a two-letter ISO country code");
 const dateTime = z.string().datetime().nullable().optional();
-const url = z.string().url().max(2_000);
+const url = z.url({ protocol: /^https?$/ }).max(2_000);
 const contactStatuses = new Set(["permission_confirmed", "contacted", "negotiating", "agreed", "delivering", "complete"]);
 
 function hasRecordedPermission(value: { outreach_permission_status: string; outreach_permission_basis?: string | null; outreach_permission_recorded_at?: string | Date | null; outreach_permission_revoked_at?: string | Date | null }) {
