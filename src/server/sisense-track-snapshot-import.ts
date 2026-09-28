@@ -1,4 +1,3 @@
-import { runAnalyticsSourceImport } from "./analytics-source-import-legacy";
 import { createHash, randomUUID } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -13,6 +12,8 @@ import {
 } from "../db/schema";
 import { HttpError } from "./errors";
 import {
+  runAnalyticsSourceImport,
+  listLatestAnalyticsSourceImports,
   withAnalyticsSourceTransaction,
   type AnalyticsSourceImportDatabase,
   type AnalyticsSourceImportFailurePhase,
@@ -121,107 +122,12 @@ interface SisenseTrackRunMetadata extends Record<string, unknown> {
   totals: SisenseTrackSnapshotPreview["totals"];
 }
 
-export type SisenseTrackSnapshotImportTransaction = SisenseTrackPreviewStore & {
-  findSuccessfulDuplicate(input: {
-    artistId: string;
-    requestedDateRange: string;
-    aggregation: string;
-    sha256: string;
-  }): Promise<LatestSisenseTrackSnapshotImport | null>;
-  findLatestSuccessful(input: { artistId: string }): Promise<LatestSisenseTrackSnapshotImport | null>;
-  createRun(input: {
-    id: string;
-    artistId: string;
-    requestedDateRange: string;
-    aggregation: string;
-    metadata: SisenseTrackRunMetadata;
-  }): Promise<void>;
-  recordFile(input: {
-    id: string;
-    runId: string;
-    artistId: string;
-    requestedDateRange: string;
-    aggregation: string;
-    fileName: string;
-    sha256: string;
-    byteSize: number;
-    rowCount: number;
-    headers: string[];
-    storageBucket: string;
-    storageKey: string;
-  }): Promise<void>;
-  upsertRows(input: {
-    runId: string;
-    artistId: string;
-    requestedDateRange: string;
-    aggregation: string;
-    rows: ResolvedSisenseTrackRow[];
-  }): Promise<{ inserted: number; updated: number; unchanged: number }>;
-  completeRun(input: {
-    runId: string;
-    inserted: number;
-    updated: number;
-    unchanged: number;
-  }): Promise<void>;
-};
-
-export interface SisenseTrackSnapshotImportStore {
-  withPreviewTransaction<T>(
-    orgId: string,
-    work: (store: SisenseTrackPreviewStore) => Promise<T>,
-  ): Promise<T>;
-  withLockedTransaction<T>(
-    orgId: string,
-    work: (tx: SisenseTrackSnapshotImportTransaction) => Promise<T>,
-  ): Promise<T>;
-  recordFailedRun(input: SisenseTrackSnapshotFailedEvidence): Promise<void>;
-  listLatestByArtist(orgId: string): Promise<LatestSisenseTrackSnapshotImport[]>;
-}
-
-export interface SisenseTrackSnapshotFailedEvidence {
-  runId: string;
-  fileId: string;
-  orgId: string;
-  artistId: string | null;
-  fileName: string;
-  sha256: string;
-  byteSize: number;
-  rowCount: number;
-  headers: string[];
-  requestedDateRange: string;
-  reportingFrom: string;
-  reportingThrough: string;
-  aggregation: string;
-  counts: SisenseTrackSnapshotPreview["counts"] | null;
-  totals: SisenseTrackSnapshotPreview["totals"] | null;
-  archivedFile: { storageBucket: string; storageKey: string } | null;
-  error: string;
-}
-
 export interface SisenseTrackSnapshotServiceDependencies {
-  store: SisenseTrackSnapshotImportStore;
+  database: SisenseTrackSnapshotDatabaseProvider;
   archive: SisenseTrackSnapshotArchive;
   assertArchiveReady?: () => void;
   now: () => Date;
   randomId: () => string;
-}
-
-export interface SisenseTrackSnapshotProductionAdapter {
-  previewStore(tx: DrizzleTransaction, orgId: string): SisenseTrackPreviewStore;
-  importTransaction(
-    tx: DrizzleTransaction,
-    orgId: string,
-    observedAt: Date,
-  ): any;
-  recordFailedRun(
-    tx: DrizzleTransaction,
-    input: SisenseTrackSnapshotFailedEvidence,
-    observedAt: Date,
-  ): Promise<void>;
-  listLatestByArtist(
-    tx: DrizzleTransaction,
-    orgId: string,
-  ): Promise<LatestSisenseTrackSnapshotImport[]>;
 }
 
 type DrizzleTransaction = any;
@@ -571,11 +477,11 @@ function productionImportTransaction(
   tx: DrizzleTransaction,
   orgId: string,
   observedAt: Date,
-): SisenseTrackSnapshotImportTransaction {
+) {
   return {
     ...productionPreviewStore(tx, orgId),
 
-    async findSuccessfulDuplicate({ artistId, requestedDateRange, aggregation, sha256 }) {
+    async findSuccessfulDuplicate({ artistId, requestedDateRange, aggregation, sha256 }: { artistId: string; requestedDateRange: string; aggregation: string; sha256: string }) {
       const rows = await latestSelection(tx, orgId)
         .where(and(
           eq(analytics_import_runs.org_id, orgId),
@@ -595,7 +501,7 @@ function productionImportTransaction(
       return rows[0] ? latestFromRow(rows[0]) : null;
     },
 
-    async findLatestSuccessful({ artistId }) {
+    async findLatestSuccessful({ artistId }: { artistId: string }) {
       const rows = await latestSelection(tx, orgId)
         .where(and(
           eq(analytics_import_runs.org_id, orgId),
@@ -610,46 +516,7 @@ function productionImportTransaction(
       return rows[0] ? latestFromRow(rows[0]) : null;
     },
 
-    async createRun({ id, artistId, requestedDateRange, aggregation, metadata }) {
-      await tx.insert(analytics_import_runs).values({
-        id,
-        org_id: orgId,
-        source: SISENSE_TRACK_SOURCE,
-        artist_id: artistId,
-        mode: "manual_import",
-        requested_date_range: requestedDateRange,
-        requested_aggregation: aggregation,
-        status: "running",
-        started_at: observedAt,
-        metadata,
-      });
-    },
-
-    async recordFile(input) {
-      await tx.insert(analytics_import_files).values({
-        id: input.id,
-        org_id: orgId,
-        run_id: input.runId,
-        source: SISENSE_TRACK_SOURCE,
-        widget_key: SISENSE_TRACK_WIDGET,
-        widget_title: SISENSE_TRACK_WIDGET_TITLE,
-        artist_id: input.artistId,
-        requested_date_range: input.requestedDateRange,
-        requested_aggregation: input.aggregation,
-        file_name: input.fileName,
-        storage_bucket: input.storageBucket,
-        storage_key: input.storageKey,
-        storage_status: "uploaded",
-        storage_uploaded_at: observedAt,
-        sha256: input.sha256,
-        byte_size: input.byteSize,
-        row_count: input.rowCount,
-        headers: input.headers,
-        created_at: observedAt,
-      });
-    },
-
-    async upsertRows(input) {
+    async upsertRows(input: { runId: string; artistId: string; requestedDateRange: string; aggregation: string; rows: ResolvedSisenseTrackRow[] }) {
       return persistSisenseTrackSnapshotRowsSetBased(tx, {
         orgId,
         observedAt,
@@ -657,21 +524,7 @@ function productionImportTransaction(
       });
     },
 
-    async completeRun({ runId, inserted, updated, unchanged }) {
-      await tx.update(analytics_import_runs).set({
-        status: "completed",
-        completed_at: observedAt,
-        files_downloaded: 1,
-        rows_imported: inserted + updated + unchanged,
-        rows_inserted: inserted,
-        rows_updated: updated,
-        rows_unchanged: unchanged,
-        error: null,
-      }).where(and(
-        eq(analytics_import_runs.org_id, orgId),
-        eq(analytics_import_runs.id, runId),
-      ));
-    },
+
   };
 }
 
@@ -824,127 +677,6 @@ export async function persistSisenseTrackSnapshotRowsSetBased(
   };
 }
 
-async function recordFailedRunProduction(
-  tx: DrizzleTransaction,
-  input: SisenseTrackSnapshotFailedEvidence,
-  observedAt: Date,
-): Promise<void> {
-  await tx.insert(analytics_import_runs).values({
-    id: input.runId,
-    org_id: input.orgId,
-    source: SISENSE_TRACK_SOURCE,
-    artist_id: input.artistId,
-    mode: "manual_import",
-    requested_date_range: input.requestedDateRange,
-    requested_aggregation: input.aggregation,
-    status: "failed",
-    started_at: observedAt,
-    completed_at: observedAt,
-    files_downloaded: input.archivedFile ? 1 : 0,
-    rows_imported: 0,
-    rows_inserted: 0,
-    rows_updated: 0,
-    rows_unchanged: 0,
-    error: input.error.slice(0, 500),
-    metadata: {
-      export_type: "tracks_by_growth_rate",
-      reporting_from: input.reportingFrom,
-      reporting_through: input.reportingThrough,
-      observed_at: observedAt.toISOString(),
-      counts: input.counts,
-      totals: input.totals,
-      file_name: input.fileName,
-      sha256: input.sha256,
-    },
-  });
-  if (input.archivedFile && input.artistId) {
-    await tx.insert(analytics_import_files).values({
-      id: input.fileId,
-      org_id: input.orgId,
-      run_id: input.runId,
-      source: SISENSE_TRACK_SOURCE,
-      widget_key: SISENSE_TRACK_WIDGET,
-      widget_title: SISENSE_TRACK_WIDGET_TITLE,
-      artist_id: input.artistId,
-      requested_date_range: input.requestedDateRange,
-      requested_aggregation: input.aggregation,
-      file_name: input.fileName,
-      storage_bucket: input.archivedFile.storageBucket,
-      storage_key: input.archivedFile.storageKey,
-      storage_status: "uploaded",
-      storage_uploaded_at: observedAt,
-      sha256: input.sha256,
-      byte_size: input.byteSize,
-      row_count: input.rowCount,
-      headers: input.headers,
-      created_at: observedAt,
-    });
-  }
-}
-
-async function listLatestByArtistProduction(
-  tx: DrizzleTransaction,
-  orgId: string,
-): Promise<LatestSisenseTrackSnapshotImport[]> {
-  const rows = await latestSelection(tx, orgId)
-    .where(and(
-      eq(analytics_import_runs.org_id, orgId),
-      eq(analytics_import_runs.source, SISENSE_TRACK_SOURCE),
-      eq(analytics_import_runs.mode, "manual_import"),
-      eq(analytics_import_runs.status, "completed"),
-    ))
-    .orderBy(desc(analytics_import_runs.completed_at), desc(analytics_import_runs.started_at));
-  const latest = new Map<string, LatestSisenseTrackSnapshotImport>();
-  for (const row of rows) {
-    if (row.artistId && !latest.has(row.artistId)) latest.set(row.artistId, latestFromRow(row));
-  }
-  return [...latest.values()];
-}
-
-function createProductionStore(
-  databaseProvider: SisenseTrackSnapshotDatabaseProvider,
-  now: () => Date,
-  adapter: Partial<SisenseTrackSnapshotProductionAdapter> = {},
-): SisenseTrackSnapshotImportStore {
-  return {
-    withPreviewTransaction(orgId, work) {
-      return withAnalyticsSourceTransaction(databaseProvider, orgId, SISENSE_TRACK_SOURCE, "none", (tx) => work(
-        adapter.previewStore?.(tx, orgId) ?? productionPreviewStore(tx, orgId),
-      ));
-    },
-
-    withLockedTransaction(orgId, work) {
-      const observedAt = now();
-      return withAnalyticsSourceTransaction(
-        databaseProvider,
-        orgId,
-        SISENSE_TRACK_SOURCE,
-        "try",
-        (tx) => work(adapter.importTransaction?.(tx, orgId, observedAt) ?? productionImportTransaction(tx, orgId, observedAt)),
-        () => new HttpError(
-          "Sisense analytics import is already running for this organization",
-          409,
-          SISENSE_TRACK_LOCKED_ERROR,
-        ),
-      );
-    },
-
-    async recordFailedRun(input) {
-      await withAnalyticsSourceTransaction(databaseProvider, input.orgId, SISENSE_TRACK_SOURCE, "wait", async (tx) => {
-        const observedAt = now();
-        if (adapter.recordFailedRun) await adapter.recordFailedRun(tx, input, observedAt);
-        else await recordFailedRunProduction(tx, input, observedAt);
-      });
-    },
-
-    listLatestByArtist(orgId) {
-      return withAnalyticsSourceTransaction(databaseProvider, orgId, SISENSE_TRACK_SOURCE, "none", (tx) => (
-        adapter.listLatestByArtist?.(tx, orgId) ?? listLatestByArtistProduction(tx, orgId)
-      ));
-    },
-  };
-}
-
 const productionNow = () => new Date();
 const productionRandomId = () => randomUUID();
 const productionDatabaseProvider: SisenseTrackSnapshotDatabaseProvider = async () => (await import("../lib/db")).db;
@@ -969,11 +701,10 @@ export function createSisenseTrackSnapshotProductionService(input: {
   archive: SisenseTrackSnapshotArchive;
   now?: () => Date;
   randomId?: () => string;
-  adapter?: Partial<SisenseTrackSnapshotProductionAdapter>;
 }) {
   const now = input.now ?? productionNow;
   return createSisenseTrackSnapshotService({
-    store: createProductionStore(async () => input.database, now, input.adapter),
+    database: async () => input.database,
     archive: input.archive,
     now,
     randomId: input.randomId ?? productionRandomId,
@@ -982,7 +713,7 @@ export function createSisenseTrackSnapshotProductionService(input: {
 
 export function createProductionSisenseTrackSnapshotService() {
   return createSisenseTrackSnapshotService({
-    store: createProductionStore(productionDatabaseProvider, productionNow),
+    database: productionDatabaseProvider,
     archive: productionArchive,
     assertArchiveReady: () => { resolveSisenseTrackPrivateAnalyticsBucket(process.env); },
     now: productionNow,
@@ -1013,8 +744,8 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
   return {
     async preview(input: SisenseTrackSnapshotPreviewRequest): Promise<BoundSisenseTrackSnapshotPreview> {
       const parsed = parseSisenseTrackSnapshot(input.bytes, input.fileName, input);
-      return dependencies.store.withPreviewTransaction(input.orgId, async (store) => (
-        bindPreview(input.orgId, await previewSisenseTrackSnapshot(store, {
+      return withAnalyticsSourceTransaction(dependencies.database, input.orgId, SISENSE_TRACK_SOURCE, "none", async (tx) => (
+        bindPreview(input.orgId, await previewSisenseTrackSnapshot(productionPreviewStore(tx, input.orgId), {
           orgId: input.orgId,
           artistId: input.artistId,
           parsed,
@@ -1045,13 +776,15 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
       return runAnalyticsSourceImport<
         SisenseLifecycleInput,
         SisenseImportContext,
-        SisenseTrackSnapshotImportTransaction,
+        ReturnType<typeof productionImportTransaction>,
         LatestSisenseTrackSnapshotImport,
-        { inserted: number; updated: number; unchanged: number },
-        SisenseTrackSnapshotApplyResult,
-        SisenseTrackSnapshotFailedEvidence
+        SisenseTrackSnapshotApplyResult
       >({
-        store: dependencies.store,
+        database: dependencies.database,
+        source: SISENSE_TRACK_SOURCE,
+        lock: "try",
+        lockError: () => new HttpError("Sisense analytics import is already running for this organization", 409, SISENSE_TRACK_LOCKED_ERROR),
+        transaction: productionImportTransaction,
         now: dependencies.now,
         randomId: dependencies.randomId,
         initialFailurePhase: "tenant verification",
@@ -1094,7 +827,7 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
           runId: duplicate.runId,
           latest: (await tx.findLatestSuccessful({ artistId: duplicate.artistId })) ?? duplicate,
         }),
-        createRun: async (tx, context, runId) => {
+        runEvidence: (context) => {
           sideEffectsStarted = true;
           const observedAt = dependencies.now();
           const metadata: SisenseTrackRunMetadata = {
@@ -1105,13 +838,12 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
             counts: context.preview.counts,
             totals: context.preview.totals,
           };
-          await tx.createRun({
-            id: runId,
-            artistId: context.preview.artistId,
-            requestedDateRange: context.preview.requestedDateRange,
-            aggregation: context.preview.aggregation,
+          return {
+            artist_id: context.preview.artistId,
+            requested_date_range: context.preview.requestedDateRange,
+            requested_aggregation: context.preview.aggregation,
             metadata,
-          });
+          };
         },
         archive: (value, context) => dependencies.archive({
           orgId: value.orgId,
@@ -1121,20 +853,18 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
           sha256: context.preview.sha256,
           bytes: value.bytes,
         }),
-        recordFile: (tx, context, runId, fileId, archived) => tx.recordFile({
-            id: fileId,
-            runId,
-            artistId: context.preview.artistId,
-            requestedDateRange: context.preview.requestedDateRange,
-            aggregation: context.preview.aggregation,
-            fileName: context.preview.fileName,
-            sha256: context.preview.sha256,
-            byteSize: context.parsed.byteSize,
-            rowCount: context.parsed.sourceRowCount,
-            headers: context.parsed.headers,
-            storageBucket: archived.bucket,
-            storageKey: archived.key,
-          }),
+        fileEvidence: (context) => ({
+          artist_id: context.preview.artistId,
+          widget_key: SISENSE_TRACK_WIDGET,
+          widget_title: SISENSE_TRACK_WIDGET_TITLE,
+          requested_date_range: context.preview.requestedDateRange,
+          requested_aggregation: context.preview.aggregation,
+          file_name: context.preview.fileName,
+          sha256: context.preview.sha256,
+          byte_size: context.parsed.byteSize,
+          row_count: context.parsed.sourceRowCount,
+          headers: context.parsed.headers,
+        }),
         persistRows: (tx, context, runId) => tx.upsertRows({
           runId,
           artistId: context.preview.artistId,
@@ -1142,7 +872,6 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
           aggregation: context.preview.aggregation,
           rows: context.preview.rows,
         }),
-        completeRun: (tx, runId, counts) => tx.completeRun({ runId, ...counts }),
         importedResult: (context, runId, counts, observedAt) => {
           const latest: LatestSisenseTrackSnapshotImport = {
             artistId: context.preview.artistId,
@@ -1161,28 +890,39 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
           };
           return { kind: "imported" as const, runId, ...counts, latest };
         },
-        buildFailureEvidence: ({ input: value, context, archivedFile, phase, runId, fileId }) => ({
-          runId,
-          fileId,
-          orgId: value.orgId,
-          artistId: verifiedArtistId ?? context?.preview.artistId ?? null,
-          fileName: value.parsed.fileName,
-          sha256: value.parsed.sha256,
-          byteSize: value.parsed.byteSize,
-          rowCount: value.parsed.sourceRowCount,
-          headers: value.parsed.headers,
-          requestedDateRange: value.parsed.requestedDateRange,
-          reportingFrom: value.parsed.reportingFrom,
-          reportingThrough: value.parsed.reportingThrough,
-          aggregation: value.parsed.aggregation,
-          counts: previewEvidence.current?.counts ?? null,
-          totals: previewEvidence.current?.totals ?? null,
-          archivedFile: archivedFile ? {
-            storageBucket: archivedFile.bucket,
-            storageKey: archivedFile.key,
-          } : null,
-          error: safeFailureMessage(phase),
-        }),
+        failureEvidence: (value, context, phase, observedAt) => {
+          const artistId = verifiedArtistId ?? context?.preview.artistId ?? null;
+          return {
+            run: {
+              artist_id: artistId,
+              requested_date_range: value.parsed.requestedDateRange,
+              requested_aggregation: value.parsed.aggregation,
+              metadata: {
+                export_type: "tracks_by_growth_rate",
+                reporting_from: value.parsed.reportingFrom,
+                reporting_through: value.parsed.reportingThrough,
+                observed_at: observedAt.toISOString(),
+                counts: previewEvidence.current?.counts ?? null,
+                totals: previewEvidence.current?.totals ?? null,
+                file_name: value.parsed.fileName,
+                sha256: value.parsed.sha256,
+              },
+            },
+            file: artistId ? {
+              artist_id: artistId,
+              widget_key: SISENSE_TRACK_WIDGET,
+              widget_title: SISENSE_TRACK_WIDGET_TITLE,
+              requested_date_range: value.parsed.requestedDateRange,
+              requested_aggregation: value.parsed.aggregation,
+              file_name: value.parsed.fileName,
+              sha256: value.parsed.sha256,
+              byte_size: value.parsed.byteSize,
+              row_count: value.parsed.sourceRowCount,
+              headers: value.parsed.headers,
+            } : null,
+            error: safeFailureMessage(phase),
+          };
+        },
         shouldRecordFailure: (error) => sideEffectsStarted || !isKnownPreSideEffectClientError(error),
         mapError: (error, phase) => {
           if (!sideEffectsStarted && isKnownPreSideEffectClientError(error)) throw error;
@@ -1191,8 +931,9 @@ export function createSisenseTrackSnapshotService(dependencies: SisenseTrackSnap
       }, lifecycleInput);
     },
 
-    listLatestByArtist(orgId: string) {
-      return dependencies.store.listLatestByArtist(orgId);
+    async listLatestByArtist(orgId: string): Promise<LatestSisenseTrackSnapshotImport[]> {
+      const rows = await listLatestAnalyticsSourceImports(dependencies.database, orgId, SISENSE_TRACK_SOURCE, SISENSE_TRACK_WIDGET, "none", true);
+      return rows.map(latestFromRow);
     },
   };
 }
