@@ -171,6 +171,7 @@ if ! curl -fsS "${PUBLIC_SITE_URL}/api/health" >/dev/null; then
   exit 1
 fi
 
+export RELEASE_GATE_FIXTURE_MANIFEST="$temp_dir/fixture-manifest.json"
 npm run release-gate:seed
 E2E_BASE_URL="$PUBLIC_SITE_URL" \
   RELEASE_GATE_REQUIRE_WORKER_HEALTH=true \

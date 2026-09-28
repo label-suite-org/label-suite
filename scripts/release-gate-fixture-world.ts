@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { isDeepStrictEqual } from "node:util";
+
 /**
  * Validated identity and relationship topology for the release-gate scenario.
  *
@@ -8,6 +11,7 @@
 
 export type ReleaseGateFixtureWorld = {
   orgId: string;
+  operator: { name: string; email: string; password: string };
   readOnlyUser: { name: string; email: string; password: string };
   foreignTenant: {
     org: string;
@@ -55,6 +59,8 @@ export type ReleaseGateFixtureWorld = {
     subject: string;
     body: string;
   };
+  activity: Array<{ key: "desktop" | "mobile390" | "mobile320"; project: string; leadId: string; taskId: string; eventId: string; runId: string; suggestionId: string; at: string }>;
+  dates: { release: string; taskDue: string; readOnlyActivity: string; sentEmail: string };
   publicFixturePublishedAt: string;
 };
 
@@ -113,6 +119,7 @@ export function createReleaseGateFixtureWorld(env: Record<string, string | undef
     : `${operatorEmail}+readonly@example.test`;
   const world: ReleaseGateFixtureWorld = {
     orgId: "true-nature",
+    operator: { name: "Release Gate Operator", email: operatorEmail, password: env.E2E_USER_PASSWORD?.trim() ?? "" },
     readOnlyUser: {
       name: "Release Gate Read-only Member",
       email: env.E2E_READ_ONLY_USER_EMAIL?.trim() || derivedReadOnlyEmail,
@@ -139,6 +146,12 @@ export function createReleaseGateFixtureWorld(env: Record<string, string | undef
       subject: "Fountain Edits — an independent-radio update",
       body: "A concise radio update for Fountain Edits.\n\nListen: https://example.test/fountain-listen\n\nShared with our independent radio network.",
     },
+    activity: (["desktop", "mobile390", "mobile320"] as const).map((key, index) => ({
+      key, project: ["desktop-gate", "mobile-390-gate", "mobile-320-gate"][index],
+      leadId: ids.activityLeads[key], taskId: ids.activityTasks[key], eventId: ids.activityEvents[key],
+      runId: ids.activityRuns[key], suggestionId: ids.activitySuggestions[key], at: `2026-08-06T${10 + index}:00:00.000Z`,
+    })),
+    dates: { release: "2026-08-05", taskDue: "2026-08-12", readOnlyActivity: "2026-08-06T13:00:00.000Z", sentEmail: "2026-08-06T14:00:00.000Z" },
     publicFixturePublishedAt: "2026-08-05T08:00:00.000Z",
   };
   validateReleaseGateFixtureWorld(world);
@@ -157,7 +170,20 @@ export function validateReleaseGateFixtureWorld(world: ReleaseGateFixtureWorld):
   if (world.relationships.campaign.id !== world.ids.campaign || world.relationships.campaign.releaseId !== world.ids.release || world.relationships.campaign.artistId !== world.ids.artist) {
     throw new Error("Campaign relationship topology does not match fixture identities.");
   }
-  if (world.foreignTenant.campaign === world.ids.campaign || world.foreignTenant.lead === world.ids.lead) {
+  if (world.relationships.campaign.stationId !== world.ids.station || world.relationships.campaign.campaignStationId !== world.ids.campaignStation
+    || world.relationships.publicCampaign.id !== world.ids.publishedCampaign || world.relationships.publicCampaign.releaseId !== world.ids.release
+    || world.relationships.publicCampaign.artistId !== world.ids.artist || world.relationships.activity.campaignId !== world.ids.campaign) {
+    throw new Error("Campaign relationship topology does not match fixture identities.");
+  }
+  for (const entry of world.activity) {
+    if (entry.leadId !== world.ids.activityLeads[entry.key] || entry.taskId !== world.ids.activityTasks[entry.key]
+      || entry.eventId !== world.ids.activityEvents[entry.key] || entry.runId !== world.ids.activityRuns[entry.key]
+      || entry.suggestionId !== world.ids.activitySuggestions[entry.key]) throw new Error("Activity topology does not match fixture identities.");
+  }
+  if ([...Object.values(world.dates), world.publicFixturePublishedAt, ...world.activity.map(entry => entry.at)].some(date => !Number.isFinite(Date.parse(date)))) {
+    throw new Error("Fixture dates must be valid stable dates.");
+  }
+  if (Object.values(world.foreignTenant).some(id => flattened.includes(id)) || world.foreignTenant.org === world.orgId) {
     throw new Error("Foreign-tenant identities must remain separate from the primary fixture world.");
   }
 }
@@ -167,3 +193,33 @@ function flattenIds(ids: ReleaseGateFixtureWorld["ids"]): string[] {
 }
 
 export const releaseGateFixtureWorld = createReleaseGateFixtureWorld();
+
+/** Validate prerequisites separately from product assertions and runtime health. */
+export function configuredReleaseGateFixtureWorld(env: Record<string, string | undefined> = process.env): ReleaseGateFixtureWorld {
+  const required = ["E2E_USER_EMAIL", "E2E_USER_PASSWORD", "E2E_ARTIST_ID", "E2E_RELEASE_ID", "E2E_TRACK_ID", "E2E_EVENT_ID"];
+  const missing = required.filter(name => !env[name]?.trim());
+  if (missing.length) throw new Error(`Release-gate fixture prerequisites missing: ${missing.join(", ")}`);
+  const world = createReleaseGateFixtureWorld(env);
+  if (world.operator.email === world.readOnlyUser.email) throw new Error("Operator and read-only fixture identities must differ.");
+  return world;
+}
+
+/** Identity/topology evidence only: never serialize passwords or expected UI outcomes. */
+export function releaseGateFixtureManifest(world: ReleaseGateFixtureWorld) {
+  return { userEmail: world.operator.email, readOnlyUserEmail: world.readOnlyUser.email,
+    artistId: world.ids.artist, releaseId: world.ids.release, eventId: world.ids.event,
+    campaignId: world.ids.campaign, foreignTenantLeadId: world.foreignTenant.lead, stationId: world.ids.station,
+    version: 1, orgId: world.orgId, ids: world.ids, relationships: world.relationships,
+    activity: world.activity, dates: world.dates, publicFixturePublishedAt: world.publicFixturePublishedAt };
+}
+
+export function assertReleaseGateFixtureManifest(world: ReleaseGateFixtureWorld, manifest: unknown): void {
+  if (!isDeepStrictEqual(manifest, releaseGateFixtureManifest(world))) {
+    throw new Error("Release-gate seed manifest does not match the configured fixture world. Reseed this disposable target.");
+  }
+}
+
+export function verifyReleaseGateFixtureManifest(world: ReleaseGateFixtureWorld, file = process.env.RELEASE_GATE_FIXTURE_MANIFEST): void {
+  if (!file?.trim()) throw new Error("Release-gate seed manifest path is required: RELEASE_GATE_FIXTURE_MANIFEST.");
+  assertReleaseGateFixtureManifest(world, JSON.parse(readFileSync(file, "utf8")));
+}
