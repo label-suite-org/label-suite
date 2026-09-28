@@ -24,11 +24,12 @@ type Workspace = {
   engagements: Array<{ id: string; contact_id: string; contact_name: string; status: string; relationship_notes: string | null; outreach_channel: string; outreach_permission_status: string; outreach_permission_basis: string | null; outreach_permission_recorded_at: string | null; outreach_permission_revoked_at: string | null; agreed_rate: number | null; agreed_currency: string | null; budget_line_id: string | null }>;
   deliverables: Array<{ id: string; engagement_id: string; description: string; due_date: string | null; approval_status: string; evidence_url: string | null; notes: string | null; updated_at: string | null }>;
   posts: Array<{ id: string; url: string; platform: string; published_at: string | null; metrics_captured_at: string | null; manual_metrics: Record<string, number> }>;
+  budgetLineOptions?: Array<{ id: string; name: string; campaign_id: string | null }>;
   cost: { planned: number; committed: number; paid: number };
   report: { narrative: string | null; snapshot: ReportSnapshot | null; finalized_at: string | null };
 };
 
-type Props = { campaignId: string; section: "creators" | "posts" | "cost" | "report"; canMutate: boolean; contacts: Array<{ id: string; name: string }> };
+type Props = { campaignId: string; section: "creators" | "posts" | "cost" | "report"; canMutate: boolean; canLinkBudget?: boolean; contacts: Array<{ id: string; name: string }> };
 
 function metricsFromForm(form: FormData) {
   return Object.fromEntries(["views", "likes", "comments", "shares", "saves"].flatMap((name) => {
@@ -37,7 +38,7 @@ function metricsFromForm(form: FormData) {
   }));
 }
 
-export default function CampaignOsWorkspace({ campaignId, section, canMutate, contacts }: Props) {
+export default function CampaignOsWorkspace({ campaignId, section, canMutate, canLinkBudget = false, contacts }: Props) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [error, setError] = useState("");
   const [report, setReport] = useState("");
@@ -67,6 +68,7 @@ export default function CampaignOsWorkspace({ campaignId, section, canMutate, co
   if (!workspace) return <p className="text-sm text-muted-foreground">Loading Campaign OS…</p>;
   const deliverablesByEngagement = new Map<string, Workspace["deliverables"]>();
   for (const item of workspace.deliverables) deliverablesByEngagement.set(item.engagement_id, [...(deliverablesByEngagement.get(item.engagement_id) ?? []), item]);
+  const budgetLineById = new Map((workspace.budgetLineOptions ?? []).map((line) => [line.id, line]));
   const liveMetrics = workspace.posts.reduce<Record<string, number>>((all, post) => {
     for (const [key, value] of Object.entries(post.manual_metrics ?? {})) all[key] = (all[key] ?? 0) + Number(value);
     return all;
@@ -93,6 +95,10 @@ export default function CampaignOsWorkspace({ campaignId, section, canMutate, co
               </form> : null}
             </AccordionContent>
           </AccordionItem>)}</Accordion>
+          {canMutate && canLinkBudget ? <form key={engagement.budget_line_id ?? "none"} className="grid gap-2" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); submit("update_engagement", { id: engagement.id, budget_line_id: form.get("budget_line_id") || null }).catch((reason) => setError(reason.message)); }}>
+            <label className="text-sm font-medium">Budget line<NativeSelect name="budget_line_id" defaultValue={engagement.budget_line_id ?? ""}><option value="">No Budget line</option>{(workspace.budgetLineOptions ?? []).map((line) => <option key={line.id} value={line.id}>{line.name}{line.campaign_id ? "" : " · unassigned"}</option>)}</NativeSelect></label>
+            <Button type="submit" variant="outline">Save Budget link</Button>
+          </form> : <p>Budget line: {engagement.budget_line_id ? budgetLineById.get(engagement.budget_line_id)?.name ?? "Unavailable" : "None linked"}</p>}
           {!canMutate && engagement.relationship_notes ? <p className="whitespace-pre-wrap">{engagement.relationship_notes}</p> : null}
           {!canMutate && engagement.agreed_rate !== null ? <p>Agreed rate: {engagement.agreed_rate} {engagement.agreed_currency ?? ""}</p> : null}
           <div className="text-muted-foreground">{engagement.outreach_permission_basis ? <p>Permission basis: {engagement.outreach_permission_basis}</p> : null}{engagement.outreach_permission_recorded_at ? <p>Recorded {new Date(engagement.outreach_permission_recorded_at).toLocaleString()}</p> : null}{engagement.outreach_permission_revoked_at ? <p>Revoked {new Date(engagement.outreach_permission_revoked_at).toLocaleString()}</p> : null}</div>

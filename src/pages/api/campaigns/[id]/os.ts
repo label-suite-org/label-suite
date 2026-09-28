@@ -48,6 +48,7 @@ export const POST: APIRoute = async ({ request, locals, params }) => {
     const campaignId = params.id;
     if (!campaignId) return json({ error: "campaign id required" }, 400);
     const command = await parseJson(request, commandSchema);
+    if ((command.action === "create_engagement" || command.action === "update_engagement") && command.input.budget_line_id !== undefined) requireCapability(locals, "budgets.mutate");
     if (command.action === "create_engagement") return json(await createCampaignEngagement(orgId, campaignId, command.input), 201);
     if (command.action === "update_engagement") return json(await updateCampaignEngagement(orgId, campaignId, command.input));
     if (command.action === "create_deliverable") return json(await createCampaignDeliverable(orgId, campaignId, command.input), 201);

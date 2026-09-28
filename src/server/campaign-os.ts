@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   budget_line_items,
@@ -104,17 +104,22 @@ async function requireContact(orgId: string, contactId: string) {
   if (!rows.length) throw new NotFoundError("Contact not found in active workspace");
 }
 
-async function requireBudgetLine(orgId: string, campaignId: string, budgetLineId: string | null | undefined) {
+async function claimBudgetLine(orgId: string, campaignId: string, budgetLineId: string | null | undefined, database: Pick<typeof db, "select" | "update">) {
   if (!budgetLineId) return null;
-  const rows = await db.select({ id: budget_line_items.id, campaign_id: budget_line_items.campaign_id }).from(budget_line_items)
-    .where(and(eq(budget_line_items.id, budgetLineId), eq(budget_line_items.org_id, orgId))).limit(1);
+  const rows = await database.select({ id: budget_line_items.id, campaign_id: budget_line_items.campaign_id }).from(budget_line_items)
+    .where(and(eq(budget_line_items.id, budgetLineId), eq(budget_line_items.org_id, orgId))).limit(1).for("update");
   if (!rows.length || (rows[0].campaign_id && rows[0].campaign_id !== campaignId)) throw new NotFoundError("Budget Line not found for this Campaign");
+  const otherLinks = await database.select({ id: campaign_creator_engagements.id }).from(campaign_creator_engagements)
+    .where(and(eq(campaign_creator_engagements.org_id, orgId), eq(campaign_creator_engagements.budget_line_id, budgetLineId), ne(campaign_creator_engagements.campaign_id, campaignId))).limit(1);
+  if (otherLinks.length) throw new NotFoundError("Budget Line not found for this Campaign");
+  if (!rows[0].campaign_id) await database.update(budget_line_items).set({ campaign_id: campaignId })
+    .where(and(eq(budget_line_items.id, budgetLineId), eq(budget_line_items.org_id, orgId), isNull(budget_line_items.campaign_id)));
   return budgetLineId;
 }
 
 export async function getCampaignOsWorkspace(orgId: string, campaignId: string, database: Pick<typeof db, "select"> = db) {
   const campaign = await requireCampaign(orgId, campaignId, database);
-  const [territories, engagements, posts, budgetLines] = await Promise.all([
+  const [territories, engagements, posts, availableBudgetLines] = await Promise.all([
     database.select({ id: campaign_territories.id, country_code: campaign_territories.country_code }).from(campaign_territories)
       .where(and(eq(campaign_territories.org_id, orgId), eq(campaign_territories.campaign_id, campaignId))).orderBy(asc(campaign_territories.country_code)),
     database.select({
@@ -127,9 +132,12 @@ export async function getCampaignOsWorkspace(orgId: string, campaignId: string, 
     }).from(campaign_creator_engagements).innerJoin(contacts, and(eq(campaign_creator_engagements.contact_id, contacts.id), eq(contacts.org_id, orgId)))
       .where(and(eq(campaign_creator_engagements.org_id, orgId), eq(campaign_creator_engagements.campaign_id, campaignId))).orderBy(asc(contacts.name)),
     database.select().from(campaign_posts).where(and(eq(campaign_posts.org_id, orgId), eq(campaign_posts.campaign_id, campaignId))).orderBy(desc(campaign_posts.published_at)),
-    database.select({ id: budget_line_items.id, name: budget_line_items.name, planned_amount: budget_line_items.planned_amount, amount: budget_line_items.amount, committed_amount: budget_line_items.committed_amount, paid_amount: budget_line_items.paid_amount, status: budget_line_items.status })
-      .from(budget_line_items).where(and(eq(budget_line_items.org_id, orgId), eq(budget_line_items.campaign_id, campaignId))),
+    database.select({ id: budget_line_items.id, name: budget_line_items.name, campaign_id: budget_line_items.campaign_id, planned_amount: budget_line_items.planned_amount, amount: budget_line_items.amount, committed_amount: budget_line_items.committed_amount, paid_amount: budget_line_items.paid_amount, status: budget_line_items.status })
+      .from(budget_line_items).where(and(eq(budget_line_items.org_id, orgId), or(eq(budget_line_items.campaign_id, campaignId), isNull(budget_line_items.campaign_id)))).orderBy(asc(budget_line_items.name)),
   ]);
+  const linkedBudgetIds = new Set(engagements.map((engagement) => engagement.budget_line_id).filter(Boolean));
+  const budgetLines = availableBudgetLines.filter((line) => line.campaign_id === campaignId && linkedBudgetIds.has(line.id));
+  const budgetLineOptions = availableBudgetLines.map(({ id, name, campaign_id }) => ({ id, name, campaign_id }));
   const engagementIds = engagements.map((engagement) => engagement.id);
   const deliverables = engagementIds.length
     ? await database.select().from(campaign_creator_deliverables).where(and(eq(campaign_creator_deliverables.org_id, orgId), inArray(campaign_creator_deliverables.engagement_id, engagementIds))).orderBy(asc(campaign_creator_deliverables.due_date))
@@ -139,19 +147,20 @@ export async function getCampaignOsWorkspace(orgId: string, campaignId: string, 
     committed: total.committed + Number(line.committed_amount ?? 0),
     paid: total.paid + Number(line.paid_amount ?? 0),
   }), { planned: 0, committed: 0, paid: 0 });
-  return { territories, engagements, deliverables, posts, budgetLines, cost, report: { narrative: campaign.final_report, snapshot: campaign.final_report_snapshot, finalized_at: campaign.final_report_finalized_at } };
+  return { territories, engagements, deliverables, posts, budgetLines, budgetLineOptions, cost, report: { narrative: campaign.final_report, snapshot: campaign.final_report_snapshot, finalized_at: campaign.final_report_finalized_at } };
 }
 
 export async function createCampaignEngagement(orgId: string, campaignId: string, input: z.infer<typeof createCampaignEngagementSchema>) {
   await requireCampaign(orgId, campaignId);
   await requireContact(orgId, input.contact_id);
-  const budgetLineId = await requireBudgetLine(orgId, campaignId, input.budget_line_id);
   const id = input.id ?? crypto.randomUUID();
-  await db.insert(campaign_creator_engagements).values({ ...input, id, org_id: orgId, campaign_id: campaignId, budget_line_id: budgetLineId,
-    outreach_permission_recorded_at: input.outreach_permission_recorded_at ? new Date(input.outreach_permission_recorded_at) : null,
-    outreach_permission_revoked_at: input.outreach_permission_revoked_at ? new Date(input.outreach_permission_revoked_at) : null,
+  await db.transaction(async (tx) => {
+    const budgetLineId = await claimBudgetLine(orgId, campaignId, input.budget_line_id, tx);
+    await tx.insert(campaign_creator_engagements).values({ ...input, id, org_id: orgId, campaign_id: campaignId, budget_line_id: budgetLineId,
+      outreach_permission_recorded_at: input.outreach_permission_recorded_at ? new Date(input.outreach_permission_recorded_at) : null,
+      outreach_permission_revoked_at: input.outreach_permission_revoked_at ? new Date(input.outreach_permission_revoked_at) : null,
+    });
   });
-  if (budgetLineId) await db.update(budget_line_items).set({ campaign_id: campaignId }).where(and(eq(budget_line_items.id, budgetLineId), eq(budget_line_items.org_id, orgId)));
   return { id, ok: true };
 }
 
@@ -172,13 +181,14 @@ export async function updateCampaignEngagement(orgId: string, campaignId: string
   if (scopeChanged && contactStatuses.has(input.status ?? current.status) && !hasRecordedPermission(permission)) throw new HttpError("Recorded outreach permission is required before changing a contacted engagement's Contact or channel", 409);
   if (input.status && input.status !== current.status && contactStatuses.has(input.status) && !hasRecordedPermission(permission)) throw new HttpError("Recorded outreach permission is required before contact", 409);
   if (input.contact_id) await requireContact(orgId, input.contact_id);
-  const budgetLineId = await requireBudgetLine(orgId, campaignId, input.budget_line_id);
   const updates: Record<string, unknown> = { ...input, updated_at: new Date() };
   delete updates.id;
-  if (input.budget_line_id !== undefined) updates.budget_line_id = budgetLineId;
   for (const field of ["outreach_permission_recorded_at", "outreach_permission_revoked_at"] as const) if (input[field] !== undefined) updates[field] = input[field] ? new Date(input[field]!) : null;
-  await db.update(campaign_creator_engagements).set(updates).where(and(eq(campaign_creator_engagements.id, input.id), eq(campaign_creator_engagements.org_id, orgId), eq(campaign_creator_engagements.campaign_id, campaignId)));
-  if (budgetLineId) await db.update(budget_line_items).set({ campaign_id: campaignId }).where(and(eq(budget_line_items.id, budgetLineId), eq(budget_line_items.org_id, orgId)));
+  await db.transaction(async (tx) => {
+    if (input.budget_line_id !== undefined) updates.budget_line_id = await claimBudgetLine(orgId, campaignId, input.budget_line_id, tx);
+    const saved = await tx.update(campaign_creator_engagements).set(updates).where(and(eq(campaign_creator_engagements.id, input.id), eq(campaign_creator_engagements.org_id, orgId), eq(campaign_creator_engagements.campaign_id, campaignId))).returning({ id: campaign_creator_engagements.id });
+    if (!saved.length) throw new NotFoundError("Creator Engagement not found");
+  });
   return { ok: true };
 }
 

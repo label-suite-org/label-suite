@@ -91,6 +91,34 @@ it("edits creator details and records fresh permission evidence without sending 
   expect(fetch).toHaveBeenCalledWith("/api/campaigns/campaign/os", expect.objectContaining({ method: "POST" }));
 });
 
+it("shows the selected Budget line read-only and submits link or unlink without cost fields", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "identified", relationship_notes: null, outreach_channel: "email", outreach_permission_status: "unknown", outreach_permission_basis: null, outreach_permission_recorded_at: null, outreach_permission_revoked_at: null, agreed_rate: null, agreed_currency: null, budget_line_id: "existing" }], deliverables: [], posts: [], budgetLineOptions: [{ id: "existing", name: "Creator fee", campaign_id: "campaign" }, { id: "new", name: "Video production", campaign_id: null }], cost: { planned: 100, committed: 50, paid: 20 }, report: { narrative: null, snapshot: null, finalized_at: null } };
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => workspace });
+  vi.stubGlobal("fetch", fetch);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate={false} contacts={[]} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("Budget line: Creator fee");
+  expect(container.textContent).not.toContain("Save Budget link");
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate canLinkBudget contacts={[]} />));
+  const select = container.querySelector<HTMLSelectElement>('[name="budget_line_id"]')!;
+  expect(select.labels?.[0]?.textContent).toContain("Budget line");
+  expect(select.textContent).toContain("Video production · unassigned");
+  const save = [...container.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Save Budget link")!;
+  select.value = "";
+  await act(async () => save.click());
+  select.value = "new";
+  await act(async () => save.click());
+  const inputs = fetch.mock.calls.filter(([, options]) => options?.method === "POST").map(([, options]) => JSON.parse(options.body));
+  expect(inputs).toEqual([
+    { action: "update_engagement", input: { id: "engagement", budget_line_id: null } },
+    { action: "update_engagement", input: { id: "engagement", budget_line_id: "new" } },
+  ]);
+});
+
 it("records a revocation timestamp and hides edit controls for read-only viewers", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "contacted", relationship_notes: null, outreach_channel: "email", outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z", outreach_permission_revoked_at: null, agreed_rate: null, agreed_currency: null }], deliverables: [], posts: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null } };
