@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 
-const database = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn() }));
+const database = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn(), transaction: vi.fn() }));
 vi.mock("../lib/db", () => ({ db: database }));
 import { updateCampaignEngagement, updateCampaignEngagementSchema } from "./campaign-os";
 
@@ -16,10 +16,11 @@ describe("Creator Engagement permission updates", () => {
     vi.clearAllMocks();
     saved = null;
     current = { id: "engagement-1", contact_id: "contact-1", status: "identified", outreach_channel: "email", outreach_permission_status: "unknown", outreach_permission_basis: null, outreach_permission_recorded_at: null, outreach_permission_revoked_at: null };
+    database.transaction.mockImplementation((callback: (tx: { select: typeof database.select; update: typeof database.update }) => Promise<unknown>) => callback({ select: database.select, update: database.update }));
     database.select.mockImplementation(() => ({ from: () => ({ where: (condition: Parameters<PgDialect["sqlToQuery"]>[0]) => ({
       limit: async () => new PgDialect().sqlToQuery(condition).params.includes(orgId) ? [current] : [],
     }) }) }));
-    database.update.mockImplementation(() => ({ set: (values: Record<string, unknown>) => ({ where: async () => { saved = values; } }) }));
+    database.update.mockImplementation(() => ({ set: (values: Record<string, unknown>) => ({ where: () => ({ returning: async () => { saved = values; return [{ id: "engagement-1" }]; } }) }) }));
   });
 
   it("changes notes without resetting status, channel, or permission", async () => {

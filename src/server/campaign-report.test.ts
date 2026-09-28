@@ -24,10 +24,10 @@ describe("Campaign report finalisation", () => {
       from: (table: unknown) => ({
         where: (condition: Parameters<PgDialect["sqlToQuery"]>[0]) => ({
           limit: async () => table === campaigns && new PgDialect().sqlToQuery(condition).params.includes(orgId) ? [{ id: campaignId, final_report: saved?.final_report ?? null, final_report_snapshot: saved?.final_report_snapshot ?? null, final_report_finalized_at: saved?.final_report_finalized_at ?? null }] : [],
-          orderBy: async () => table === campaign_posts ? posts : table === campaign_creator_deliverables ? [{ engagement_id: "engagement-1", description: "One video", approval_status: "approved", evidence_url: "https://example.test/evidence" }] : [],
-          then: (resolve: (rows: unknown[]) => void) => resolve(table === budget_line_items ? [{ name: "Creator fee", planned_amount: "100", amount: "100", committed_amount: "50", paid_amount: "25" }] : []),
+          orderBy: async () => table === campaign_posts ? posts : table === campaign_creator_deliverables ? [{ engagement_id: "engagement-1", description: "One video", approval_status: "approved", evidence_url: "https://example.test/evidence" }] : table === budget_line_items ? [{ id: "line-1", campaign_id: campaignId, name: "Creator fee", planned_amount: "100", amount: "100", committed_amount: "50", paid_amount: "25" }] : [],
+          then: (resolve: (rows: unknown[]) => void) => resolve([]),
         }),
-        innerJoin: () => ({ where: () => ({ orderBy: async () => [{ id: "engagement-1", contact_name: "Alex", status: "complete" }] }) }),
+        innerJoin: () => ({ where: () => ({ orderBy: async () => [{ id: "engagement-1", contact_name: "Alex", status: "complete", budget_line_id: "line-1" }] }) }),
       }),
     }));
     database.update.mockImplementation(() => ({ set: (values: Record<string, unknown>) => ({
