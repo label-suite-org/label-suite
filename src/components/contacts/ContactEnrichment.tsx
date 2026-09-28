@@ -275,7 +275,7 @@ function EvidenceLine({ evidence }: { evidence?: Record<string, unknown> | null 
 function formatDate(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown time";
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Copenhagen", dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 function suggestionLabel(field: string) {
