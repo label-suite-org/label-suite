@@ -31,7 +31,7 @@ export function ReleaseDeliveryPanel({releaseId,canManage,compact=false,onOpen,o
     return <div className="space-y-2 py-3 text-sm">
       <p className="font-medium">{statusLabel(attempt.status)} · Version {attempt.payload_version}.{attempt.patch_version}</p>
       <p className="text-xs text-muted-foreground">{timestamp(attempt.created_at)}</p>
-      <a className="inline-block underline underline-offset-4" download={`${releaseId}-${attempt.provider_key}-v${attempt.payload_version}.${attempt.patch_version}.json`} href={`/api/releases/${encodeURIComponent(releaseId)}/delivery/export?attempt=${encodeURIComponent(attempt.id)}`}>Download JSON</a>
+      <a className="inline-block underline underline-offset-4" download={`${releaseId}-${attempt.provider_key}-v${attempt.payload_version}.${attempt.patch_version}.json`} href={`data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(attempt.payload,null,2))}`}>Download JSON</a>
       {!!warnings.length&&<ul className="space-y-1">{warnings.map(warning=><li key={`${warning.code}:${warning.track_id??"release"}`}><span>{warning.message}. </span><button type="button" className="underline underline-offset-4" onClick={()=>onInspect(Boolean(warning.track_id))}>{warning.track_id?"Review tracks":"Review UPC/EAN"}</button></li>)}</ul>}
       {attempt.error_message&&<p className="text-destructive">{attempt.error_message}</p>}
       <details><summary className="cursor-pointer text-xs">Export evidence</summary><p className="mt-2 break-all text-xs">Payload hash: {attempt.payload_hash}</p><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(evidence,null,2)}</pre></details>
