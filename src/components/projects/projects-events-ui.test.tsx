@@ -372,6 +372,7 @@ describe("form surfaces", () => {
     expect(html).toContain("Contact");
     expect(html).toContain("Owner");
     expect(html).toContain("Venue");
+    expect(html).toMatch(/<button(?=[^>]*form="event-form")(?=[^>]*type="submit")[^>]*>/);
   });
 
   it("renders project dialog in canonical wording", () => {
@@ -388,6 +389,7 @@ describe("form surfaces", () => {
 
     expect(html).toContain("New project");
     expect(html).toContain("Project type");
+    expect(html).toMatch(/<button(?=[^>]*form="project-form")(?=[^>]*type="submit")[^>]*>/);
     expect(html).toContain("Tracks");
   });
 
