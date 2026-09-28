@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   audit_events,
@@ -333,7 +333,7 @@ export async function listIntegrationProviders(orgId: string) {
   return db
     .select()
     .from(integration_providers)
-    .where(eq(integration_providers.org_id, orgId))
+    .where(and(eq(integration_providers.org_id, orgId), ne(integration_providers.key, "warm")))
     .orderBy(asc(integration_providers.category), asc(integration_providers.name));
 }
 

@@ -1,13 +1,20 @@
-# Public source preparation
+# Public source and production boundary
 
-This is a fresh-history verification candidate for `label-suite-org/label-suite`,
+This is the production source repository `label-suite-org/label-suite`,
 exported from private candidate `5ffd1fc2af8b17123681c678a2e9d29fc533f1c7`.
-The export does not imply that candidate was merged or deployed.
+The original export alone did not establish deployment. The separately verified
+web cutover completed on 27 September 2026 at public main revision
+`f0b1e2c8360b30453eb93a685ff6f0e26dcfedb4`, following
+[PR #2](https://github.com/label-suite-org/label-suite/pull/2).
+This is a historical checkpoint; verify the current deployed revision for each
+subsequent release.
 
 The original private repository retains its history, issues, pull requests,
 production evidence, and rollback records. Do not copy those wholesale here.
-Production remains on its existing source until a separately verified cutover.
-Historical delivery documents below this notice describe that existing deployment.
+Dokploy deploys reviewed, verified public `main` through its serialized Compose
+lane. The private repository is retained for backlog and recovery, not as the
+current production source. Retained Forgejo delivery references are historical;
+GitHub alone owns current repository, issue, PR and CI state.
 
 ## Export boundary
 
@@ -49,4 +56,5 @@ this sequencing decision does not certify those features or enable providers.
 Publication verification and CI results must be checked for the exact public SHA.
 A passing public workflow does not automatically satisfy checks on private PRs,
 authorize production deployment, or prove physical-device/provider acceptance.
-No production source change, credential rotation, or license change is included.
+The completed cutover does not by itself authorize changing deployment
+integrations, credential rotation, license changes or external-provider activation.

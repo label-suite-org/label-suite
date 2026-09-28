@@ -434,7 +434,8 @@ test("core-surfaces-light-dark-a11y", async ({ page }, testInfo) => {
   const renderLifecycleWarnings = captureRenderLifecycleWarnings(page);
   await login(page);
   const releaseId = requiredFixture("E2E_RELEASE_ID", "Schedule accessibility requires a seeded release.");
-  const surfaces = ["/dashboard", "/analytics", "/artists", "/releases", `/releases/${releaseId}?section=timeline`, "/campaigns", "/events", "/settings"];
+  const trackId = requiredFixture("E2E_TRACK_ID", "Catalog accessibility requires a seeded track.");
+  const surfaces = ["/dashboard", "/analytics", "/artists", "/releases", `/catalog?track=${trackId}`, `/releases/${releaseId}?section=timeline`, "/campaigns", "/events", "/settings"];
 
   for (const path of surfaces) {
     await scanSurface(page, testInfo, path);
@@ -1519,6 +1520,10 @@ test("campaign rich editor keeps AI review local until an explicit save", async 
 
   await login(page);
   await page.goto(`/campaigns/${RADIO_CAMPAIGN_ID}`, { waitUntil: "domcontentloaded" });
+  const moreSections = page.getByRole("button", { name: "More campaign sections", exact: true });
+  await expect(moreSections.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", "");
+  await moreSections.click();
+  await page.getByRole("menuitem", { name: "Details", exact: true }).click();
   const editCampaign = page.getByRole("button", { name: "Edit Fountain Edits — Release Gate Campaign", exact: true });
   await expect(editCampaign.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", "");
   await editCampaign.click();

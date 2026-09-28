@@ -125,6 +125,22 @@ body {
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+.campaign-workspace {
+  --font-sans: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --primary: oklch(0.51 0.23 260);
+  --primary-foreground: oklch(1 0 0);
+  --accent: oklch(0.96 0.025 260);
+  --accent-foreground: oklch(0.32 0.1 260);
+  --ring: oklch(0.68 0.13 260);
+  --radius: 0.5rem;
+  font-family: var(--font-sans);
+}
+
+.dark .campaign-workspace {
+  --accent: oklch(0.27 0.045 260);
+  --accent-foreground: oklch(0.92 0.02 260);
+}
+
 /* Public Fountain radio update: a warm, cardless editorial press sheet. */
 .fountain-press-page {
   --fountain-paper: #f7f4ec;

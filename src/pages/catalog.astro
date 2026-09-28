@@ -1,18 +1,32 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
 import { CatalogWorkspace } from "../components/catalog/CatalogWorkspace";
-import { listCatalogEntries, listCatalogReleaseOptions } from "../server/catalog";
+import { CatalogBrowser } from "../components/catalog/CatalogBrowser";
+import { listCatalogEntries, listCatalogReleaseOptions, listCatalogTracks } from "../server/catalog";
+import { listArtists } from "../server/artists";
+import { listReleases } from "../server/releases";
 import { serializeClientCapabilities } from "../server/tenant";
 
 const orgId = Astro.locals.orgId!;
-const [entries, releaseOptions] = await Promise.all([
+const numbering = Astro.url.searchParams.get("view") === "numbering";
+const [entries, releaseOptions] = numbering ? await Promise.all([
   listCatalogEntries(orgId),
   listCatalogReleaseOptions(orgId),
+]) : [[], []];
+const [artistRows, releases, tracks] = numbering ? [[], [], []] : await Promise.all([
+  listArtists(orgId), listReleases(orgId), listCatalogTracks(orgId),
 ]);
+const artists = artistRows.map(({ id, name, image_url }) => ({ id, name, image_url }));
 const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
 
 ---
 
 <AppLayout>
-  <CatalogWorkspace client:load initialEntries={entries} releaseOptions={releaseOptions} canMutate={canMutate} />
+  {numbering ? <>
+    <a href="/catalog" class="mb-5 inline-block text-sm underline underline-offset-4">Back to artists, releases & tracks</a>
+    <CatalogWorkspace client:load initialEntries={entries} releaseOptions={releaseOptions} canMutate={canMutate} />
+  </> : <CatalogBrowser client:load artists={artists} releases={releases} tracks={tracks} canMutate={canMutate}
+    selectedArtistId={Astro.url.searchParams.get("artist")}
+    selectedReleaseId={Astro.url.searchParams.get("release")}
+    selectedTrackId={Astro.url.searchParams.get("track")} />}
 </AppLayout>

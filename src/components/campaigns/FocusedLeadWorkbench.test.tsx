@@ -119,7 +119,9 @@ describe("focused lead workbench", () => {
   it("renders one evidence-led five-step operator flow without a send action", () => {
     const html = renderToStaticMarkup(<CampaignOutreachWorkspace initialData={focusedWorkbenchData} canMutate={false} />);
 
-    expect(html).toContain("grid-cols-[220px_minmax(0,1fr)_280px]");
+    expect(html).toContain("grid-cols-[var(--queue-width)_minmax(0,1fr)_var(--context-width)]");
+    expect(html).toContain('aria-label="Collapse lead queue"');
+    expect(html).toContain('aria-label="Expand lead context"');
     expect(html).toContain('<section aria-label="Focused lead workbench"');
     expect(html).not.toContain('<main class="min-w-0 px-0 lg:px-6">');
     expect(html).toContain("text-[11px] text-foreground");

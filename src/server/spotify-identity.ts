@@ -98,6 +98,11 @@ export async function confirmSpotifyIdentity(orgId: string, raw: z.input<typeof 
     .limit(1);
   if (!connection || connection.provider_key !== "spotify") throw new NotFoundError("Connected Spotify integration not found in active workspace");
 
+  const table = input.label_suite_object_type === "artist" ? artists : input.label_suite_object_type === "release" ? releases : tracks;
+  const [target] = await db.select({ id: table.id }).from(table)
+    .where(and(eq(table.org_id, orgId), eq(table.id, input.label_suite_object_id))).limit(1);
+  if (!target) throw new NotFoundError("Spotify identity target not found in active workspace");
+
   const link = await upsertExternalObjectLink(orgId, {
     connection_id: input.connection_id,
     provider_key: "spotify",

@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildSchemaDriftReport,
   captureSchemaContract,
@@ -230,50 +230,50 @@ describe("schema drift policy", () => {
     }
   });
 
-  it("accepts Git provenance reachable from a local non-HEAD ref", async () => {
-    const directory = await mkdtemp(resolve(tmpdir(), "label-suite-schema-provenance-"));
-    const repository = resolve(directory, "repository");
+  describe.sequential("Git provenance reachable from a local non-HEAD ref", () => {
+    let directory: string | undefined;
+    let repository: string;
+    let nonHeadCommit: string;
     const runGit = (...args: string[]) => execFileSync("git", ["-C", repository, ...args], { encoding: "utf8" }).trim();
-    try {
+
+    beforeAll(async () => {
+      directory = await mkdtemp(resolve(tmpdir(), "label-suite-schema-provenance-"));
+      repository = resolve(directory, "repository");
       await mkdir(repository);
       runGit("init");
       runGit("config", "user.name", "Schema Contract Test");
       runGit("config", "user.email", "schema-contract@example.test");
-      runGit("remote", "add", "origin", "https://git.truenature.online/malthe/label-suite_neon_r2.git");
+      runGit("remote", "add", "origin", "https://github.com/label-suite-org/label-suite_neon_r2.git");
       await writeFile(resolve(repository, "README.md"), "fixture\n");
       runGit("add", "README.md");
       runGit("commit", "-m", "fixture");
-      const nonHeadCommit = runGit("commit-tree", "HEAD^{tree}", "-m", "migration evidence");
+      nonHeadCommit = runGit("commit-tree", "HEAD^{tree}", "-m", "migration evidence");
       runGit("update-ref", "refs/heads/migration-evidence", nonHeadCommit);
+    });
+    afterAll(async () => { if (directory) await rm(directory, { recursive: true, force: true }); });
 
-      const historicalSource = `https://git.truenature.online/malthe/label-suite_neon_r2/commit/${nonHeadCommit}`;
+    it.each([
+      ["historical Forgejo", "https://git.truenature.online/malthe/label-suite_neon_r2.git"],
+      ["canonical GitHub", "https://github.com/label-suite-org/label-suite_neon_r2.git"],
+      ["historical GitHub SSH", "git@github.com:malthelm/label-suite_neon_r2.git"],
+    ])("accepts historical evidence with the %s origin", (_name, origin) => {
+      runGit("remote", "set-url", "origin", origin);
       expect(() => verifyDriftPolicyProvenance(
-        policy([policyEntry({ source: historicalSource })]),
+        policy([policyEntry({ source: `https://git.truenature.online/malthe/label-suite_neon_r2/commit/${nonHeadCommit}` })]),
         repository,
       )).not.toThrow();
+    });
 
-      runGit("remote", "set-url", "origin", "https://github.com/label-suite-org/label-suite_neon_r2.git");
-      expect(() => verifyDriftPolicyProvenance(
-        policy([policyEntry({ source: historicalSource })]),
-        repository,
-      )).not.toThrow();
-
+    it.each([
+      "https://git.truenature.online/wrong-origin/other-repository",
+      "https://github.com/wrong-origin/label-suite_neon_r2",
+    ])("rejects evidence from a different repository: %s", (source) => {
       runGit("remote", "set-url", "origin", "git@github.com:malthelm/label-suite_neon_r2.git");
       expect(() => verifyDriftPolicyProvenance(
-        policy([policyEntry({ source: historicalSource })]),
-        repository,
-      )).not.toThrow();
-      expect(() => verifyDriftPolicyProvenance(
-        policy([policyEntry({ source: `https://git.truenature.online/wrong-origin/other-repository/commit/${nonHeadCommit}` })]),
+        policy([policyEntry({ source: `${source}/commit/${nonHeadCommit}` })]),
         repository,
       )).toThrow("Unverifiable drift policy provenance");
-      expect(() => verifyDriftPolicyProvenance(
-        policy([policyEntry({ source: `https://github.com/wrong-origin/label-suite_neon_r2/commit/${nonHeadCommit}` })]),
-        repository,
-      )).toThrow("Unverifiable drift policy provenance");
-    } finally {
-      await rm(directory, { recursive: true, force: true });
-    }
+    });
   });
 
   it("rejects a Git commit object that is not reachable from a local ref", async () => {

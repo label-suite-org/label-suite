@@ -1,13 +1,21 @@
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-const target = "postgres://label_suite:label_suite@127.0.0.1:55432/label_suite";
-const enabled = process.env.CI === "true" && process.env.DATABASE_URL === target;
+import { assertDisposableReleaseGateTarget } from "../../scripts/release-gate-fixture-safety";
+const target = process.env.DATABASE_URL ?? "";
+const enabled = process.env.CI === "true";
 const org = `schedule-${randomUUID()}`;
 let sql: ReturnType<typeof postgres>;
 let tasks: typeof import("./ops-tasks");
 describe.skipIf(!enabled)("task dependency graph on disposable PostgreSQL", () => {
   beforeAll(async () => {
+    assertDisposableReleaseGateTarget({
+      databaseUrl: target, ci: process.env.CI,
+      fixtureDisposable: process.env.RELEASE_GATE_FIXTURE_DISPOSABLE,
+      userEmail: process.env.E2E_USER_EMAIL, userPassword: process.env.E2E_USER_PASSWORD,
+      analyticsFixtureDb: process.env.ANALYTICS_FIXTURE_DB,
+      analyticsFixtureDisposable: process.env.ANALYTICS_FIXTURE_DISPOSABLE,
+    });
     sql = postgres(target, { max: 1 });
     tasks = await import("./ops-tasks");
     await sql`insert into label_suite.orgs (id, name, slug) values (${org}, 'Schedule test', ${org})`;
