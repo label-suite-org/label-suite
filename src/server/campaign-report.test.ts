@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { budget_line_items, campaign_creator_deliverables, campaign_posts, campaigns } from "../db/schema";
 
-const database = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn() }));
+const database = vi.hoisted(() => ({ select: vi.fn(), update: vi.fn(), transaction: vi.fn() }));
 vi.mock("../lib/db", () => ({ db: database }));
 import { finalizeCampaignReport, getCampaignOsWorkspace } from "./campaign-os";
 
@@ -19,6 +19,7 @@ describe("Campaign report finalisation", () => {
     saved = null;
     whereSql = [];
     posts = [{ id: "post-1", url: "https://example.test/post", platform: "Instagram", published_at: new Date("2026-09-20"), metrics_captured_at: new Date("2026-09-21"), manual_metrics: { views: 100 }, notes: "Screenshot on file" }];
+    database.transaction.mockImplementation((callback: (tx: { select: typeof database.select; update: typeof database.update }) => Promise<unknown>) => callback({ select: database.select, update: database.update }));
     database.select.mockImplementation(() => ({
       from: (table: unknown) => ({
         where: (condition: Parameters<PgDialect["sqlToQuery"]>[0]) => ({
@@ -57,6 +58,7 @@ describe("Campaign report finalisation", () => {
     expect(whereSql[0]).toContain('"org_id"');
     expect(whereSql[0]).toContain('"final_report_snapshot" is null');
     expect(whereSql[0]).toContain('"final_report_finalized_at" is null');
+    expect(database.transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: "repeatable read" });
   });
 
   it("does not expose a campaign report through another organisation", async () => {
