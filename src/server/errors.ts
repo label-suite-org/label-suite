@@ -22,3 +22,8 @@ export class ConflictError extends HttpError {
     this.name = "ConflictError";
   }
 }
+
+export function isPostgresSerializationFailure(error: unknown): boolean {
+  const cause = error instanceof Error ? error.cause : null;
+  return [error, cause].some((value) => typeof value === "object" && value !== null && "code" in value && value.code === "40001");
+}
