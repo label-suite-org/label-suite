@@ -5,6 +5,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { ArtistForm, type Artist, type ArtistFocusField, type ContactOption } from "./ArtistForm";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 type ArtistEditButtonVariant = "primary" | "secondary";
 
 const BUTTON_LABELS: Record<ArtistFocusField, string> = {
@@ -79,29 +80,18 @@ export function ArtistEditDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  if (!open) return null;
-
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="artist-edit-dialog-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={() => onOpenChange(false)}
-    >
-      <div
-        className="bg-card rounded-lg shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="artist-edit-dialog-title" className="text-xl font-bold mb-4">Edit Artist</h2>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto p-6 sm:max-w-lg">
+        <DialogTitle>Edit Artist</DialogTitle>
         <ArtistForm
           initial={artist}
           focusField={focusField}
           contactOptions={contactOptions}
           onClose={() => onOpenChange(false)}
         />
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
