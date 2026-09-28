@@ -29,11 +29,7 @@ const FIXTURE_USER = {
   email: process.env.E2E_USER_EMAIL?.trim() ?? "",
   password: process.env.E2E_USER_PASSWORD?.trim() ?? "",
 } as const;
-const READ_ONLY_FIXTURE_USER = {
-  name: "Release Gate Read-only Member",
-  email: process.env.E2E_READ_ONLY_USER_EMAIL?.trim() || readOnlyFixtureEmail(FIXTURE_USER.email),
-  password: process.env.E2E_READ_ONLY_USER_PASSWORD?.trim() || FIXTURE_USER.password,
-} as const;
+const READ_ONLY_FIXTURE_USER = releaseGateFixtureWorld.readOnlyUser;
 const RADIO_REVIEW_SLUG = radio.reviewSlug;
 const RADIO_PUBLIC_SLUG = radio.publicSlug;
 const ARTWORK_FIXTURE_URL = radio.artworkUrl;
@@ -60,11 +56,6 @@ const PUBLIC_FIXTURE_PUBLISHED_AT = releaseGateFixtureWorld.publicFixturePublish
 async function findUserByEmail(email: string) {
   const rows = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.email, email)).limit(1);
   return rows[0] ?? null;
-}
-
-function readOnlyFixtureEmail(email: string) {
-  const at = email.indexOf("@");
-  return at > 0 ? `${email.slice(0, at)}+readonly${email.slice(at)}` : `${email}+readonly@example.test`;
 }
 
 async function ensureFixtureUser(user: { name: string; email: string; password: string } = FIXTURE_USER) {

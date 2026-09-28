@@ -63,7 +63,6 @@ const ACTIVITY_OPERATOR_LEAD_BY_PROJECT = {
   "mobile-390-gate": releaseGateFixtureWorld.ids.activityLeads.mobile390,
   "mobile-320-gate": releaseGateFixtureWorld.ids.activityLeads.mobile320,
 } as const;
-const ACTIVITY_READ_ONLY_EMAIL_SUFFIX = "+readonly";
 const FOREIGN_TENANT_LEAD_ID = releaseGateFixtureWorld.foreignTenant.lead;
 
 type AxeNodeEvidence = {
@@ -110,15 +109,8 @@ async function login(page: Page) {
   await expect(page.getByRole("main")).toBeVisible({ timeout: 30_000 });
 }
 
-function releaseGateReadOnlyEmail() {
-  const email = process.env.E2E_USER_EMAIL?.trim() ?? "";
-  const at = email.indexOf("@");
-  return at > 0 ? `${email.slice(0, at)}${ACTIVITY_READ_ONLY_EMAIL_SUFFIX}${email.slice(at)}` : `${email}${ACTIVITY_READ_ONLY_EMAIL_SUFFIX}@example.test`;
-}
-
 async function loginReadOnly(page: Page) {
-  const password = process.env.E2E_USER_PASSWORD;
-  const email = releaseGateReadOnlyEmail();
+  const { email, password } = releaseGateFixtureWorld.readOnlyUser;
 
   if (!email.trim() || !password?.trim()) {
     throw new Error("Release-gate read-only auth preconditions missing: base E2E_USER_EMAIL and E2E_USER_PASSWORD are required.");

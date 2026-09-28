@@ -13,6 +13,16 @@ describe("release-gate fixture world", () => {
     expect(() => validateReleaseGateFixtureWorld(world)).not.toThrow();
   });
 
+  it("resolves the same read-only credentials for seeding and browser login", () => {
+    const env = { E2E_USER_EMAIL: "operator@example.test", E2E_USER_PASSWORD: "fixture-password" };
+    expect(createReleaseGateFixtureWorld(env).readOnlyUser).toEqual({
+      name: "Release Gate Read-only Member", email: "operator+readonly@example.test", password: "fixture-password",
+    });
+    expect(createReleaseGateFixtureWorld({ ...env, E2E_READ_ONLY_USER_EMAIL: " custom@example.test ", E2E_READ_ONLY_USER_PASSWORD: " distinct-password " }).readOnlyUser).toEqual({
+      name: "Release Gate Read-only Member", email: "custom@example.test", password: "distinct-password",
+    });
+  });
+
   it("rejects identity collisions before seeding or browser verification", () => {
     const world = createReleaseGateFixtureWorld();
     expect(() => validateReleaseGateFixtureWorld({ ...world, ids: { ...world.ids, track: world.ids.release } })).toThrow("IDs must be unique");
