@@ -72,7 +72,7 @@ it("shows saved report figures beside live figures without offering finalisation
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
     territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 20, committed: 10, paid: 5 },
-    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T12:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
+    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T00:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
   }) }));
   container = document.createElement("div");
   document.body.append(container);
@@ -88,6 +88,7 @@ it("shows saved report figures beside live figures without offering finalisation
   expect(container.textContent).toContain("One video");
   expect(container.textContent).toContain("https://example.test/post");
   expect(container.textContent).toContain(`Published ${new Date("2026-09-27T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
+  expect(container.textContent).toContain(`Metrics captured ${new Date("2026-09-27T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
   expect(container.textContent).toContain("Creator fee");
   expect(container.textContent).not.toContain("Finalise report");
 });
