@@ -183,7 +183,15 @@ export async function finalizeCampaignReport(orgId: string, campaignId: string, 
   const snapshot = { finalized_at: finalizedAt.toISOString(), cost: workspace.cost, deliverable_count: workspace.deliverables.length, approved_deliverable_count: workspace.deliverables.filter((item) => item.approval_status === "approved").length, post_count: workspace.posts.length, manual_metrics: workspace.posts.reduce<Record<string, number>>((all, post) => {
     for (const [key, value] of Object.entries(post.manual_metrics ?? {})) all[key] = (all[key] ?? 0) + Number(value);
     return all;
-  }, {}) };
+  }, {}), creator_delivery: workspace.engagements.map((engagement) => ({
+    contact_name: engagement.contact_name, status: engagement.status,
+    deliverables: workspace.deliverables.filter((item) => item.engagement_id === engagement.id).map((item) => ({ description: item.description, approval_status: item.approval_status, evidence_url: item.evidence_url })),
+  })), post_evidence: workspace.posts.map((post) => ({
+    url: post.url, platform: post.platform, published_at: post.published_at, metrics_captured_at: post.metrics_captured_at,
+    manual_metrics: post.manual_metrics, notes: post.notes,
+  })), budget_lines: workspace.budgetLines.map((line) => ({
+    name: line.name, planned_amount: line.planned_amount ?? line.amount, committed_amount: line.committed_amount, paid_amount: line.paid_amount,
+  })) };
   const saved = await db.update(campaigns).set({ final_report: report, final_report_snapshot: snapshot, final_report_finalized_at: finalizedAt, final_report_finalized_by: actorId, updated_at: finalizedAt })
     .where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId), isNull(campaigns.final_report_snapshot), isNull(campaigns.final_report_finalized_at))).returning({ id: campaigns.id });
   if (!saved.length) throw new ConflictError("Campaign report has already been finalised");

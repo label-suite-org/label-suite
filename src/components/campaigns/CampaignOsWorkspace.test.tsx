@@ -44,7 +44,7 @@ it("shows saved report figures beside live figures without offering finalisation
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
     territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 20, committed: 10, paid: 5 },
-    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 } } },
+    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: null, metrics_captured_at: "2026-09-27T12:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
   }) }));
   container = document.createElement("div");
   document.body.append(container);
@@ -55,5 +55,23 @@ it("shows saved report figures beside live figures without offering finalisation
   expect(container.textContent).toContain("Live now");
   expect(container.textContent).toContain("Planned 20 · Committed 10 · Paid 5");
   expect(container.textContent).toContain("views: 100");
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("One video");
+  expect(container.textContent).toContain("https://example.test/post");
+  expect(container.textContent).toContain("Creator fee");
   expect(container.textContent).not.toContain("Finalise report");
+});
+
+it("labels older snapshots without item-level evidence honestly", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+    territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 0, committed: 0, paid: 0 },
+    report: { narrative: "Older report", finalized_at: "2026-09-20T12:00:00.000Z", snapshot: { finalized_at: "2026-09-20T12:00:00.000Z", cost: { planned: 0, committed: 0, paid: 0 }, deliverable_count: 0, approved_deliverable_count: 0, post_count: 0, manual_metrics: {} } },
+  }) }));
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="report" canMutate contacts={[]} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("Item-level evidence was not saved with this older snapshot.");
 });

@@ -7,7 +7,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-type ReportSnapshot = { finalized_at: string; cost: { planned: number; committed: number; paid: number }; deliverable_count: number; approved_deliverable_count: number; post_count: number; manual_metrics: Record<string, number> };
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+type ReportSnapshot = {
+  finalized_at: string;
+  cost: { planned: number; committed: number; paid: number };
+  deliverable_count: number;
+  approved_deliverable_count: number;
+  post_count: number;
+  manual_metrics: Record<string, number>;
+  creator_delivery?: Array<{ contact_name: string; status: string; deliverables: Array<{ description: string; approval_status: string; evidence_url: string | null }> }>;
+  post_evidence?: Array<{ url: string; platform: string; published_at: string | null; metrics_captured_at: string | null; manual_metrics: Record<string, number>; notes: string | null }>;
+  budget_lines?: Array<{ name: string; planned_amount: string | number | null; committed_amount: string | number | null; paid_amount: string | number | null }>;
+};
 type Workspace = {
   territories: Array<{ id: string; country_code: string }>;
   engagements: Array<{ id: string; contact_id: string; contact_name: string; status: string; outreach_channel: string; outreach_permission_status: string; outreach_permission_basis: string | null; agreed_rate: number | null; agreed_currency: string | null; budget_line_id: string | null }>;
@@ -78,10 +89,18 @@ export default function CampaignOsWorkspace({ campaignId, section, canMutate, co
         <CardHeader><CardTitle>Finalised report · {new Date(workspace.report.finalized_at ?? snapshot!.finalized_at).toLocaleDateString()}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <p className="whitespace-pre-wrap">{workspace.report.narrative}</p>
-          {snapshot ? <div className="grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
+          {snapshot ? <><div className="grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
             <div><p className="font-medium">Saved at finalisation</p><p className="text-muted-foreground">Planned {snapshot.cost.planned} · Committed {snapshot.cost.committed} · Paid {snapshot.cost.paid}</p><p className="text-muted-foreground">Deliverables {snapshot.deliverable_count} · Approved {snapshot.approved_deliverable_count} · Posts {snapshot.post_count}</p><p className="text-muted-foreground">Captured metrics: {Object.entries(snapshot.manual_metrics).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p></div>
             <div><p className="font-medium">Live now</p><p className="text-muted-foreground">Planned {workspace.cost.planned} · Committed {workspace.cost.committed} · Paid {workspace.cost.paid}</p><p className="text-muted-foreground">Deliverables {workspace.deliverables.length} · Approved {workspace.deliverables.filter((item) => item.approval_status === "approved").length} · Posts {workspace.posts.length}</p><p className="text-muted-foreground">Captured metrics: {Object.entries(liveMetrics).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p></div>
-          </div> : <p className="text-muted-foreground">No saved figures are available for this report.</p>}
+          </div>
+          <Accordion><AccordionItem value="evidence"><AccordionTrigger>Saved evidence at finalisation</AccordionTrigger><AccordionContent>
+            {snapshot.post_evidence && snapshot.creator_delivery && snapshot.budget_lines ? <div className="space-y-3 text-muted-foreground">
+              <div><p className="font-medium text-foreground">Creator delivery</p>{snapshot.creator_delivery.length ? snapshot.creator_delivery.map((creator, index) => <div key={index}><p>{creator.contact_name} · {creator.status}</p>{creator.deliverables.map((item, itemIndex) => <p key={itemIndex} className="pl-3">{item.description} · {item.approval_status}{item.evidence_url ? ` · Evidence: ${item.evidence_url}` : ""}</p>)}</div>) : <p>None recorded</p>}</div>
+              <div><p className="font-medium text-foreground">Manual post observations</p>{snapshot.post_evidence.length ? snapshot.post_evidence.map((post, index) => <div key={index}><p>{post.platform} · {post.url}</p><p>Published {post.published_at ? new Date(post.published_at).toLocaleDateString() : "date unknown"} · Metrics captured {post.metrics_captured_at ? new Date(post.metrics_captured_at).toLocaleDateString() : "date unknown"}</p><p>Captured metrics: {Object.entries(post.manual_metrics ?? {}).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p>{post.notes ? <p>{post.notes}</p> : null}</div>) : <p>None recorded</p>}</div>
+              <div><p className="font-medium text-foreground">Budget Lines</p>{snapshot.budget_lines.length ? snapshot.budget_lines.map((line, index) => <p key={index}>{line.name} · Planned {line.planned_amount ?? 0} · Committed {line.committed_amount ?? 0} · Paid {line.paid_amount ?? 0}</p>) : <p>None linked</p>}</div>
+            </div> : <p className="text-muted-foreground">Item-level evidence was not saved with this older snapshot.</p>}
+          </AccordionContent></AccordionItem></Accordion>
+          </> : <p className="text-muted-foreground">No saved figures are available for this report.</p>}
         </CardContent>
       </Card> : null}
       {canMutate && !workspace.report.finalized_at && !snapshot ? <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); submit("finalize_report", { report }).catch((reason) => setError(reason.message)); }}><Textarea required value={report} onChange={(event) => setReport(event.target.value)} placeholder="Final report" className="min-h-32" /><Button type="submit">Finalise report</Button></form> : null}
