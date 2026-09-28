@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { royalty_statements, royalty_payouts, royalty_ledger_transactions, royalty_ledger_entries } from "../db/schema";
+import { contacts, royalty_statements, royalty_payouts, royalty_ledger_transactions, royalty_ledger_entries } from "../db/schema";
 import { db } from "../lib/db";
 import { ConflictError, NotFoundError } from "./errors";
 import { compareMoney, createMoney } from "./royalty-engine/money";
@@ -117,4 +117,21 @@ export async function reversePayoutBatch(orgId: string, actorId: string, batchId
       .where(and(eq(royalty_ledger_transactions.org_id,orgId),eq(royalty_ledger_transactions.id,batchId)));
     return {reversal_id:reversalId,duplicate:false};
   });
+}
+
+export async function getPayoutBatch(orgId: string, batchId: string) {
+  if (!/^payout-batch:[a-f0-9]{24}$/.test(batchId)) throw new NotFoundError("Payout batch not found");
+  return db.transaction(async tx => {
+    const [batch] = await tx.select({ id:royalty_ledger_transactions.id, status:royalty_ledger_transactions.posting_status,
+      reference:royalty_ledger_transactions.evidence_reference, effective_date:royalty_ledger_transactions.effective_date,
+    }).from(royalty_ledger_transactions).where(and(eq(royalty_ledger_transactions.org_id,orgId),eq(royalty_ledger_transactions.id,batchId)));
+    if (!batch) throw new NotFoundError("Payout batch not found in this workspace");
+    const lines = await tx.select({ id:royalty_ledger_entries.id, statement_id:royalty_ledger_entries.statement_id,
+      contact_name:contacts.name, amount:royalty_ledger_entries.amount, currency:royalty_ledger_entries.currency,
+    }).from(royalty_ledger_entries)
+      .leftJoin(contacts,and(eq(contacts.org_id,orgId),eq(contacts.id,royalty_ledger_entries.contact_id)))
+      .where(and(eq(royalty_ledger_entries.org_id,orgId),eq(royalty_ledger_entries.transaction_id,batchId)))
+      .orderBy(royalty_ledger_entries.id);
+    return {batch,lines};
+  },{isolationLevel:"repeatable read"});
 }

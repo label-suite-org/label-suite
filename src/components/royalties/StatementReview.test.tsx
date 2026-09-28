@@ -31,3 +31,37 @@ it("keeps a stale review visible, refreshes its version, and exposes no mutation
     expect(element.textContent).toContain("Test payee");
   } finally { await act(async()=>root.unmount()); }
 });
+
+it("records multiple selected statements with one stable key when a response is lost",async()=>{
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
+  const rows=[{...statement,status:"issued",posted_balance:"1.00000000"},{...statement,id:"statement-b",contact_name:"Second payee",status:"issued",posted_balance:"1.00000000"}];
+  let attempts=0;
+  const fetch=vi.fn(async(url:string,options?:RequestInit)=>{
+    if(options?.method==="POST") {
+      if(++attempts===1) throw new TypeError("Network response lost");
+      return new Response(JSON.stringify({batch_id:"payout-batch:test"}));
+    }
+    return new Response(JSON.stringify(url.includes("/payouts/") ? {batch:{id:"payout-batch:test",status:"posted",reference:"Test receipt",effective_date:"2026-09-28"},lines:[]} : {rows,next_offset:null}));
+  });
+  vi.stubGlobal("fetch",fetch);
+  const element=document.createElement("div");document.body.append(element);const root=createRoot(element);
+  const input=(field:HTMLInputElement,value:string)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,value);field.dispatchEvent(new Event("input",{bubbles:true}));};
+  try {
+    await act(async()=>root.render(<StatementReview canMutate />));
+    await act(async()=>{element.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(field=>field.click());});
+    const form=[...element.querySelectorAll("form")].find(item=>item.textContent?.includes("Record completed payments"))!;
+    await act(async()=>{
+      form.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]').forEach(field=>input(field,"0.25"));
+      input(form.querySelector('[name="reference"]')!,"Test receipt");input(form.querySelector('[name="effective_date"]')!,"2026-09-28");
+      form.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click();
+    });
+    expect(form.checkValidity()).toBe(true);
+    await act(async()=>form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain("Network response lost");
+    await act(async()=>form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+    const requests=fetch.mock.calls.filter(([,options])=>options?.method==="POST").map(([,options])=>JSON.parse(String(options?.body)));
+    expect(requests).toHaveLength(2);expect(requests[0]).toEqual(requests[1]);
+    expect(requests[0].lines).toEqual([{statement_id:"statement-a",amount:"0.25"},{statement_id:"statement-b",amount:"0.25"}]);
+    expect(element.textContent).toContain("Payout batch recorded. No money was sent.");
+  } finally { await act(async()=>root.unmount()); }
+});
