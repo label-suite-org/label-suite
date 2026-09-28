@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NotFoundError } from "./errors";
 
 const service = vi.hoisted(() => ({ getCampaignOsWorkspace: vi.fn(), finalizeCampaignReport: vi.fn() }));
 vi.mock("../lib/db", () => ({ db: {} }));
@@ -37,5 +38,13 @@ describe("Campaign report route boundaries", () => {
     const allowed = await POST({ request: request(), locals: locals(), params: { id: "campaign-1" } } as never);
     expect(allowed.status).toBe(200);
     expect(service.finalizeCampaignReport).toHaveBeenCalledWith("org-1", "campaign-1", "Finished", "actor-1");
+  });
+
+  it("returns not found when the campaign belongs to another organisation", async () => {
+    service.finalizeCampaignReport.mockRejectedValueOnce(new NotFoundError("Campaign not found"));
+    const { POST } = await loadRoute();
+    const response = await POST({ request: request(), locals: locals(), params: { id: "other-org-campaign" } } as never);
+    expect(response.status).toBe(404);
+    expect(service.finalizeCampaignReport).toHaveBeenCalledWith("org-1", "other-org-campaign", "Finished", "actor-1");
   });
 });
