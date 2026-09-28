@@ -91,8 +91,8 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
         </div>
       </li>)}
     </ul>
-    <div className="flex gap-2"><Button disabled={busy || offset === 0} onClick={() => void perform(() => loadPage(Math.max(0,offset-50)))}>Previous statements</Button><Button disabled={busy || page.next_offset === null} onClick={() => void perform(() => loadPage(page.next_offset!))}>Next statements</Button></div>
-    {canMutate && Object.keys(selected).length > 0 && <form className="border border-[var(--border)] rounded-lg p-4 space-y-3" onSubmit={event => {
+    <div className="flex flex-wrap gap-2"><Button disabled={busy || offset === 0} onClick={() => void perform(() => loadPage(Math.max(0,offset-50)))}>Previous statements</Button><Button disabled={busy || page.next_offset === null} onClick={() => void perform(() => loadPage(page.next_offset!))}>Next statements</Button></div>
+    {canMutate && Object.keys(selected).length > 0 && <form className="min-w-0 break-words border border-[var(--border)] rounded-lg p-4 space-y-3" onSubmit={event => {
       event.preventDefault(); const data=new FormData(event.currentTarget);
       const payload={reference:String(data.get("reference")),effective_date:String(data.get("effective_date")),lines:Object.values(selected).map(item=>({statement_id:item.statement.id,amount:item.amount}))};
       const signature=JSON.stringify(payload);
@@ -117,7 +117,7 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
       <Button type="submit" disabled={busy}>Record payout batch</Button>
       <Button type="button" disabled={busy} onClick={()=>setSelected({})}>Clear selection</Button>
     </form>}
-    {canMutate && batch && <div className="border border-[var(--border)] rounded-lg p-4 space-y-3">
+    {canMutate && batch && <div className="min-w-0 break-words border border-[var(--border)] rounded-lg p-4 space-y-3">
       <h3 className="font-semibold">Recorded batch · {batch.batch.status}</h3>
       <p>{batch.batch.reference} · {batch.batch.effective_date}</p>
       <ul>{batch.lines.map(line=><li key={line.id}>{line.contact_name || "Unnamed payee"} · {line.currency} {line.amount} · Statement {line.statement_id}</li>)}</ul>
@@ -137,7 +137,7 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
         <Button type="submit" disabled={busy}>Reverse batch recording</Button>
       </form>}
     </div>}
-    {detail && <div className="border border-[var(--border)] rounded-lg p-4 space-y-3" key={detail.statement.id + detail.statement.updated_at}>
+    {detail && <div className="min-w-0 break-words border border-[var(--border)] rounded-lg p-4 space-y-3" key={detail.statement.id + detail.statement.updated_at}>
       <h3 className="font-semibold">{detail.statement.contact_name || "Unnamed payee"} · {detail.statement.status}</h3>
       <p className="text-sm">{detail.statement.period_start} – {detail.statement.period_end} · {detail.statement.currency} {detail.statement.closing_balance}</p>
       <p>Posted balance: {detail.statement.currency} {detail.statement.posted_balance}</p>
@@ -151,7 +151,7 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
         <p>{line.description || line.track_title || "Earning"} · {detail.statement.currency} {line.amount} · {line.share_percent}%</p>
         <p className="text-[var(--muted-foreground)]">{line.source} · {line.report_period} · Source row {line.source_row_id || "missing"}{line.source_changed ? " · Changed since calculation" : ""}</p>
       </li>)}</ul>
-      <div className="flex gap-2"><Button disabled={busy || lineOffset === 0} onClick={() => void perform(() => open(detail.statement.id, Math.max(0,lineOffset-50)))}>Previous lines</Button><Button disabled={busy || detail.next_offset === null} onClick={() => void perform(() => open(detail.statement.id,detail.next_offset!))}>Next lines</Button></div>
+      <div className="flex flex-wrap gap-2"><Button disabled={busy || lineOffset === 0} onClick={() => void perform(() => open(detail.statement.id, Math.max(0,lineOffset-50)))}>Previous lines</Button><Button disabled={busy || detail.next_offset === null} onClick={() => void perform(() => open(detail.statement.id,detail.next_offset!))}>Next lines</Button></div>
       {canMutate && detail.statement.status === "calculated" && <Button disabled={busy} onClick={() => void perform(() => transition("review"))}>Mark reviewed</Button>}
       {canMutate && detail.statement.status === "reviewed" && <form className="space-y-3" onSubmit={event => {
         event.preventDefault(); const data = new FormData(event.currentTarget);
