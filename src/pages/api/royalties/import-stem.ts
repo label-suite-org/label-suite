@@ -250,7 +250,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       .reduce((sum, row) => sum.plus(row.net_amount), new Decimal(0))
       .toFixed(8);
 
-    await db.transaction(async (tx) => {
+    const duplicate = await db.transaction(async (tx) => {
       await tx.insert(royalty_imports).values({
         id: importId,
         org_id: orgId,
@@ -271,6 +271,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
         },
       }).onConflictDoNothing();
 
+      const [current] = await tx.select({ status: royalty_imports.status, rowCount: royalty_imports.row_count })
+        .from(royalty_imports)
+        .where(and(eq(royalty_imports.id, importId), eq(royalty_imports.org_id, orgId)))
+        .for("update");
+      if (current.status === "parsed") {
+        return { ok: true, duplicate: true, import_id: importId, rows_imported: current.rowCount };
+      }
+
       await tx.update(royalty_imports).set({ status: "parsing" }).where(eq(royalty_imports.id, importId));
       await tx.delete(royalty_earnings).where(eq(royalty_earnings.import_id, importId));
       for (let index = 0; index < normalizedRows.length; index += 500) {
@@ -290,6 +298,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }).onConflictDoNothing();
       await tx.update(royalty_imports).set({ status: "parsed", completed_at: new Date() }).where(eq(royalty_imports.id, importId));
     });
+
+    if (duplicate) return json(duplicate);
 
     return json({
       ok: true,
