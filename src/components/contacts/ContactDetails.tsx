@@ -7,7 +7,7 @@ import type { DirectoryContact, EnrichmentScanState, EnrichmentSuggestion, Gmail
 import { AddOrganizationLink, ContactEnrichmentPanel } from "./ContactEnrichment";
 import { ContactAvatar, EditableBlock, EditableInfoRow, emptyFallback, HealthPanel, HealthRow, IconLink, InlineLabelField, InlineText, OrganizationAvatar, primaryOrganization, RecordPanel, apiWrite } from "./ContactControls";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 export function ContactDetail({
   contact,
   organizations,
@@ -83,7 +83,7 @@ export function ContactDetail({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild><a href={`/documents?contact_id=${encodeURIComponent(contact.id)}`}>Documents</a></Button>
+          <a className={buttonVariants({ variant: "outline" })} href={`/documents?contact_id=${encodeURIComponent(contact.id)}`}>Documents</a>
           {contact.email && <IconLink href={`mailto:${contact.email}`} label={`Email ${contact.name}`} icon={Mail} />}
           {contact.phone && <IconLink href={`tel:${contact.phone}`} label={`Call ${contact.name}`} icon={Phone} />}
           {canMutate && <ContactDeleteButton
