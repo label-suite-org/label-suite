@@ -31,6 +31,12 @@ it.each([
     await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent === label)!.click());
   }
   const form = container.querySelectorAll("form")[section === "creators" ? 0 : index];
+  if (action === "create_deliverable") {
+    for (const [name, label] of Object.entries({ engagement_id: "Creator", description: "Description", due_date: "Due date", approval_status: "Approval", evidence_url: "Evidence URL", notes: "Notes" })) {
+      const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(`[name="${name}"]`);
+      expect(field?.labels?.[0]?.textContent).toContain(label);
+    }
+  }
   for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[required]")) {
     if (field instanceof HTMLSelectElement) field.value = field.options[field.options.length - 1].value;
     else if (field instanceof HTMLInputElement && field.type === "url") field.value = "https://example.test/post";
@@ -40,6 +46,10 @@ it.each([
   if (action === "create_engagement") {
     form.querySelector<HTMLSelectElement>('[name="permission"]')!.value = "permitted";
     form.querySelector<HTMLInputElement>('[name="basis"]')!.value = "Direct opt-in";
+  }
+  if (action === "create_deliverable") {
+    form.querySelector<HTMLSelectElement>('[name="approval_status"]')!.value = "approved";
+    form.querySelector<HTMLInputElement>('[name="evidence_url"]')!.value = "https://example.test/evidence";
   }
   await act(async () => form.querySelector<HTMLButtonElement>("button")!.click());
   const saves = fetch.mock.calls.filter(([, options]) => options?.method === "POST");
@@ -53,6 +63,7 @@ it.each([
       outreach_permission_recorded_at: expect.any(String),
     });
   }
+  if (action === "create_deliverable") expect(JSON.parse(saves[0][1].body).input).toMatchObject({ approval_status: "approved", evidence_url: "https://example.test/evidence" });
   expect(container.querySelector('[role="alert"]')).toBeNull();
   if (action !== "finalize_report") expect(form.querySelector<HTMLInputElement>("input[required], textarea[required]")?.value ?? "").toBe("");
 });
