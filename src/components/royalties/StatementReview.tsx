@@ -77,7 +77,7 @@ export function StatementReview({ canMutate, onChanged }: { canMutate: boolean; 
     </div>}
     {error && <p role="alert" className="text-red-600">{error}</p>}
     {message && <p role="status">{message}</p>}
-    <Button disabled={busy} onClick={() => void perform(async () => { await loadPage(offset); if (detail) await open(detail.statement.id,lineOffset); })}>Refresh</Button>
+    <Button disabled={busy} onClick={() => void perform(async () => { setSelected({}); await loadPage(offset); await onChanged?.(); if (detail) await open(detail.statement.id,lineOffset); })}>Refresh</Button>
     {!busy && page.rows.length === 0 && <p>No calculated statements yet.</p>}
     <ul className="divide-y divide-[var(--border)]">
       {page.rows.map(statement => <li key={statement.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
@@ -125,7 +125,7 @@ export function StatementReview({ canMutate, onChanged }: { canMutate: boolean; 
         event.preventDefault(); const data=new FormData(event.currentTarget); const id=batch.batch.id;
         void perform(async()=>{
           await request(`/api/royalties/payouts/${encodeURIComponent(id)}/reverse`,Object.fromEntries(data));
-          setMessage("Batch recording reversed. No money was moved.");
+          setSelected({}); setMessage("Batch recording reversed. No money was moved.");
           setBatch(await request(`/api/royalties/payouts/${encodeURIComponent(id)}`));
           await loadPage(offset); if (detail) await open(detail.statement.id); await onChanged?.();
         });

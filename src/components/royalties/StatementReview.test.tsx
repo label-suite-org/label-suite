@@ -50,6 +50,9 @@ it("records multiple selected statements with one stable key when a response is 
   try {
     await act(async()=>root.render(<StatementReview canMutate onChanged={changed} />));
     await act(async()=>{element.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(field=>field.click());});
+    await act(async()=>[...element.querySelectorAll("button")].find(button=>button.textContent==="Refresh")!.click());
+    expect(element.textContent).not.toContain("Record completed payments");
+    await act(async()=>{element.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(field=>field.click());});
     const form=[...element.querySelectorAll("form")].find(item=>item.textContent?.includes("Record completed payments"))!;
     await act(async()=>{
       form.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]').forEach(field=>input(field,"0.25"));
@@ -61,7 +64,7 @@ it("records multiple selected statements with one stable key when a response is 
     expect(element.querySelector('[role="alert"]')?.textContent).toContain("Network response lost");
     await act(async()=>form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
     const requests=fetch.mock.calls.filter(([,options])=>options?.method==="POST").map(([,options])=>JSON.parse(String(options?.body)));
-    expect(changed).toHaveBeenCalledTimes(1);
+    expect(changed).toHaveBeenCalledTimes(2);
     expect(requests).toHaveLength(2);expect(requests[0]).toEqual(requests[1]);
     expect(requests[0].lines).toEqual([{statement_id:"statement-a",amount:"0.25"},{statement_id:"statement-b",amount:"0.25"}]);
     expect(element.textContent).toContain("Payout batch recorded. No money was sent.");
