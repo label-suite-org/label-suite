@@ -533,7 +533,7 @@ function OverviewTab({
   const imageCount = assets.filter(isImageLike).length;
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="space-y-5" aria-label="Artist workspace overview">
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Metric label="Profile" value={`${health.complete}%`} detail={health.missing.length ? `${health.missing.length} gaps` : "complete"} icon={<ListChecks className="h-4 w-4" />} />
@@ -712,7 +712,7 @@ function ReleaseGrid({ releases }: { releases: ArtistRelease[] }) {
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
       {releases.map((release) => (
         <a key={release.id} href={`/releases/${release.id}`} className="group rounded-lg border border-border bg-background p-3 transition hover:bg-muted/25">
           <div className="flex items-start gap-3">
@@ -996,7 +996,7 @@ function ReadinessCard({
         {health.rows.map((row) => {
           if (row.ok) {
             return (
-              <div key={row.label} className="flex items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                   <span>Complete</span>
@@ -1008,7 +1008,7 @@ function ReadinessCard({
 
           if (!canMutate || !row.action) {
             return (
-              <div key={row.label} className="flex items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
                   <span>Missing</span>
@@ -1020,7 +1020,7 @@ function ReadinessCard({
 
           if (row.action.kind === "edit") {
             return (
-              <div key={row.label} className="flex items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
                 <ArtistEditButton
                   artist={artist}
@@ -1043,7 +1043,7 @@ function ReadinessCard({
                   : `Fix ${row.label.toLowerCase()}`;
 
           return (
-            <div key={row.label} className="flex items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+            <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
               <span className="text-muted-foreground">{row.label}</span>
               <Button
                 type="button"
