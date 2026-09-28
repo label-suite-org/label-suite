@@ -62,7 +62,7 @@ describe("out-of-scope read-only affordances", () => {
     expect(artists).not.toContain("New Artist");
     expect(media).toContain("Read-only for fundraiser");
     expect(media).not.toContain("Add asset");
-    expect(tasks).toContain("Read-only for fundraiser");
+    expect(tasks).toContain("Read-only access");
     expect(tasks).not.toContain("New Task");
   });
 

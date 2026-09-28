@@ -92,7 +92,7 @@ export function OpsTaskManager({
   return (
     <div className="space-y-4">
       {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
-      {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
+      {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only access</p>}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{filteredTasks.length} tasks</p>
         {canMutate && <Button onClick={() => setCreating(true)}

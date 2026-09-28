@@ -1,4 +1,5 @@
 ---
+import { serializeClientCapabilities } from "../../server/tenant";
 import AppLayout from "../../layouts/AppLayout.astro";
 import ProjectsEventsWorkspace from "../../components/projects/ProjectsEventsWorkspace";
 import { listArtistOptions } from "../../server/artists";
@@ -7,6 +8,7 @@ import { listProjectEvents } from "../../server/project-events";
 import { listProjects } from "../../server/projects";
 import { listReleaseOptions } from "../../server/releases";
 
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["projects.mutate"];
 const orgId = Astro.locals.orgId!;
 const [projects, events, artists, releases, contacts] = await Promise.all([
   listProjects(orgId), listProjectEvents(orgId, {}), listArtistOptions(orgId), listReleaseOptions(orgId), listContactOptions(orgId),
@@ -15,5 +17,5 @@ const initialView = Astro.url.searchParams.get("view") === "projects" ? "project
 ---
 
 <AppLayout title="Events">
-  <ProjectsEventsWorkspace client:load projects={projects} events={events} artists={artists} releases={releases} contacts={contacts} initialView={initialView} workspaceRoute="events" />
+  <ProjectsEventsWorkspace client:load canMutate={canMutate} projects={projects} events={events} artists={artists} releases={releases} contacts={contacts} initialView={initialView} workspaceRoute="events" />
 </AppLayout>
