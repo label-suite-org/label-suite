@@ -31,6 +31,12 @@ it.each([
     await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent === label)!.click());
   }
   const form = container.querySelectorAll("form")[section === "creators" ? 0 : index];
+  if (action === "create_deliverable") {
+    for (const [name, label] of Object.entries({ engagement_id: "Creator", description: "Description", due_date: "Due date", approval_status: "Approval", evidence_url: "Evidence URL", notes: "Notes" })) {
+      const field = form.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(`[name="${name}"]`);
+      expect(field?.labels?.[0]?.textContent).toContain(label);
+    }
+  }
   for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[required]")) {
     if (field instanceof HTMLSelectElement) field.value = field.options[field.options.length - 1].value;
     else if (field instanceof HTMLInputElement && field.type === "url") field.value = "https://example.test/post";
@@ -40,6 +46,10 @@ it.each([
   if (action === "create_engagement") {
     form.querySelector<HTMLSelectElement>('[name="permission"]')!.value = "permitted";
     form.querySelector<HTMLInputElement>('[name="basis"]')!.value = "Direct opt-in";
+  }
+  if (action === "create_deliverable") {
+    form.querySelector<HTMLSelectElement>('[name="approval_status"]')!.value = "approved";
+    form.querySelector<HTMLInputElement>('[name="evidence_url"]')!.value = "https://example.test/evidence";
   }
   await act(async () => form.querySelector<HTMLButtonElement>("button")!.click());
   const saves = fetch.mock.calls.filter(([, options]) => options?.method === "POST");
@@ -53,6 +63,7 @@ it.each([
       outreach_permission_recorded_at: expect.any(String),
     });
   }
+  if (action === "create_deliverable") expect(JSON.parse(saves[0][1].body).input).toMatchObject({ approval_status: "approved", evidence_url: "https://example.test/evidence" });
   expect(container.querySelector('[role="alert"]')).toBeNull();
   if (action !== "finalize_report") expect(form.querySelector<HTMLInputElement>("input[required], textarea[required]")?.value ?? "").toBe("");
 });
@@ -80,6 +91,34 @@ it("edits creator details and records fresh permission evidence without sending 
   expect(fetch).toHaveBeenCalledWith("/api/campaigns/campaign/os", expect.objectContaining({ method: "POST" }));
 });
 
+it("shows the selected Budget line read-only and submits link or unlink without cost fields", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "identified", relationship_notes: null, outreach_channel: "email", outreach_permission_status: "unknown", outreach_permission_basis: null, outreach_permission_recorded_at: null, outreach_permission_revoked_at: null, agreed_rate: null, agreed_currency: null, budget_line_id: "existing" }], deliverables: [], posts: [], budgetLineOptions: [{ id: "existing", name: "Creator fee", campaign_id: "campaign" }, { id: "new", name: "Video production", campaign_id: null }], cost: { planned: 100, committed: 50, paid: 20 }, report: { narrative: null, snapshot: null, finalized_at: null } };
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => workspace });
+  vi.stubGlobal("fetch", fetch);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate={false} contacts={[]} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("Budget line: Creator fee");
+  expect(container.textContent).not.toContain("Save Budget link");
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate canLinkBudget contacts={[]} />));
+  const select = container.querySelector<HTMLSelectElement>('[name="budget_line_id"]')!;
+  expect(select.labels?.[0]?.textContent).toContain("Budget line");
+  expect(select.textContent).toContain("Video production · unassigned");
+  const save = [...container.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Save Budget link")!;
+  select.value = "";
+  await act(async () => save.click());
+  select.value = "new";
+  await act(async () => save.click());
+  const inputs = fetch.mock.calls.filter(([, options]) => options?.method === "POST").map(([, options]) => JSON.parse(options.body));
+  expect(inputs).toEqual([
+    { action: "update_engagement", input: { id: "engagement", budget_line_id: null } },
+    { action: "update_engagement", input: { id: "engagement", budget_line_id: "new" } },
+  ]);
+});
+
 it("records a revocation timestamp and hides edit controls for read-only viewers", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "contacted", relationship_notes: null, outreach_channel: "email", outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z", outreach_permission_revoked_at: null, agreed_rate: null, agreed_currency: null }], deliverables: [], posts: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null } };
@@ -96,6 +135,33 @@ it("records a revocation timestamp and hides edit controls for read-only viewers
   await act(async () => [...container.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Revoke permission")!.click());
   const save = JSON.parse(fetch.mock.calls.find(([, options]) => options?.method === "POST")![1].body);
   expect(save).toMatchObject({ action: "update_engagement", input: { id: "engagement", outreach_permission_status: "revoked", outreach_permission_revoked_at: expect.any(String) } });
+});
+
+it("shows deliverable evidence read-only and edits due date, approval, evidence, and notes for operators", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "identified", outreach_channel: "email", outreach_permission_status: "unknown" }], deliverables: [{ id: "deliverable", engagement_id: "engagement", description: "Launch video", due_date: "2026-10-01T00:00:00.000Z", approval_status: "pending", evidence_url: "https://example.test/draft", notes: "First cut", updated_at: "2026-09-28T10:00:00.000Z" }], posts: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null } };
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => workspace });
+  vi.stubGlobal("fetch", fetch);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate={false} contacts={[]} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent?.includes("Launch video"))!.click());
+  expect(container.textContent).toContain("First cut");
+  expect(container.querySelector<HTMLAnchorElement>('a[href="https://example.test/draft"]')).not.toBeNull();
+  expect(container.textContent).not.toContain("Save deliverable");
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate contacts={[]} />));
+  const deliverable = [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent?.includes("Launch video"))!;
+  if (deliverable.getAttribute("data-state") === "closed") await act(async () => deliverable.click());
+  const form = [...container.querySelectorAll<HTMLFormElement>("form")].find((candidate) => candidate.querySelector('[name="approval_status"]'))!;
+  form.querySelector<HTMLInputElement>('[name="due_date"]')!.value = "2026-10-02";
+  form.querySelector<HTMLSelectElement>('[name="approval_status"]')!.value = "approved";
+  form.querySelector<HTMLInputElement>('[name="evidence_url"]')!.value = "https://example.test/final";
+  form.querySelector<HTMLTextAreaElement>('[name="notes"]')!.value = "Approved cut";
+  await act(async () => form.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+  const save = JSON.parse(fetch.mock.calls.find(([, options]) => options?.method === "POST")![1].body);
+  expect(save).toMatchObject({ action: "update_deliverable", input: { id: "deliverable", expected_updated_at: "2026-09-28T10:00:00.000Z", due_date: "2026-10-02T00:00:00.000Z", approval_status: "approved", evidence_url: "https://example.test/final", notes: "Approved cut" } });
 });
 
 it("shows the captured observation date beside a recorded post", async () => {
@@ -115,9 +181,11 @@ it("shows the captured observation date beside a recorded post", async () => {
 
 it("shows saved report figures beside live figures without offering finalisation again", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const savedCampaign = { id: "campaign", name: "First launch", artist_id: "artist", artist_name: "Alex", release_id: "release", release_title: "First EP", start_date: "2026-09-01", end_date: "2026-09-30", territories: ["DK"], brief: "Original brief", goal: "First goal", notes: "Original notes" };
+  const liveCampaign = { ...savedCampaign, name: "Revised launch", artist_name: "Alex New", territories: ["DK", "DE"], brief: "Revised brief", goal: "New goal", notes: "Later correction" };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-    territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 20, committed: 10, paid: 5 },
-    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T00:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
+    campaign: liveCampaign, territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 20, committed: 10, paid: 5 },
+    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", campaign: savedCampaign, cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T00:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
   }) }));
   container = document.createElement("div");
   document.body.append(container);
@@ -130,6 +198,13 @@ it("shows saved report figures beside live figures without offering finalisation
   expect(container.textContent).toContain("views: 100");
   expect(container.textContent).toContain("no platform monitoring occurs");
   await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("First launch · campaign");
+  expect(container.textContent).toContain("Revised launch · campaign");
+  expect(container.textContent).toContain("Original brief");
+  expect(container.textContent).toContain("Revised brief");
+  expect(container.textContent).toContain("Alex · artist");
+  expect(container.textContent).toContain("Alex New · artist");
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent === "Saved evidence at finalisation")!.click());
   expect(container.textContent).toContain("One video");
   expect(container.textContent).toContain("https://example.test/post");
   expect(container.textContent).toContain(`Published ${new Date("2026-09-27T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
@@ -149,5 +224,7 @@ it("labels older snapshots without item-level evidence honestly", async () => {
   root = createRoot(container);
   await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="report" canMutate contacts={[]} />));
   await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("Campaign details were not saved with this older snapshot.");
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent === "Saved evidence at finalisation")!.click());
   expect(container.textContent).toContain("Item-level evidence was not saved with this older snapshot.");
 });

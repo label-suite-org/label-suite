@@ -32,14 +32,15 @@ function campaignDocumentSchemaForLimit(characterLimit: 10_000 | 20_000) {
 }
 
 const campaignDocumentSchema = campaignDocumentSchemaForLimit(20_000).optional();
+const nullableDate = nullableText.pipe(z.iso.date().nullable().optional());
 
 const campaignBaseSchema = {
   campaign_name: z.string().trim().min(1, "Campaign name is required"),
   linked_release_id: nullableText,
   linked_artist_id: nullableText,
   campaign_type: nullableText,
-  start_date: nullableText,
-  end_date: nullableText,
+  start_date: nullableDate,
+  end_date: nullableDate,
   status: nullableText,
   owner: nullableText,
   goal: nullableText,

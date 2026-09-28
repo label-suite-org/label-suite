@@ -3,9 +3,11 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../lib/db", () => ({ db: {} }));
 import {
   createCampaignEngagementSchema,
+  createCampaignDeliverableSchema,
   createCampaignPostSchema,
   setCampaignTerritoriesSchema,
   updateCampaignEngagementSchema,
+  updateCampaignDeliverableSchema,
 } from "./campaign-os";
 
 describe("Campaign OS input contract", () => {
@@ -37,11 +39,22 @@ describe("Campaign OS input contract", () => {
   });
 
   it("accepts only valid ISO country codes and manual post URLs", () => {
-    expect(setCampaignTerritoriesSchema.parse({ country_codes: ["DK", "DE"] }).country_codes).toEqual(["DK", "DE"]);
+    expect(setCampaignTerritoriesSchema.parse({ country_codes: ["DK", "DE", "TW"] }).country_codes).toEqual(["DK", "DE", "TW"]);
     expect(() => setCampaignTerritoriesSchema.parse({ country_codes: ["Denmark"] })).toThrow("two-letter ISO");
+    expect(() => setCampaignTerritoriesSchema.parse({ country_codes: ["ZZ"] })).toThrow("two-letter ISO");
+    expect(() => setCampaignTerritoriesSchema.parse({ country_codes: ["EU"] })).toThrow("two-letter ISO");
     expect(createCampaignPostSchema.parse({ url: "https://example.test/post", platform: "TikTok", manual_metrics: { views: 120 } })).toMatchObject({ platform: "TikTok" });
     expect(createCampaignPostSchema.parse({ url: "http://example.test/post", platform: "TikTok" })).toMatchObject({ platform: "TikTok" });
     expect(() => createCampaignPostSchema.parse({ url: "javascript:alert(1)", platform: "TikTok" })).toThrow();
     expect(() => createCampaignPostSchema.parse({ url: "data:text/html,hello", platform: "TikTok" })).toThrow();
+  });
+
+  it("keeps deliverable updates partial and evidence links on the web", () => {
+    expect(updateCampaignDeliverableSchema.parse({ id: "deliverable-1", expected_updated_at: null, notes: "Reviewed" })).toEqual({ id: "deliverable-1", expected_updated_at: null, notes: "Reviewed" });
+    expect(createCampaignDeliverableSchema.parse({ engagement_id: "engagement-1", description: "Video", evidence_url: "https://example.test/evidence" })).toMatchObject({ approval_status: "pending", evidence_url: "https://example.test/evidence" });
+    for (const evidence_url of ["javascript:alert(1)", "data:text/html,hello", "ftp://example.test/evidence"]) {
+      expect(() => createCampaignDeliverableSchema.parse({ engagement_id: "engagement-1", description: "Video", evidence_url })).toThrow();
+      expect(() => updateCampaignDeliverableSchema.parse({ id: "deliverable-1", expected_updated_at: null, evidence_url })).toThrow();
+    }
   });
 });
