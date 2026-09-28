@@ -195,7 +195,9 @@ function isUnsafeMethod(method: string): boolean {
 }
 
 function withPrivateCachePolicy(response: Response): Response {
-  response.headers.set("Cache-Control", "private, no-store");
+  // Preserve React hydration markup: CDN email obfuscation rewrites private HTML.
+  const html = response.headers.get("Content-Type")?.includes("text/html");
+  response.headers.set("Cache-Control", html ? "private, no-store, no-transform" : "private, no-store");
   response.headers.set("Vary", appendVary(response.headers.get("Vary"), "Cookie"));
   return response;
 }

@@ -216,13 +216,15 @@ describe("Spotify import middleware boundary", () => {
     const request = new Request("https://labels.example/royalties");
     const next = vi.fn(async () => {
       expect(databaseBoundary.activeContext).toEqual({ userId: "user-a", orgId: "org-a" });
-      return new Response("royalties rendered");
+      return new Response("royalties rendered", { headers: { "Content-Type": "text/html; charset=utf-8" } });
     });
 
     const response = await onRequest(contextFor(request) as never, next) as Response;
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("royalties rendered");
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store, no-transform");
+    expect(response.headers.get("Vary")).toContain("Cookie");
     expect(databaseBoundary.calls).toEqual([
       { userId: "user-a" },
       { userId: "user-a", orgId: "org-a" },
