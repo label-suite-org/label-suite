@@ -197,6 +197,21 @@ try {
   );
   assert.equal(await countMetricRows(orgA, highVolumeArtist), 10_000);
 
+  // Latest Spotify history intentionally includes successful non-manual runs.
+  await pool.query(
+    `update "label_suite"."analytics_import_runs" set mode = 'sync' where org_id = $1 and id = $2`,
+    [orgA, high.runId],
+  );
+  try {
+    const latest = await service.listLatestSpotifyAudienceImports(orgA);
+    assert.equal(latest.find((item) => item.artistId === highVolumeArtist)?.runId, high.runId);
+  } finally {
+    await pool.query(
+      `update "label_suite"."analytics_import_runs" set mode = 'manual_import' where org_id = $1 and id = $2`,
+      [orgA, high.runId],
+    );
+  }
+
   const collision = await pool.query<{ id: string }>(
     `select id from "label_suite"."analytics_import_files" where org_id = $1 order by created_at limit 1`,
     [orgA],
