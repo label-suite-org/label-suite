@@ -1216,7 +1216,7 @@ function CoverWorkbench({
             }}
           />
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center bg-muted text-muted-foreground">
+          <div className="flex h-full w-full flex-col items-center justify-center bg-muted text-foreground">
             <ImageIcon className="h-6 w-6 opacity-80" />
             <span className="mt-2 px-2 text-center text-xs font-medium">{release.cover_art_url ? "Preview unavailable" : "Add cover"}</span>
           </div>
