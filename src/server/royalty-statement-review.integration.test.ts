@@ -100,6 +100,13 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
     const summary = await readScoped(() => getRoyaltyPipelineSummary(org));
     expect(summary.earningTotals).toEqual([{currency:'EUR',amount:'3.00000000'},{currency:'USD',amount:'2.00000000'}]);
     expect(summary.postedTotals).toEqual([{currency:'USD',amount:'1.60000000'}]);
+    const { getPayeePortalData } = await import('./payee-portal');
+    const payeeEmail = `${issued[0].contact_id}@example.test`;
+    await sql`update label_suite.contacts set email=${payeeEmail} where id=${issued[0].contact_id} and org_id=${org}`;
+    const portal = await readScoped(() => getPayeePortalData(org,payeeEmail));
+    expect(portal?.balances).toEqual([{currency:'USD',balance:'0.60000000'}]);
+    expect(portal?.statements.map(statement=>statement.id)).toEqual([issued[0].id]);
+    expect(portal?.payouts.map(payout=>payout.amount)).toEqual(['0.40000000']);
     await expect(scoped(() => recordPayoutBatch(org,org,batch))).rejects.toMatchObject({status:409});
     await expect(scoped(() => reversePayoutBatch(org,org,repeats[0].batch_id,{...reversal,reference:'different'}))).rejects.toMatchObject({status:409});
 
