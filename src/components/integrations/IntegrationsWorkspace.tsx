@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { AlertCircle, CheckCircle2, CircleDot, Pause, Play, PlugZap, RefreshCw } from "lucide-react";
 
+import SpotifyIdentityReview from "./SpotifyIdentityReview";
 import { Button } from "@/components/ui/button";
 type Provider = {
   id: string;
@@ -58,7 +59,7 @@ export type IntegrationsWorkspaceData = {
   errors: IntegrationError[];
 };
 
-export default function IntegrationsWorkspace({ initialData }: { initialData: IntegrationsWorkspaceData }) {
+export default function IntegrationsWorkspace({ initialData, spotifyIdentityEnabled = false }: { initialData: IntegrationsWorkspaceData; spotifyIdentityEnabled?: boolean }) {
   const [data, setData] = useState(initialData);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -184,6 +185,7 @@ export default function IntegrationsWorkspace({ initialData }: { initialData: In
                     )}
                   </div>
                 </div>
+                {spotifyIdentityEnabled && connection.provider_key === "spotify" && connection.status === "connected" && <SpotifyIdentityReview connectionId={connection.id} />}
                 {providerByKey.get(connection.provider_key)?.status === "deprecated" && <p className="mt-3 border border-amber-500/40 bg-amber-500/10 p-2 text-xs" role="status">This provider is deprecated; do not create new connections.</p>}
               </article>
             ))}
