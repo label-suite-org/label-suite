@@ -15,6 +15,7 @@ import {
   type SpotifyCatalogCandidate,
   type SpotifyIdentityInput,
 } from "./spotify-identity-core";
+import { resolveSpotifyIdentityLink } from "./spotify-identity-link";
 import { idSchema, nullableText, requiredText } from "./validation";
 
 export const spotifyIdentityInputSchema = z.object({
@@ -26,6 +27,11 @@ export const spotifyIdentityInputSchema = z.object({
   isrc: nullableText,
   upc_ean: nullableText,
 }).strict();
+
+export const spotifyIdentityProposalSchema = z.union([
+  z.object({ spotify_url: z.string().trim().min(1).max(2048) }).strict(),
+  spotifyIdentityInputSchema,
+]);
 
 export const confirmSpotifyIdentitySchema = z.object({
   connection_id: idSchema,
@@ -69,9 +75,10 @@ async function listCandidates(orgId: string, objectType: SpotifyIdentityInput["o
   return rows.map((row) => ({ object_type: "track", object_id: row.id, title: row.title, artist_name: row.artist_name, isrc: row.isrc }));
 }
 
-export async function proposeSpotifyIdentity(orgId: string, raw: z.input<typeof spotifyIdentityInputSchema>) {
+export async function proposeSpotifyIdentity(orgId: string, raw: z.input<typeof spotifyIdentityProposalSchema>) {
   requireSpotifyIdentityFlag();
-  const input = spotifyIdentityInputSchema.parse(raw);
+  const request = spotifyIdentityProposalSchema.parse(raw);
+  const input = "spotify_url" in request ? await resolveSpotifyIdentityLink(request.spotify_url) : request;
   const proposal = proposeSpotifyIdentityCore(input, await listCandidates(orgId, input.object_type));
   return {
     provider_key: "spotify",
@@ -90,6 +97,11 @@ export async function confirmSpotifyIdentity(orgId: string, raw: z.input<typeof 
     .where(and(eq(integration_connections.org_id, orgId), eq(integration_connections.id, input.connection_id), eq(integration_connections.status, "connected")))
     .limit(1);
   if (!connection || connection.provider_key !== "spotify") throw new NotFoundError("Connected Spotify integration not found in active workspace");
+
+  const table = input.label_suite_object_type === "artist" ? artists : input.label_suite_object_type === "release" ? releases : tracks;
+  const [target] = await db.select({ id: table.id }).from(table)
+    .where(and(eq(table.org_id, orgId), eq(table.id, input.label_suite_object_id))).limit(1);
+  if (!target) throw new NotFoundError("Spotify identity target not found in active workspace");
 
   const link = await upsertExternalObjectLink(orgId, {
     connection_id: input.connection_id,

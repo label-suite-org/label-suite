@@ -1,4 +1,5 @@
 ---
+import { serializeClientCapabilities } from "../../server/tenant";
 import AppLayout from "../../layouts/AppLayout.astro";
 import ProjectEventDetail from "../../components/projects/ProjectEventDetail";
 import type { EventDetailRecord, EventProjectContext } from "../../components/projects/ProjectEventDetail";
@@ -13,6 +14,7 @@ import { listProjects } from "../../server/projects";
 import { listReleaseOptions } from "../../server/releases";
 import { buildEventSharedContext, getProjectWorkspaceDetail, hasEventSharedContext, mergeProjectAndSeamContext } from "../../server/project-workspace";
 
+const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["projects.mutate"];
 const orgId = Astro.locals.orgId!;
 const id = Astro.params.id;
 if (!id) return Astro.redirect("/events");
@@ -78,5 +80,5 @@ const detail: EventDetailRecord & { project_context: EventProjectContext | null 
 ---
 
 <AppLayout title={event.title}>
-<ProjectEventDetail client:load event={detail} projects={projects} artists={artists} releases={releases} contacts={contacts} project_context={detail.project_context} />
+<ProjectEventDetail client:load canMutate={canMutate} event={detail} projects={projects} artists={artists} releases={releases} contacts={contacts} project_context={detail.project_context} />
 </AppLayout>

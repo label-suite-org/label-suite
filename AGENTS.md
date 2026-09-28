@@ -1,15 +1,19 @@
-# Label Suite public source candidate
+# Label Suite source and delivery
 
 ## Repository and production boundary
 
 - This repository is `https://github.com/label-suite-org/label-suite`.
   The `origin` remote must point here.
-- Read `PUBLIC_SOURCE.md`. This is a fresh-history verification candidate.
-- The owner approved preparing the web release separately from native device
-  acceptance. Follow `docs/runbooks/public-web-cutover.md` for promotion gates.
-- The existing private GitHub repository `label-suite-org/label-suite_neon_r2`
-  still owns production and its outstanding backlog. Do not change Dokploy's
-  source or deploy this candidate without a separately verified cutover.
+- Read `PUBLIC_SOURCE.md`. The verified production source moved to this
+  repository on 27 September 2026. Only reviewed, verified `origin/main`
+  revisions may be deployed through Dokploy.
+- Web delivery remains separate from native device acceptance. Follow
+  `docs/runbooks/public-web-cutover.md` for deployment and recovery gates.
+- The private GitHub repository `label-suite-org/label-suite_neon_r2` retains
+  outstanding issues, historical PRs, provenance and recovery evidence.
+  Reconcile that backlog without importing private history or closing items
+  solely because their implementation was exported. Deliver source changes
+  through pull requests in this public repository.
 - GitHub is the source of truth. Forgejo references in retained documents are
   historical; do not create, merge, or deploy work there.
 - Do not import private Git history, internal research, credentials, production
@@ -33,8 +37,11 @@ bash scripts/repository-flow-check.sh start
 
 Before a pull request, run relevant focused checks, then `npm run ci` and
 `bash scripts/repository-flow-check.sh pr`. Record the exact commands and SHA.
-Merge only after required checks and review pass. A merge here does not grant
-production deployment authority. Report tested, merged, and deployed separately.
+Merge only after required checks and review pass. Dokploy can automatically
+deploy `main`; verify deployment authorization and host resource admission
+before a merge that triggers deployment. A green check does not override a
+resource hold or authorize provider activation. Report tested, merged, and
+deployed separately.
 
 ## Implementation
 

@@ -48,7 +48,7 @@ function LeadButton({ lead, selected, disabled, onSelect }: { lead: Lead; select
       disabled={disabled}
       aria-current={selected ? "true" : undefined}
       onClick={onSelect}
-      className={`w-full border-l-2 px-2 py-2 text-left transition ${selected ? "border-[#4f6f9f] bg-[#4f6f9f]/10" : "border-transparent hover:bg-muted/50"}`}
+      className={`w-full border-l-2 px-2 py-2 text-left ${selected ? "border-[#4f6f9f] bg-[#4f6f9f]/10" : "border-transparent hover:bg-muted/50"}`}
     >
       <span className="block truncate text-sm font-medium">{lead.target_name}</span>
       <span className={`mt-0.5 flex items-center justify-between gap-2 text-[11px] ${selected ? "text-foreground" : "text-muted-foreground"}`}>

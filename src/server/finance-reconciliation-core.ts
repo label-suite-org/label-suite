@@ -46,7 +46,9 @@ function normalizeAmount(value: string) {
   if (!/^\d+(?:\.\d{1,8})?$/.test(amount) || Number(amount) <= 0) {
     throw new Error("amount must be a positive decimal with up to 8 fractional digits");
   }
-  return amount.replace(/\.?(0+)$/, "").replace(/\.$/, "") || "0";
+  const [whole, fraction = ""] = amount.split(".");
+  const trimmedFraction = fraction.replace(/0+$/, "");
+  return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
 }
 
 export function normalizeFinanceTransaction(input: FinanceTransactionInput): NormalizedFinanceTransaction {

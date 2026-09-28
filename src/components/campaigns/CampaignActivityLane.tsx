@@ -87,7 +87,7 @@ export function CampaignActivityLane({ snapshot, canMutate, disabled = false, de
             <h3 id="campaign-activity-recommendations-title" className="text-lg font-semibold">Recommendations</h3>
             <p className="mt-1 text-sm text-muted-foreground">Review these explicit next steps before changing campaign records.</p>
           </div>
-          <ul aria-label="Pending recommendations" className="space-y-3">
+          <ul aria-label="Pending recommendations" className="divide-y divide-border border-y border-border">
             {pendingProposals.map((proposal) => (
               <li key={proposal.key}>
                 <ProposalCard
@@ -165,7 +165,7 @@ function ProposalCard({
   const headingId = `campaign-activity-proposal-${slug(proposal.key)}`;
 
   return (
-    <article aria-labelledby={headingId} aria-busy={decisionPending} className="border border-border bg-card p-4">
+    <article aria-labelledby={headingId} aria-busy={decisionPending} className="py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 id={headingId} className="font-semibold">{proposal.title}</h4>
@@ -199,6 +199,7 @@ function ProposalCard({
           <Button
             type="button"
             aria-label="Dismiss recommendation"
+            variant="outline"
             disabled={decisionPending || disabled}
             onClick={() => void onDecision(proposal, "dismissed")}
             className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:cursor-wait disabled:opacity-60"
@@ -210,7 +211,7 @@ function ProposalCard({
             aria-label="Mark handled"
             disabled={decisionPending || disabled}
             onClick={() => void onDecision(proposal, "resolved")}
-            className="rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+            className="rounded-md px-3 py-2 text-sm font-medium disabled:cursor-wait disabled:opacity-60"
           >
             Mark handled
           </Button>

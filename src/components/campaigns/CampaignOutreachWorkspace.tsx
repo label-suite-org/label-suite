@@ -13,6 +13,7 @@ import LeadContextInspector from "./LeadContextInspector";
 import LeadWorkbench from "./LeadWorkbench";
 import RadioUpdateWorkspace from "./RadioUpdateWorkspace";
 import CampaignDiscoveryWorkspace from "./CampaignDiscoveryWorkspace";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 type Props = {
@@ -51,6 +52,8 @@ export default function CampaignOutreachWorkspace({ initialData, initialLeadId =
       ? initialLeadId
       : initialData.queue.now[0]?.id ?? initialData.leads[0]?.id ?? null
   ));
+  const [queueOpen, setQueueOpen] = useState(true);
+  const [contextOpen, setContextOpen] = useState(false);
   const queue = useMemo(() => buildQueue(leads), [leads]);
   const selectedLead = useMemo(() => leads.find((lead) => lead.id === selectedLeadId) ?? leads[0] ?? null, [leads, selectedLeadId]);
   const source = selectedLead ? initialData.sources.find((candidate) => candidate.id === selectedLead.source_id) ?? null : null;
@@ -314,25 +317,26 @@ export default function CampaignOutreachWorkspace({ initialData, initialLeadId =
     <fieldset disabled={!hydrated} className="min-w-0">
       <div role="tablist" aria-label="Outreach lanes" className="mb-6 flex gap-4 border-b border-border">{tabs.map((tab) => <Button variant="ghost" id={`outreach-tab-${tab.id}`} key={tab.id} type="button" role="tab" aria-selected={activeLane === tab.id} aria-controls={`outreach-panel-${tab.id}`} disabled={aiDecisionPending} onClick={() => selectLane(tab.id)} className={`border-b-2 px-1 py-2 text-xs font-semibold ${activeLane === tab.id ? "border-foreground" : "border-transparent text-muted-foreground"}`}>{tab.label}</Button>)}</div>
       <div id="outreach-panel-focused" role="tabpanel" aria-labelledby="outreach-tab-focused">
-      <div className="mb-4 border-b border-border pb-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Earned-media desk</p>
-        <h2 className="mt-1 text-xl font-semibold">{initialData.campaign.name}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Choose one lead and move through explicit research, review, drafting, approval and manual recording gates.</p>
-      </div>
       {notice && <p className="mb-4 border-y border-border py-2 text-xs" role="status">{notice}</p>}
 
-      <details className="mb-4 border-y border-border lg:hidden">
+      <details className="mb-4 border-y border-border xl:hidden">
         <summary className="cursor-pointer py-3 text-sm font-semibold">Queue</summary>
         <FocusedLeadQueue idPrefix="mobile" queue={queue} selectedLeadId={selectedLead.id} onSelectLead={setSelectedLeadId} disabled={focusedAiDecisionPending} />
       </details>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_280px]">
-        <div className="hidden border-r border-border pr-3 lg:block"><FocusedLeadQueue idPrefix="desktop" queue={queue} selectedLeadId={selectedLead.id} onSelectLead={setSelectedLeadId} disabled={focusedAiDecisionPending} /></div>
+      <div className="grid grid-cols-1 transition-[grid-template-columns] duration-300 ease-out motion-reduce:transition-none xl:grid-cols-[var(--queue-width)_minmax(0,1fr)_var(--context-width)]" style={{ "--queue-width": queueOpen ? "220px" : "44px", "--context-width": contextOpen ? "280px" : "44px" } as React.CSSProperties}>
+        <div className="hidden min-w-0 overflow-hidden border-r border-border pr-2 xl:block">
+          <Button variant="ghost" size="icon-sm" aria-label={queueOpen ? "Collapse lead queue" : "Expand lead queue"} aria-expanded={queueOpen} aria-controls="focused-lead-queue" onClick={() => setQueueOpen(!queueOpen)} className="mb-2"><PanelLeftClose className={queueOpen ? "" : "hidden"} /><PanelLeftOpen className={queueOpen ? "hidden" : ""} /></Button>
+          <div id="focused-lead-queue">{queueOpen && <FocusedLeadQueue idPrefix="desktop" queue={queue} selectedLeadId={selectedLead.id} onSelectLead={setSelectedLeadId} disabled={focusedAiDecisionPending} />}</div>
+        </div>
         <LeadWorkbench lead={selectedLead} prompt={prompt} canMutate={canMutate} busyAction={focusedAiDecisionPending ? "ai-decision" : busyAction} aiUnavailable={aiUnavailable} onSavePrompt={savePrompt} onSuggestionDecision={decideSuggestion} onGenerateDraft={generateDraft} onSaveDraft={saveDraft} onApproveDraft={approveDraft} onUpdatePreparation={updatePreparation} onRecordSent={recordSent} onAiDecisionPending={setFocusedAiDecisionPending} />
-        <div className="hidden border-l border-border pl-4 lg:block"><LeadContextInspector lead={selectedLead} source={source} activityItems={selectedActivityItems} pendingProposals={selectedActivityProposals} canMutate={canMutate} busy={Boolean(busyAction) || focusedAiDecisionPending} onOverrideStage={overrideStage} onLogFinding={logFinding} /></div>
+        <div className="hidden min-w-0 overflow-hidden border-l border-border pl-2 xl:block">
+          <Button variant="ghost" size="icon-sm" aria-label={contextOpen ? "Collapse lead context" : "Expand lead context"} aria-expanded={contextOpen} aria-controls="focused-lead-context" onClick={() => setContextOpen(!contextOpen)} className="mb-2"><PanelRightClose className={contextOpen ? "" : "hidden"} /><PanelRightOpen className={contextOpen ? "hidden" : ""} /></Button>
+          <div id="focused-lead-context">{contextOpen && <LeadContextInspector lead={selectedLead} source={source} activityItems={selectedActivityItems} pendingProposals={selectedActivityProposals} canMutate={canMutate} busy={Boolean(busyAction) || focusedAiDecisionPending} onOverrideStage={overrideStage} onLogFinding={logFinding} />}</div>
+        </div>
       </div>
 
-      <details className="mt-4 border-y border-border lg:hidden">
+      <details className="mt-4 border-y border-border xl:hidden">
         <summary className="cursor-pointer py-3 text-sm font-semibold">Lead context</summary>
         <LeadContextInspector lead={selectedLead} source={source} activityItems={selectedActivityItems} pendingProposals={selectedActivityProposals} canMutate={canMutate} busy={Boolean(busyAction) || focusedAiDecisionPending} onOverrideStage={overrideStage} onLogFinding={logFinding} />
       </details>

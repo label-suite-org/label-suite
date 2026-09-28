@@ -15,7 +15,7 @@ import { buildMasterPayoutPreview, buildRoyaltiesDashboard } from "../server/roy
 
 const royaltyData = {
   dashboard: buildRoyaltiesDashboard([], []),
-  pipeline: { earnings: { rowCount: 0, matchedCount: 0, unmatchedCount: 0, netAmount: 0 }, imports: [], statements: { closingBalance: 0, openCount: 0 } },
+  pipeline: { earningTotals: [], postedTotals: [], earnings: { rowCount: 0, matchedCount: 0, unmatchedCount: 0, netAmount: 0 }, imports: [], statements: { closingBalance: 0, openCount: 0 } },
   payoutPreview: buildMasterPayoutPreview([], []),
 };
 
@@ -62,7 +62,7 @@ describe("out-of-scope read-only affordances", () => {
     expect(artists).not.toContain("New Artist");
     expect(media).toContain("Read-only for fundraiser");
     expect(media).not.toContain("Add asset");
-    expect(tasks).toContain("Read-only for fundraiser");
+    expect(tasks).toContain("Read-only access");
     expect(tasks).not.toContain("New Task");
   });
 

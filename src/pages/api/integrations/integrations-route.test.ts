@@ -98,4 +98,18 @@ describe("integration routes", () => {
       object_id: "connection-1",
     }));
   });
+
+  it.each(["paused", "revoked"])("does not queue sync for a %s connection", async (status) => {
+    integrations.listIntegrationConnections.mockResolvedValue([{ id: "connection-1", status }]);
+    const response = await POST_SYNC({
+      locals,
+      request: new Request("https://suite.test/api/integrations/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ connection_id: "connection-1" }),
+      }),
+    } as never);
+    expect(response.status).toBe(409);
+    expect(integrations.createSyncJob).not.toHaveBeenCalled();
+  });
 });

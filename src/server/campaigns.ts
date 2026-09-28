@@ -198,6 +198,7 @@ export async function listCampaigns(orgId: string) {
       performance_rating: campaigns.performance_rating,
       main_platform: campaigns.main_platform,
       release_title: releases.title,
+      cover_art_url: releases.cover_art_url,
       artist_name: artists.name,
       updated_at: campaigns.updated_at,
       revision: campaigns.revision,

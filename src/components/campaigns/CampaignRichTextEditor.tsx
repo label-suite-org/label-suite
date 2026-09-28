@@ -48,7 +48,7 @@ export type CampaignRichTextEditorProps = {
 
 const EMPTY_DOCUMENT: CampaignDocument = { type: "doc", content: [{ type: "paragraph", content: [] }] };
 
-const toolbarButtonClass = "rounded border border-border bg-background px-2 py-1 text-sm text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+const toolbarButtonClass = "rounded border border-border bg-background px-2 py-1 text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 function validationCategory(error: unknown): string {
   const message = error instanceof Error ? error.message.toLowerCase() : "";

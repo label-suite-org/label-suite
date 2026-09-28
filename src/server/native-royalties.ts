@@ -11,6 +11,13 @@ export const nativeRoyaltyPageSchema = z.object({
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
 }).strict();
 const pageSize = 50;
+const postedStatementBalance = sql<string>`(select coalesce(sum(entry.amount),0)::text
+  from label_suite.royalty_ledger_entries entry
+  join label_suite.royalty_ledger_transactions transaction on transaction.id=entry.transaction_id and transaction.org_id=entry.org_id
+  where entry.org_id=${royalty_statements.org_id} and entry.statement_id=${royalty_statements.id}
+    and entry.contact_id=${royalty_statements.contact_id} and entry.currency=${royalty_statements.currency}
+    and transaction.posting_status in ('posted','reversed'))`;
+
 const splitContact = alias(contacts, "native_royalty_split_contact");
 const trackRelease = alias(releases, "native_royalty_track_release");
 
@@ -45,7 +52,7 @@ export async function getNativeRoyaltyPage(orgId: string, input: unknown) {
           id: royalty_statements.id, contact_id: royalty_statements.contact_id, contact_name: contacts.name,
           period_start: royalty_statements.period_start, period_end: royalty_statements.period_end,
           currency: royalty_statements.currency, status: royalty_statements.status,
-          closing_balance: royalty_statements.closing_balance, updated_at: royalty_statements.updated_at,
+          posted_balance: postedStatementBalance, closing_balance: royalty_statements.closing_balance, updated_at: royalty_statements.updated_at,
         }).from(royalty_statements).leftJoin(contacts, and(eq(contacts.id, royalty_statements.contact_id), eq(contacts.org_id, orgId)))
           .where(eq(royalty_statements.org_id, orgId)).orderBy(desc(royalty_statements.period_end), royalty_statements.id).limit(pageSize + 1).offset(offset);
         rows = statements.map(row => ({ ...row, valid_money: validMoney(row.closing_balance, row.currency) }));
@@ -115,7 +122,7 @@ export async function getNativeRoyaltyStatement(orgId: string, id: string, rawOf
       currency: royalty_statements.currency, status: royalty_statements.status,
       opening_balance: royalty_statements.opening_balance, earnings_amount: royalty_statements.earnings_amount,
       adjustments_amount: royalty_statements.adjustments_amount, payout_amount: royalty_statements.payout_amount,
-      closing_balance: royalty_statements.closing_balance, updated_at: royalty_statements.updated_at, notes: royalty_statements.notes,
+      posted_balance: postedStatementBalance, closing_balance: royalty_statements.closing_balance, updated_at: royalty_statements.updated_at, notes: royalty_statements.notes,
     }).from(royalty_statements).leftJoin(contacts, and(eq(contacts.id, royalty_statements.contact_id), eq(contacts.org_id, orgId)))
       .where(and(eq(royalty_statements.org_id, orgId), eq(royalty_statements.id, id)));
     if (!statement) throw new NotFoundError("Statement not found in this workspace");
@@ -170,6 +177,10 @@ export async function getNativeRoyaltyStatement(orgId: string, id: string, rawOf
       balanceMatch = compareMoney(subtractMoney(addMoney(addMoney(money(statement.opening_balance), money(statement.earnings_amount)), money(statement.adjustments_amount)), money(statement.payout_amount)), money(statement.closing_balance)) === 0;
     } catch { /* Invalid stored money remains an explicit unknown reconciliation. */ }
     const payouts = await tx.select({
+      recording_batch_id: sql<string | null>`(select entry.transaction_id from label_suite.royalty_ledger_entries entry
+        where entry.org_id=${royalty_payouts.org_id} and entry.payout_id=${royalty_payouts.id}
+          and entry.amount < 0 and entry.entry_type='payout' and entry.transaction_id like 'payout-batch:%'
+        order by entry.transaction_id limit 1)`,
       id: royalty_payouts.id, contact_id: royalty_payouts.contact_id, contact_name: contacts.name,
       amount: royalty_payouts.amount, currency: royalty_payouts.currency, status: royalty_payouts.status,
       scheduled_for: royalty_payouts.scheduled_for, paid_at: royalty_payouts.paid_at, updated_at: royalty_payouts.updated_at,

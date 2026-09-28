@@ -1,10 +1,7 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
+import AnalyticsOperations from "../components/analytics/AnalyticsOperations";
 import AnalyticsCommandCenterView from "../components/analytics/AnalyticsCommandCenter";
-import CampaignBreakdown from "../components/analytics/CampaignBreakdown";
-import OpsTasksBreakdownView from "../components/analytics/OpsTasksBreakdownView";
-import { TopArtistsByNet, TopReleasesByNet } from "../components/analytics/RevenueRankings";
-import RoyaltiesTimeseries from "../components/analytics/RoyaltiesTimeseries";
 import DatedTrackSnapshotTable from "../components/analytics/DatedTrackSnapshotTable";
 import CitiesByStreams from "../components/analytics/CitiesByStreams";
 import SpotifySourceBreakdown from "../components/analytics/SpotifySourceBreakdown";
@@ -106,31 +103,7 @@ const [
     {activeSection === "overview" && (
       <>
         <AnalyticsCommandCenterView client:only="react" command={commandCenter} section="overview" />
-        <details class="group border-t border-[var(--border)] pt-5">
-          <summary class="cursor-pointer list-none">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Ops layer</p>
-                <h2 class="mt-1 text-xl font-semibold tracking-tight">Royalties, campaigns, and tasks</h2>
-                <p class="mt-1 text-sm text-muted-foreground">Review revenue, campaign progress, and open tasks.</p>
-              </div>
-              <span class="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-muted-foreground group-open:hidden">Show</span>
-              <span class="hidden rounded-full border border-[var(--border)] px-3 py-1 text-xs text-muted-foreground group-open:inline">Hide</span>
-            </div>
-          </summary>
-          <div class="mt-6 space-y-6">
-            <RoyaltiesTimeseries client:only="react" data={royaltiesTimeseries} />
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <TopArtistsByNet client:only="react" rows={topArtists} />
-              <TopReleasesByNet client:only="react" rows={topReleases} />
-            </div>
-
-            <CampaignBreakdown client:only="react" rows={campaignBreakdown} />
-
-            <OpsTasksBreakdownView client:only="react" data={opsBreakdown} />
-          </div>
-        </details>
+        <AnalyticsOperations client:only="react" royaltiesTimeseries={royaltiesTimeseries} topArtists={topArtists} topReleases={topReleases} campaignBreakdown={campaignBreakdown} opsBreakdown={opsBreakdown} />
       </>
     )}
 

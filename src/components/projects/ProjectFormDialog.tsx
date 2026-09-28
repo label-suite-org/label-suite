@@ -107,7 +107,7 @@ export function ProjectFormDialog({ open, onOpenChange, onCreated, artists = [],
           <label className="sm:col-span-2 text-sm font-medium">Summary<Textarea value={draft.description} onChange={(e) => update({ description: e.target.value })} rows={3} className="mt-1 w-full border border-border bg-background px-3 py-2 text-sm outline-none" /></label>
           {error && <p role="alert" className="sm:col-span-2 text-sm text-red-600">{error}</p>}
         </form>
-        <DialogFooter><Button type="button" onClick={() => onOpenChange(false)} className="h-10 border border-border px-4 text-sm font-medium">Cancel</Button><Button form="project-form" disabled={submitting} className="h-10 bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50">{submitting ? "Creating…" : "Create project"}</Button></DialogFooter>
+        <DialogFooter><Button type="button" onClick={() => onOpenChange(false)} className="h-10 border border-border px-4 text-sm font-medium">Cancel</Button><Button type="submit" form="project-form" disabled={submitting} className="h-10 bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50">{submitting ? "Creating…" : "Create project"}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -108,10 +108,11 @@ describe("ArtistWorkspace readiness destinations", () => {
       );
     });
 
-    expect(container.textContent).toContain("Edit Artist");
-    const bioField = container.querySelector('[role="textbox"][aria-label="Bio"]');
+    const dialog = document.querySelector('[role="dialog"]')!;
+    expect(dialog.textContent).toContain("Edit Artist");
+    const bioField = dialog.querySelector('[role="textbox"][aria-label="Bio"]');
     expect(bioField?.getAttribute("contenteditable")).toBe("true");
-    expect(container.textContent).toContain("Draft");
+    expect(dialog.textContent).toContain("Draft");
   });
 
   it("does not submit unchanged biography fields when saving another artist field", async () => {
@@ -139,7 +140,7 @@ describe("ArtistWorkspace readiness destinations", () => {
       );
     });
 
-    const form = container.querySelector("form");
+    const form = document.querySelector('[role="dialog"] form');
     if (!form) throw new Error("Artist edit form was not rendered");
     await act(async () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -220,21 +221,22 @@ describe("ArtistWorkspace readiness destinations", () => {
       );
     });
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("shown safely");
-    expect(container.querySelector('[role="textbox"][aria-label="Bio"]')?.getAttribute("contenteditable")).toBe("false");
-    const replaceButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Replace invalid biography");
+    const dialog = document.querySelector('[role="dialog"]')!;
+    expect(dialog.querySelector('[role="alert"]')?.textContent).toContain("shown safely");
+    expect(dialog.querySelector('[role="textbox"][aria-label="Bio"]')?.getAttribute("contenteditable")).toBe("false");
+    const replaceButton = Array.from(dialog.querySelectorAll("button")).find((button) => button.textContent === "Replace invalid biography");
     expect(replaceButton?.disabled).toBe(false);
 
     await act(async () => {
       replaceButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(container.querySelector('[role="alert"]')).toBeNull();
-    expect(container.querySelector('[role="textbox"][aria-label="Bio"]')?.getAttribute("contenteditable")).toBe("true");
-    const reviewButton = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Save before review");
+    expect(dialog.querySelector('[role="alert"]')).toBeNull();
+    expect(dialog.querySelector('[role="textbox"][aria-label="Bio"]')?.getAttribute("contenteditable")).toBe("true");
+    const reviewButton = Array.from(dialog.querySelectorAll("button")).find((button) => button.textContent === "Save before review");
     expect(reviewButton?.disabled).toBe(true);
 
-    const form = container.querySelector("form");
+    const form = document.querySelector('[role="dialog"] form');
     if (!form) throw new Error("Artist edit form was not rendered");
     await act(async () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -270,7 +272,7 @@ describe("ArtistWorkspace readiness destinations", () => {
       );
     });
 
-    expect(container.textContent).not.toContain("Edit Artist");
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("selects the requested visuals tab when a readiness destination route is provided", async () => {

@@ -434,7 +434,8 @@ test("core-surfaces-light-dark-a11y", async ({ page }, testInfo) => {
   const renderLifecycleWarnings = captureRenderLifecycleWarnings(page);
   await login(page);
   const releaseId = requiredFixture("E2E_RELEASE_ID", "Schedule accessibility requires a seeded release.");
-  const surfaces = ["/dashboard", "/analytics", "/artists", "/releases", `/releases/${releaseId}?section=timeline`, "/campaigns", "/events", "/settings"];
+  const trackId = requiredFixture("E2E_TRACK_ID", "Catalog accessibility requires a seeded track.");
+  const surfaces = ["/dashboard", "/analytics", "/artists", "/releases", `/catalog?track=${trackId}`, `/releases/${releaseId}?section=timeline`, "/campaigns", "/events", "/settings"];
 
   for (const path of surfaces) {
     await scanSurface(page, testInfo, path);
@@ -592,6 +593,18 @@ test("analytics-workspace-hierarchy", async ({ page }) => {
   await page.goto("/analytics?section=overview", { waitUntil: "domcontentloaded" });
   const analyticsSections = page.getByRole("navigation", { name: "Analytics sections" });
   await expect(analyticsSections).toBeVisible();
+
+  const operations = page.locator("details").filter({ has: page.getByRole("heading", { name: "Royalties, campaigns, and tasks", exact: true }) });
+  const summary = operations.locator("summary");
+  await expect(summary).toBeVisible();
+  await expect(operations.locator(".recharts-responsive-container")).toHaveCount(0);
+  for (let cycle = 0; cycle < 2; cycle += 1) {
+    await summary.press("Enter");
+    await expect(operations.getByRole("heading", { name: "Campaign pipeline", exact: true })).toBeVisible();
+    await expect.poll(() => operations.locator(".recharts-responsive-container").count()).toBeGreaterThan(0);
+    await summary.press("Enter");
+    await expect(operations.locator(".recharts-responsive-container")).toHaveCount(0);
+  }
 
   const expected = [
     ["Overview", "overview", () => page.getByRole("heading", { name: "Overview", exact: true })],
@@ -1519,6 +1532,10 @@ test("campaign rich editor keeps AI review local until an explicit save", async 
 
   await login(page);
   await page.goto(`/campaigns/${RADIO_CAMPAIGN_ID}`, { waitUntil: "domcontentloaded" });
+  const moreSections = page.getByRole("button", { name: "More campaign sections", exact: true });
+  await expect(moreSections.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", "");
+  await moreSections.click();
+  await page.getByRole("menuitem", { name: "Details", exact: true }).click();
   const editCampaign = page.getByRole("button", { name: "Edit Fountain Edits — Release Gate Campaign", exact: true });
   await expect(editCampaign.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", "");
   await editCampaign.click();
@@ -1622,5 +1639,42 @@ test("campaign overview and outreach have responsive accessible editor surfaces"
   for (const path of [`/campaigns/${RADIO_CAMPAIGN_ID}`, `/campaigns/${RADIO_CAMPAIGN_ID}?tab=outreach`]) {
     await scanSurface(page, testInfo, path);
     await expectNoHorizontalPageOverflow(page);
+  }
+});
+
+test("enabled campaign controls immediately regain full contrast", async ({ page }) => {
+  await login(page);
+  await page.goto(`/campaigns/${RADIO_CAMPAIGN_ID}?tab=outreach`);
+  const focused = page.getByRole("tab", { name: "Focused", exact: true });
+  await expect(focused).toBeEnabled();
+  const opacities = await focused.evaluate(async (tab) => {
+    const fieldset = tab.closest("fieldset")!;
+    fieldset.disabled = true;
+    await Promise.all(fieldset.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    fieldset.disabled = false;
+    // The same native state change happens when this island hydrates.
+    await new Promise(requestAnimationFrame);
+    return [...fieldset.querySelectorAll("button:not(:disabled)")].map((button) => getComputedStyle(button).opacity);
+  });
+  expect(opacities.length).toBeGreaterThan(0);
+  expect(opacities.every((opacity) => opacity === "1")).toBe(true);
+});
+
+test("campaign recommendation actions retain contrast on hover", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-gate", "Hover requires a mouse pointer");
+  await login(page);
+  await page.goto(`/campaigns/${RADIO_CAMPAIGN_ID}?tab=outreach`);
+  for (const dark of [false, true]) {
+    await setTheme(page, dark);
+    for (const name of ["Dismiss recommendation", "Mark handled"]) {
+      const button = page.getByRole("button", { name, exact: true }).first();
+      await expect(button).toBeEnabled();
+      await button.hover();
+      await button.evaluate(async (element) => {
+        await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      });
+      const result = await new AxeBuilder({ page }).include(`[aria-label="${name}"]`).analyze();
+      expect(result.violations).toEqual([]);
+    }
   }
 });

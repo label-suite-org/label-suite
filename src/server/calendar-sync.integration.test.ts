@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { afterAll, beforeAll, expect, it, describe, vi } from "vitest";
 import type { CalendarEvent } from "./calendar-sync-core";
-const target = "postgres://label_suite:label_suite@127.0.0.1:55432/label_suite";
-const enabled = process.env.CI === "true" && process.env.DATABASE_URL === target;
+import { assertDisposableReleaseGateTarget } from "../../scripts/release-gate-fixture-safety";
+const target = process.env.DATABASE_URL ?? "";
+const enabled = process.env.CI === "true";
 const org = `calendar-${randomUUID()}`, releaseId = randomUUID(), taskId = randomUUID(), milestoneId = randomUUID();
 const runtimeRole = `calendar_runtime_${randomUUID().replaceAll("-", "")}`;
 let sql: ReturnType<typeof postgres>;
@@ -16,6 +17,13 @@ function move(event: CalendarEvent, date: string) {
 }
 describe.skipIf(!enabled)("calendar sync on disposable PostgreSQL", () => {
   beforeAll(async () => {
+    assertDisposableReleaseGateTarget({
+      databaseUrl: target, ci: process.env.CI,
+      fixtureDisposable: process.env.RELEASE_GATE_FIXTURE_DISPOSABLE,
+      userEmail: process.env.E2E_USER_EMAIL, userPassword: process.env.E2E_USER_PASSWORD,
+      analyticsFixtureDb: process.env.ANALYTICS_FIXTURE_DB,
+      analyticsFixtureDisposable: process.env.ANALYTICS_FIXTURE_DISPOSABLE,
+    });
     vi.stubEnv("GOOGLE_CLIENT_ID", "test-client"); vi.stubEnv("GOOGLE_CLIENT_SECRET", "test-secret"); vi.stubEnv("GMAIL_TOKEN_SECRET", "test-calendar-key");
     sql = postgres(target, { max: 1 });
     await sql.unsafe(`create role ${runtimeRole} nologin`);

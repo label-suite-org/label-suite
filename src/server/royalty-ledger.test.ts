@@ -13,6 +13,7 @@ const database = vi.hoisted(() => {
       orderBy: () => chain,
       limit: () => chain,
       leftJoin: () => chain,
+      innerJoin: () => chain,
       groupBy: () => chain,
       then: <T>(onfulfilled?: (value: unknown[]) => T | PromiseLike<T>, onrejected?: (reason: unknown) => T | PromiseLike<T>) =>
         Promise.resolve(results.shift() ?? []).then(onfulfilled, onrejected),

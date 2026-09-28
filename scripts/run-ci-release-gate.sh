@@ -178,3 +178,8 @@ E2E_BASE_URL="$PUBLIC_SITE_URL" \
 
 E2E_BASE_URL="$PUBLIC_SITE_URL" ARTIST_PORTAL_BROWSER_TEST=1 \
   npx playwright test tests/release-gate/artist-portal.spec.ts
+
+# Correction saves invalidate reviewed campaign snapshots; use a fresh fixture phase.
+npm run release-gate:seed
+E2E_BASE_URL="$PUBLIC_SITE_URL" \
+  npx playwright test tests/release-gate/release-correction.spec.ts

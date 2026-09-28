@@ -134,7 +134,7 @@ export async function getPayeePortalData(
     .innerJoin(royalty_ledger_transactions, and(
       eq(royalty_ledger_entries.transaction_id, royalty_ledger_transactions.id),
       eq(royalty_ledger_transactions.org_id, orgId),
-      eq(royalty_ledger_transactions.posting_status, "posted"),
+      inArray(royalty_ledger_transactions.posting_status, ["posted", "reversed"]),
     ))
     .where(and(
       eq(royalty_ledger_entries.org_id, orgId),

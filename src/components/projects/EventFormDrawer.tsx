@@ -181,7 +181,7 @@ export function EventFormDrawer({ open, onOpenChange, projects, artists = [], re
           <label className="sm:col-span-2 flex min-h-11 items-center gap-2 text-sm font-medium"><Input type="checkbox" checked={draft.isConfirmed} onChange={(e) => update({ isConfirmed: e.target.checked })} />Confirmed</label>
           {error && <p role="alert" className="sm:col-span-2 text-sm text-red-600">{error}</p>}
         </form>
-        <SheetFooter className="border-t border-border sm:flex-row sm:justify-end"><Button type="button" onClick={() => onOpenChange(false)} className="h-10 border border-border px-4 text-sm font-medium">Cancel</Button><Button form="event-form" disabled={submitting} className="h-10 bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50">{submitting ? (initialEvent ? "Saving…" : "Creating…") : initialEvent ? "Save event" : "Create event"}</Button></SheetFooter>
+        <SheetFooter className="border-t border-border sm:flex-row sm:justify-end"><Button type="button" onClick={() => onOpenChange(false)} className="h-10 border border-border px-4 text-sm font-medium">Cancel</Button><Button type="submit" form="event-form" disabled={submitting} className="h-10 bg-foreground px-4 text-sm font-medium text-background disabled:opacity-50">{submitting ? (initialEvent ? "Saving…" : "Creating…") : initialEvent ? "Save event" : "Create event"}</Button></SheetFooter>
       </SheetContent>
     </Sheet>
   );

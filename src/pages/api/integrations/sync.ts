@@ -24,6 +24,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const connection = (await listIntegrationConnections(orgId))
       .find((candidate) => candidate.id === input.connection_id);
     if (!connection) return json({ error: "Integration connection not found" }, 404);
+    if (connection.status === "paused" || connection.status === "revoked") {
+      return json({ error: "Resume or reconnect this integration before syncing" }, 409);
+    }
 
     const job = await createSyncJob(orgId, {
       connection_id: connection.id,

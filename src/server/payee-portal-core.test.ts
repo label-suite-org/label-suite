@@ -19,6 +19,13 @@ describe("payee portal identity and publication rules", () => {
     expect(findPayeeContact([{ id: "contact-a", name: "A", email: null }], " ")).toBeNull();
   });
 
+  it("refuses ambiguous contacts with the same normalized email", () => {
+    expect(findPayeeContact([
+      { id: "contact-a", name: "A", email: "payee@example.com" },
+      { id: "contact-b", name: "B", email: " PAYEE@example.com " },
+    ], "payee@example.com")).toBeNull();
+  });
+
   it("exposes only issued or closed statements and recorded payouts", () => {
     expect(isPublishedStatementStatus("draft")).toBe(false);
     expect(isPublishedStatementStatus("calculated")).toBe(false);

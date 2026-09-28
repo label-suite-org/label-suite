@@ -1,13 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "@playwright/test";
+import { assertDisposableReleaseGateTarget } from "../../scripts/release-gate-fixture-safety";
 
 const origin = process.env.E2E_BASE_URL ?? "";
-const enabled = process.env.ARTIST_PORTAL_BROWSER_TEST === "1"
-  && ["http://127.0.0.1:4339", "http://127.0.0.1:4341", "http://127.0.0.1:4321"].includes(origin)
-  && process.env.RELEASE_GATE_FIXTURE_DISPOSABLE === "1";
+const enabled = process.env.ARTIST_PORTAL_BROWSER_TEST === "1";
 
 test("artist agreement archive and credits submission", async ({ page, browser }, testInfo) => {
   test.skip(!enabled, "Requires an explicitly disposable local portal fixture");
+  expect(new URL(origin).protocol).toBe("http:");
+  expect(new URL(origin).hostname).toBe("127.0.0.1");
+  assertDisposableReleaseGateTarget({
+    databaseUrl: process.env.DATABASE_URL, ci: process.env.CI,
+    fixtureDisposable: process.env.RELEASE_GATE_FIXTURE_DISPOSABLE,
+    userEmail: process.env.E2E_USER_EMAIL, userPassword: process.env.E2E_USER_PASSWORD,
+    analyticsFixtureDb: process.env.ANALYTICS_FIXTURE_DB,
+    analyticsFixtureDisposable: process.env.ANALYTICS_FIXTURE_DISPOSABLE,
+  });
   const suffix = randomUUID();
   const headers = { origin };
   const signup = await page.request.post(`${origin}/api/auth/sign-up/email`, { headers, data: { name: "Portal reviewer", email: `portal-${suffix}@example.test`, password: "PortalFixture450!" } });

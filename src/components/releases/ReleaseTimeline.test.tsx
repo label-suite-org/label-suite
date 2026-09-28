@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReleaseWorkItemForm } from "./ReleaseWorkItemForm";
 import { ReleaseWorkbackBuilder } from "./ReleaseWorkbackBuilder";
 import { ReleaseTimeline } from "./ReleaseTimeline";
@@ -20,12 +20,27 @@ async function render(canManage = true) {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(<ReleaseTimeline releaseId="release" canManage={canManage} timeline={timeline} />));
 }
+beforeEach(() => { vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => timeline })); });
 afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); vi.unstubAllGlobals(); });
 
 describe("release workback UI", () => {
+  it("loads current task and release-date data each time the schedule opens", async () => {
+    const latest = { ...timeline, releaseDate: "2026-12-04", unphasedTasks: [{ ...timeline.unphasedTasks![0], title: "Newly saved task" }] };
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => latest });
+    vi.stubGlobal("fetch", fetch);
+    await render();
+    expect(container.textContent).toContain("2026-12-04");
+    expect(container.textContent).toContain("Newly saved task");
+    expect(container.textContent).not.toContain("Find artwork");
+    await act(async () => root.render(null));
+    await act(async () => root.render(<ReleaseTimeline releaseId="release" canManage timeline={timeline} />));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain("Newly saved task");
+  });
+
   it("shows cross-phase and undated work and persists completion through the shared task API", async () => {
     const fetch = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ ...timeline, unphasedTasks: [] }) });
-    vi.stubGlobal("fetch", fetch); await render();
+    await render(); vi.stubGlobal("fetch", fetch);
     expect(container.textContent).toContain("Find artwork"); expect(container.textContent).toContain("Approve master");
     expect(container.querySelector('[aria-label="Overdue"]')?.textContent).toContain("Approve master");
     await act(async () => (container.querySelector('[aria-label="Complete Find artwork"]') as HTMLButtonElement).click());
@@ -33,8 +48,16 @@ describe("release workback UI", () => {
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ id: "unphased", status: "done" });
     expect(container.textContent).not.toContain("Find artwork");
   });
+  it("offers retry without mutation controls when refresh fails", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: false }).mockResolvedValueOnce({ ok: true, json: async () => timeline });
+    vi.stubGlobal("fetch", fetch); await render();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Could not refresh");
+    expect(container.querySelector('[aria-label="Complete Find artwork"]')).toBeNull();
+    await act(async () => Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Retry")!.click());
+    expect(container.querySelector('[aria-label="Complete Find artwork"]')).toBeTruthy();
+  });
   it("retains work and reports a failed save without showing false completion", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: "Cannot save" }) })); await render();
+    await render(); vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: "Cannot save" }) }));
     await act(async () => (container.querySelector('[aria-label="Complete Find artwork"]') as HTMLButtonElement).click());
     expect(container.querySelector('[role="alert"]')?.textContent).toBe("Cannot save");
     expect(container.querySelector('[aria-label="Complete Find artwork"]')).toBeTruthy();
@@ -66,6 +89,7 @@ it("groups release milestones and shows dependencies, members and labels on the 
   ] });
   data.planningOptions = { members: [{ id: "maya", name: "Maya" }, { id: "malthe", name: "Malthe" }], tasks: [] };
   await render();
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => data }));
   await act(async () => root.render(<ReleaseTimeline key="schedule" releaseId="release" canManage timeline={data} />));
   expect(container.querySelector('[aria-label="Single delivery"]')?.textContent).toContain("Upload single");
   expect(container.textContent).toContain("Maya, Malthe");
