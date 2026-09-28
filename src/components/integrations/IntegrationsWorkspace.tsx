@@ -213,5 +213,5 @@ function Summary({ label, value, icon }: { label: string; value: string; icon: R
 function Empty({ message }: { message: string }) { return <p className="border border-border p-4 text-sm text-muted-foreground" role="status">{message}</p>; }
 function Fact({ label, value }: { label: string; value: string }) { return <div><dt>{label}</dt><dd className="mt-0.5 text-foreground">{value}</dd></div>; }
 function StatusBadge({ value }: { value: string }) { return <span className="rounded-full border border-border px-2 py-1 text-xs capitalize">{value.replaceAll("_", " ")}</span>; }
-function formatDate(value: string | Date | null) { return value ? new Date(value).toLocaleString() : "Never"; }
+function formatDate(value: string | Date | null) { return value ? new Date(value).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC") : "Never"; }
 async function readError(response: Response, fallback: string) { return (await response.json().catch(() => ({})) as { error?: string }).error ?? fallback; }
