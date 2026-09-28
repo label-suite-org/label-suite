@@ -10,7 +10,7 @@ import {
   contacts,
 } from "../db/schema";
 import { db } from "../lib/db";
-import { ConflictError, NotFoundError } from "./errors";
+import { ConflictError, isPostgresSerializationFailure, NotFoundError } from "./errors";
 import { idSchema, nullableNumber, nullableText } from "./validation";
 
 const isoCountryCode = z.string().regex(/^[A-Z]{2}$/, "Use a two-letter ISO country code");
@@ -200,7 +200,7 @@ export async function finalizeCampaignReport(orgId: string, campaignId: string, 
       return { ok: true, snapshot };
     }, { isolationLevel: "repeatable read" });
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "40001") {
+    if (isPostgresSerializationFailure(error)) {
       throw new ConflictError("Campaign changed while finalising; refresh and try again");
     }
     throw error;

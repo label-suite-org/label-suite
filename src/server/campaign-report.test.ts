@@ -69,7 +69,7 @@ describe("Campaign report finalisation", () => {
 
   it("returns a conflict when a concurrent finalisation causes a serialization failure", async () => {
     await finalizeCampaignReport(orgId, campaignId, "First report", "actor-1");
-    database.transaction.mockRejectedValueOnce(Object.assign(new Error("could not serialize"), { code: "40001" }));
+    database.transaction.mockRejectedValueOnce(new Error("query failed", { cause: Object.assign(new Error("could not serialize"), { code: "40001" }) }));
     await expect(finalizeCampaignReport(orgId, campaignId, "Concurrent report", "actor-2")).rejects.toMatchObject({ status: 409 });
     expect(saved).toMatchObject({ final_report: "First report", final_report_finalized_by: "actor-1" });
   });
