@@ -116,6 +116,20 @@ export const focusedWorkbenchData = {
 focusedWorkbenchData.queue.now = focusedWorkbenchData.leads;
 
 describe("focused lead workbench", () => {
+  it("renders enrichment dates consistently across server and browser time zones", () => {
+    const data = structuredClone(focusedWorkbenchData);
+    const suggestion = data.leads[0]!.latest_suggestions[0]!;
+    suggestion.provenance!.created_at = new Date("2026-09-27T23:32:03.289Z");
+    suggestion.evidence[0]!.retrieved_at = "2026-09-27T23:32:03.289Z";
+    const content = <CampaignOutreachWorkspace initialData={data} canMutate={false} />;
+    vi.stubEnv("TZ", "UTC");
+    const server = renderToStaticMarkup(content);
+    vi.stubEnv("TZ", "Europe/Copenhagen");
+    expect(renderToStaticMarkup(content)).toBe(server);
+    expect(server).toContain("Created 28 Sept 2026");
+    expect(server).toContain('>28 Sept 2026</time>');
+  });
+
   it("renders one evidence-led five-step operator flow without a send action", () => {
     const html = renderToStaticMarkup(<CampaignOutreachWorkspace initialData={focusedWorkbenchData} canMutate={false} />);
 
@@ -733,6 +747,7 @@ describe("focused lead workbench", () => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 function buttonNamed(container: HTMLElement, name: string) {
