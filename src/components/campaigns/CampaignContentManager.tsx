@@ -121,7 +121,7 @@ function formatSourceReferences(
 }
 
 export default function CampaignContentManager({ campaignId, canMutate }: CampaignContentManagerProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [context, setContext] = useState<CampaignContentContext | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
