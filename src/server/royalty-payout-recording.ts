@@ -6,6 +6,9 @@ import { db } from "../lib/db";
 import { ConflictError, NotFoundError } from "./errors";
 import { compareMoney, createMoney } from "./royalty-engine/money";
 
+export const payoutBatchIdSchema = z.string().regex(/^payout-batch(?::|%3[aA])[a-f0-9]{24}$/)
+  .transform(value => value.replace(/%3[aA]/, ":"));
+
 export const recordPayoutBatchSchema = z.object({
   idempotency_key: z.string().uuid(),
   reference: z.string().trim().min(1).max(500),
