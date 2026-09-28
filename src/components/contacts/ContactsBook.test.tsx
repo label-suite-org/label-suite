@@ -9,6 +9,7 @@ it("opens the linked contact and does not substitute another person when it is u
   ];
   const linked = renderToStaticMarkup(<ContactsBook contacts={contacts} organizations={[]} initialContactId="linked" canMutate={false} />);
   expect(linked).toContain("Linked private note");
+  expect(linked).toContain('href="/documents?contact_id=linked"');
   expect(linked).not.toContain("First private note");
   const missing = renderToStaticMarkup(<ContactsBook contacts={contacts} organizations={[]} initialContactId="missing" canMutate={false} />);
   expect(missing).toContain("The linked contact is no longer available in this workspace.");

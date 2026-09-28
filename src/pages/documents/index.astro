@@ -14,19 +14,30 @@ const artistRows = await listArtistOptions(orgId);
 const releaseRows = await listReleaseOptions(orgId);
 const contactRows = await listContactOptions(orgId);
 const projectRows = await listProjects(orgId);
+const contactId = Astro.url.searchParams.get("contact_id");
+const contact = contactRows.find((row) => row.id === contactId);
+const missingContact = contactId !== null && !contact;
+if (missingContact) Astro.response.status = 404;
+const visibleDocuments = contactId === null ? documentRows : documentRows.filter((row) => row.contact_id === contact?.id);
 const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "member")["operations.mutate"];
 ---
 
 <AppLayout>
   <div class="space-y-6">
-    <DocumentManager
+    {contact && <header class="space-y-2">
+      <a class="text-sm underline" href={`/contacts?contact=${encodeURIComponent(contact.id)}`}>Back to {contact.name}</a>
+      <h1 class="text-2xl font-semibold">Documents for {contact.name}</h1>
+    </header>}
+    {contactId !== null && <a class="inline-block text-sm underline" href="/documents">All documents</a>}
+    {missingContact ? <p>The linked contact is no longer available in this workspace.</p> : <DocumentManager
       client:load
-      initialDocuments={documentRows}
+      initialDocuments={visibleDocuments}
+      defaultContactId={contact?.id}
       artists={artistRows}
       releases={releaseRows}
       contacts={contactRows}
       projects={projectRows}
       canMutate={canMutate}
-    />
+    />}
   </div>
 </AppLayout>
