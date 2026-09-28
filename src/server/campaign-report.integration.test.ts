@@ -5,12 +5,15 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 const enabled = process.env.CAMPAIGN_REPORT_INTEGRATION === "1";
 const suffix = randomUUID();
 const orgId = `campaign-report-org-${suffix}`;
+const foreignOrgId = `campaign-report-foreign-org-${suffix}`;
 const actorId = `campaign-report-user-${suffix}`;
 const campaignId = `campaign-report-${suffix}`;
 const otherCampaignId = `campaign-report-other-${suffix}`;
 const artistId = `campaign-report-artist-${suffix}`;
 const releaseId = `campaign-report-release-${suffix}`;
 const contactId = `campaign-report-contact-${suffix}`;
+const otherContactId = `campaign-report-other-contact-${suffix}`;
+const foreignContactId = `campaign-report-foreign-contact-${suffix}`;
 const engagementId = `campaign-report-engagement-${suffix}`;
 let admin: Sql | undefined;
 let finalize: typeof import("./campaign-os").finalizeCampaignReport;
@@ -26,7 +29,7 @@ describe.skipIf(!enabled)("Campaign report finalisation on disposable PostgreSQL
       || process.env.RELEASE_GATE_FIXTURE_DISPOSABLE !== "1") throw new Error("Disposable local label_suite database required");
     admin = postgres(target.toString(), { max: 2 });
     [{ finalizeCampaignReport: finalize, getCampaignOsWorkspace: workspace }, { runWithDatabaseContext: scoped }, route] = await Promise.all([import("./campaign-os"), import("../lib/db"), import("../pages/api/campaigns/[id]/os")]);
-    await admin`insert into label_suite.orgs (id, name, slug) values (${orgId}, 'Campaign report fixture', ${orgId})`;
+    await admin`insert into label_suite.orgs (id, name, slug) values (${orgId}, 'Campaign report fixture', ${orgId}), (${foreignOrgId}, 'Foreign fixture', ${foreignOrgId})`;
     await admin`insert into label_suite."user" (id, name, email, "emailVerified") values (${actorId}, 'Fixture operator', ${`${actorId}@example.test`}, true)`;
     await admin`insert into label_suite.org_memberships (id, org_id, user_id, role) values (${suffix}, ${orgId}, ${actorId}, 'operator')`;
     await admin`insert into label_suite.artists (id, org_id, name) values (${artistId}, ${orgId}, 'Original Artist')`;
@@ -35,21 +38,21 @@ describe.skipIf(!enabled)("Campaign report finalisation on disposable PostgreSQL
       values (${campaignId}, ${orgId}, 'Original Campaign', ${artistId}, ${releaseId}, '2026-09-01', '2026-09-30', 'Original brief', 'Original goal', 'Original notes'),
       (${otherCampaignId}, ${orgId}, 'Other Campaign', ${artistId}, ${releaseId}, null, null, null, null, null)`;
     await admin`insert into label_suite.campaign_territories (id, org_id, campaign_id, country_code) values (${`territory-${suffix}`}, ${orgId}, ${campaignId}, 'DK')`;
-    await admin`insert into label_suite.contacts (id, org_id, name) values (${contactId}, ${orgId}, 'Fixture creator')`;
+    await admin`insert into label_suite.contacts (id, org_id, name) values (${contactId}, ${orgId}, 'Fixture creator'), (${otherContactId}, ${orgId}, 'Other fixture creator'), (${foreignContactId}, ${foreignOrgId}, 'Foreign creator')`;
     await admin`insert into label_suite.campaign_creator_engagements (id, org_id, campaign_id, contact_id) values (${engagementId}, ${orgId}, ${otherCampaignId}, ${contactId})`;
   });
 
   afterAll(async () => {
     if (!admin) return;
     await admin`delete from label_suite.campaigns where id in (${campaignId}, ${otherCampaignId})`;
-    await admin`delete from label_suite.contacts where id = ${contactId}`;
+    await admin`delete from label_suite.contacts where id in (${contactId}, ${otherContactId}, ${foreignContactId})`;
     await admin`delete from label_suite.releases where id = ${releaseId}`;
     await admin`delete from label_suite.artists where id = ${artistId}`;
-    await admin`delete from label_suite.audit_events where org_id = ${orgId}`;
-    await admin`delete from label_suite.audit_logs where org_id = ${orgId}`;
+    await admin`delete from label_suite.audit_events where org_id in (${orgId}, ${foreignOrgId})`;
+    await admin`delete from label_suite.audit_logs where org_id in (${orgId}, ${foreignOrgId})`;
     await admin`delete from label_suite.org_memberships where org_id = ${orgId}`;
     await admin`delete from label_suite."user" where id = ${actorId}`;
-    await admin`delete from label_suite.orgs where id = ${orgId}`;
+    await admin`delete from label_suite.orgs where id in (${orgId}, ${foreignOrgId})`;
     await admin.end();
   });
 
@@ -95,5 +98,47 @@ describe.skipIf(!enabled)("Campaign report finalisation on disposable PostgreSQL
     expect(saved.captured_at).toBeTruthy();
     expect(fetch).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it("requires fresh Contact and channel permission before contact and after revocation", async () => {
+    const fetch = vi.fn(() => { throw new Error("Campaign OS must not send outreach"); });
+    vi.stubGlobal("fetch", fetch);
+    const command = (role: string, action: string, input: Record<string, unknown>) => scoped({ userId: actorId, orgId }, async () => route.POST({
+      request: new Request(`https://suite.test/api/campaigns/${campaignId}/os`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, input }) }),
+      params: { id: campaignId }, locals: { orgId, membershipRole: role, user: { id: actorId } },
+    } as never));
+    try {
+      expect((await command("operator", "create_engagement", { contact_id: foreignContactId })).status).toBe(404);
+      expect((await command("operator", "update_engagement", { id: engagementId, status: "contacted" })).status).toBe(404);
+      const created = await command("operator", "create_engagement", { contact_id: contactId, outreach_channel: "email", relationship_notes: "Known from the release" });
+      expect(created.status).toBe(201);
+      const { id } = await created.json();
+      const update = (input: Record<string, unknown>) => command("operator", "update_engagement", { id, ...input });
+      expect((await update({ status: "contacted" })).status).toBe(409);
+      expect((await update({ outreach_permission_status: "permitted" })).status).toBe(409);
+      expect((await update({ outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in" })).status).toBe(409);
+      expect((await command("member", "update_engagement", { id, outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z" })).status).toBe(403);
+      expect((await update({ outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z" })).status).toBe(200);
+      expect((await update({ status: "contacted" })).status).toBe(200);
+      expect((await update({ outreach_channel: "DM" })).status).toBe(409);
+      expect((await update({ outreach_channel: "DM", outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z" })).status).toBe(409);
+      expect((await update({ contact_id: otherContactId })).status).toBe(409);
+      expect((await update({ outreach_permission_status: "revoked" })).status).toBe(409);
+      expect((await update({ outreach_permission_status: "revoked", outreach_permission_revoked_at: "2026-09-28T11:00:00.000Z" })).status).toBe(200);
+      expect((await update({ status: "negotiating" })).status).toBe(409);
+      expect((await update({ outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z", outreach_permission_revoked_at: null })).status).toBe(409);
+      expect((await update({ contact_id: otherContactId, outreach_channel: "DM" })).status).toBe(409);
+      expect((await update({ contact_id: otherContactId, outreach_channel: "DM", outreach_permission_status: "permitted", outreach_permission_basis: "Other creator opted in to DM", outreach_permission_recorded_at: "2026-09-28T12:00:00.000Z", outreach_permission_revoked_at: null })).status).toBe(200);
+      const [saved] = await admin!`select contact_id, status, outreach_channel, outreach_permission_status, outreach_permission_basis, to_char(outreach_permission_recorded_at, 'YYYY-MM-DD HH24:MI:SS') as recorded_at_text, outreach_permission_revoked_at from label_suite.campaign_creator_engagements where id = ${id}`;
+      expect(saved).toMatchObject({ contact_id: otherContactId, status: "contacted", outreach_channel: "DM", outreach_permission_status: "permitted", outreach_permission_basis: "Other creator opted in to DM", outreach_permission_revoked_at: null });
+      expect(saved.recorded_at_text).toBe("2026-09-28 12:00:00");
+      const loaded = await scoped({ userId: actorId, orgId }, async () => route.GET({ params: { id: campaignId }, locals: { orgId } } as never));
+      expect((await loaded.json()).engagements.find((item: { id: string }) => item.id === id).outreach_permission_recorded_at).toBe("2026-09-28T12:00:00.000Z");
+      const [audit] = await admin!`select count(*)::int as count, min(actor_user_id) as actor from label_suite.audit_logs where org_id = ${orgId} and entity_type = 'campaign_creator_engagements' and entity_id = ${id} and action = 'update'`;
+      expect(audit).toMatchObject({ count: 4, actor: actorId });
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

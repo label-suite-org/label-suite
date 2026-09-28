@@ -113,7 +113,7 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
       </div>
     </div>
     <nav aria-label="Campaign sections" className="grid grid-cols-2 border-b border-border sm:flex sm:items-center sm:gap-1">
-      {primary.map((section) => <Button key={section.key} render={<a href={href(section.key)} aria-current={activeTab === section.key ? "page" : undefined} />} variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeTab === section.key ? "border-b-primary text-primary" : "border-b-transparent text-muted-foreground"}`}>{section.label}</Button>)}
+      {primary.map((section) => <Button key={section.key} nativeButton={false} render={<a href={href(section.key)} aria-current={activeTab === section.key ? "page" : undefined} />} variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeTab === section.key ? "border-b-primary text-primary" : "border-b-transparent text-muted-foreground"}`}>{section.label}</Button>)}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" className={`h-11 w-full rounded-none border-b-[3px] px-2 text-sm sm:w-auto sm:px-4 sm:text-base ${activeMore ? "border-b-primary text-primary" : "border-b-transparent text-muted-foreground"}`} aria-label={activeMore ? `More: ${activeMore.label}` : "More campaign sections"} />}>
           {activeMore?.label ?? "More"} <ChevronDown />
@@ -130,7 +130,7 @@ export function CampaignWorkingTasks({ tasks }: { tasks: Array<{ id: string; tit
   return <section className="max-w-4xl" aria-label="Working now">
     <div className="mb-3 flex items-center justify-between gap-3">
       <h2 className="text-lg font-semibold">Working now</h2>
-      <Button variant="link" size="sm" render={<a href="/ops-tasks" />}>All tasks <ChevronRight /></Button>
+      <Button variant="link" size="sm" nativeButton={false} render={<a href="/ops-tasks" />}>All tasks <ChevronRight /></Button>
     </div>
     {tasks.length ? <ItemGroup className="gap-0 divide-y divide-border border-y border-border">
       {tasks.map((task) => <Item key={task.id} render={<a href={`/ops-tasks?task=${task.id}`} />} className="rounded-none px-1 py-3 hover:bg-muted">
