@@ -58,6 +58,7 @@
 		5A214F988FD8A9AB7A4DBD7D /* NativeSearchRecentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F920197D951FF7206D06B6BB /* NativeSearchRecentsTests.swift */; };
 		EF68AA610BD9860EBDA3E4A0 /* NativeAPIIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5E053CB10AE3BAFD8667EB /* NativeAPIIntegrationTests.swift */; };
 		A32500010000000000000001 /* NativeAPIReleaseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32500010000000000000002 /* NativeAPIReleaseTests.swift */; };
+		A32400010000000000000001 /* NativeAPIArtistDetailTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A32400010000000000000002 /* NativeAPIArtistDetailTests.swift */; };
 		F652FD203ECF86D212E7BD39 /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 515C7EF031754402636F13C3 /* KeychainSessionStore.swift */; };
 		FAADACE70838E80B1B31B465 /* NativeDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C34A3BB89C46AFB5D416B7C /* NativeDesignSystem.swift */; };
 		A3230001A3230001A3230001 /* NativeTodayRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3230002A3230002A3230002 /* NativeTodayRouting.swift */; };
@@ -171,6 +172,7 @@
 		E970EB3F29E87BD0916F3238 /* LabelSuiteApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LabelSuiteApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED5E053CB10AE3BAFD8667EB /* NativeAPIIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIIntegrationTests.swift; sourceTree = "<group>"; };
 		A32500010000000000000002 /* NativeAPIReleaseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIReleaseTests.swift; sourceTree = "<group>"; };
+		A32400010000000000000002 /* NativeAPIArtistDetailTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIArtistDetailTests.swift; sourceTree = "<group>"; };
 		F2ECCE6F86B3E131070C64CB /* NativeWorkspaceSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceSnapshotTests.swift; sourceTree = "<group>"; };
 		5176F21D65C4B786EB4002A5 /* NativeCampaignDetailTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCampaignDetailTests.swift; sourceTree = "<group>"; };
 		09CE128B86E3D64FD8554D6D /* NativeAPIContactsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIContactsTests.swift; sourceTree = "<group>"; };
@@ -244,6 +246,7 @@
 				A25800040000000000000004 /* NativeRoyaltyTests.swift */,
 				ED5E053CB10AE3BAFD8667EB /* NativeAPIIntegrationTests.swift */,
 				A32500010000000000000002 /* NativeAPIReleaseTests.swift */,
+				A32400010000000000000002 /* NativeAPIArtistDetailTests.swift */,
 				A33500000000000000000004 /* NativeEventProjectTests.swift */,
 				A32600000000000000000004 /* NativeTracksTests.swift */,
 				A33500000000000000000008 /* NativeLibraryCoordinatorTests.swift */,
@@ -510,6 +513,7 @@
 				A25800030000000000000003 /* NativeRoyaltyTests.swift in Sources */,
 				EF68AA610BD9860EBDA3E4A0 /* NativeAPIIntegrationTests.swift in Sources */,
 				A32500010000000000000001 /* NativeAPIReleaseTests.swift in Sources */,
+				A32400010000000000000001 /* NativeAPIArtistDetailTests.swift in Sources */,
 				A33500000000000000000003 /* NativeEventProjectTests.swift in Sources */,
 				A32600000000000000000003 /* NativeTracksTests.swift in Sources */,
 				A33500000000000000000007 /* NativeLibraryCoordinatorTests.swift in Sources */,
