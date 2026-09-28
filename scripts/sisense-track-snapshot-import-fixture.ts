@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as databaseSchema from "../src/db/schema";
+import { HttpError } from "../src/server/errors";
 import type {
   BoundSisenseTrackSnapshotPreview,
   SisenseTrackSnapshotApplyInput,
@@ -280,6 +281,7 @@ async function main(): Promise<void> {
     await assertRepositoryMigration0077(pool);
     const {
       createSisenseTrackSnapshotProductionService: createProductionSisenseTrackSnapshotService,
+      createSisenseTrackSnapshotService,
     } = await import("../src/server/sisense-track-snapshot-import");
     const database = drizzle(pool, { schema: databaseSchema });
     const archives: Array<{ bucket: string; key: string; sha256: string }> = [];
@@ -356,6 +358,39 @@ async function main(): Promise<void> {
     );
     assert.equal(archives.length, 0);
 
+    assert.equal("rows" in initialPreview, false);
+    assert.equal("ambiguities" in initialPreview, false);
+    const initialApply = boundApplyInput(initialPreview, initialInput, true);
+    await assert.rejects(service.apply({ ...initialApply, expectedSha256: "0".repeat(64) }), /preview no longer matches/);
+    await assert.rejects(service.apply({ ...initialApply, expectedPreviewFingerprint: "0".repeat(64) }), /preview no longer matches/);
+    await assert.rejects(service.apply({ ...initialApply, orgId: namespace.orgB }), /Artist not found/);
+    // Rebinding must observe catalog changes made after preview.
+    await pool.query(`update "label_suite"."tracks" set isrc = null, title = 'Changed fixture title' where org_id = $1 and id = $2`, [namespace.orgA, namespace.trackOne]);
+    try {
+      await assert.rejects(service.apply(initialApply), /preview no longer matches/);
+    } finally {
+      await pool.query(`update "label_suite"."tracks" set isrc = 'DKFIX2600001', title = 'Fixture Track One' where org_id = $1 and id = $2`, [namespace.orgA, namespace.trackOne]);
+    }
+    const noRuns = await pool.query(`select count(*)::int as total from "label_suite"."analytics_import_runs" where org_id = $1`, [namespace.orgA]);
+    assert.equal(noRuns.rows[0].total, 0);
+    assert.equal(archives.length, 0);
+
+    const locked = await pool.connect();
+    try {
+      await locked.query("begin");
+      await locked.query("select pg_advisory_xact_lock(hashtext($1))", [`label-suite:${namespace.orgA}:sisense`]);
+      await assert.rejects(service.apply(initialApply), (error: any) => error.status === 409 && error.code === "SISENSE_TRACK_LOCKED");
+    } finally {
+      await locked.query("rollback");
+      locked.release();
+    }
+    const unavailable = createSisenseTrackSnapshotService({
+      database: async () => database, archive, now, randomId: randomUUID,
+      assertArchiveReady: () => { throw new Error("private archive unavailable"); },
+    });
+    await assert.rejects(unavailable.apply({ ...initialApply, bytes: new Uint8Array() }), /private archive unavailable/);
+    assert.equal(archives.length, 0);
+
     const first = await service.apply(boundApplyInput(initialPreview, initialInput, true));
     assert.equal(first.kind, "imported");
     if (first.kind !== "imported") throw new Error("Expected first Sisense fixture import to apply");
@@ -398,6 +433,11 @@ async function main(): Promise<void> {
       { inserted: correction.inserted, updated: correction.updated, unchanged: correction.unchanged },
       { inserted: 1, updated: 1, unchanged: 0 },
     );
+
+    const replay = await service.apply(initialApply);
+    assert.equal(replay.kind, "duplicate");
+    assert.equal(replay.runId, first.runId);
+    assert.equal(replay.latest.runId, correction.runId);
 
     const membership = await pool.query<{
       title: string;
@@ -632,6 +672,51 @@ async function main(): Promise<void> {
     assert.equal(archives.length, 4);
     assert.equal(lockProofs, 4);
     assert.equal(archives.every((item) => item.bucket === "fixture-private-analytics"), true);
+    const archiveFailure = createProductionSisenseTrackSnapshotService({
+      database, now, archive: async () => { throw new HttpError("fixture private dependency detail", 409); },
+    });
+    const failureApply = boundApplyInput(failurePreview, failureInput, false);
+    await assert.rejects(archiveFailure.apply(failureApply), (error: any) =>
+      error.status === 500 && error.message === "Sisense track snapshot import failed during private archive");
+    const safeFailure = await pool.query(
+      `select error, files_downloaded from "label_suite"."analytics_import_runs" where org_id = $1 and artist_id = $2 and error = $3`,
+      [namespace.orgA, namespace.artistFailure, "Sisense track snapshot import failed during private archive"],
+    );
+    assert.deepEqual(safeFailure.rows, [{ error: "Sisense track snapshot import failed during private archive", files_downloaded: 0 }]);
+    const errorIds = [randomUUID(), randomUUID(), first.runId.slice(4), randomUUID()];
+    const evidenceFailure = createProductionSisenseTrackSnapshotService({
+      database, now, archive: async () => { throw new HttpError("fixture private dependency detail", 409); },
+      randomId: () => { const id = errorIds.shift(); assert.ok(id); return id; },
+    });
+    await assert.rejects(evidenceFailure.apply(failureApply), (error: any) =>
+      error.status === 500 && error.message === "Sisense track snapshot import failed during private archive");
+    // Equal raw rows collapse for metrics, while provenance retains the source count.
+    const duplicateLine = {
+      title: "Fixture Other Track", artist: artistNameOther, release: releaseNameOther,
+      isrc: "DKFIX2600003", spotifyStreams: 30, combinedStreams: 35, combinedViews: 3,
+    };
+    const repeatedInput = { ...otherInput, bytes: csv(duplicateLine, duplicateLine) };
+    const repeatedPreview = await service.preview(repeatedInput);
+    assert.equal(repeatedPreview.counts.sourceRows, 2);
+    assert.equal(repeatedPreview.counts.exactDuplicates, 1);
+    const repeated = await service.apply(boundApplyInput(repeatedPreview, repeatedInput, false));
+    assert.equal(repeated.kind, "imported");
+    const sourceCount = await pool.query(
+      `select row_count from "label_suite"."analytics_import_files" where org_id = $1 and run_id = $2`, [namespace.orgA, repeated.runId],
+    );
+    assert.equal(sourceCount.rows[0].row_count, 2);
+    if (repeated.kind !== "imported") throw new Error("Expected different source bytes to import");
+    assert.deepEqual([repeated.inserted, repeated.updated, repeated.unchanged], [0, 0, 1]);
+    const rangedInput = { ...otherInput, reportingFrom: "2026-09-01", reportingThrough: "2026-09-08" };
+    const rangedPreview = await service.preview(rangedInput);
+    const ranged = await service.apply(boundApplyInput(rangedPreview, rangedInput, false));
+    assert.equal(ranged.kind, "imported");
+    assert.notEqual(ranged.runId, other.runId);
+    const aggregatedInput = { ...rangedInput, aggregation: "Weekly" };
+    const aggregatedPreview = await service.preview(aggregatedInput);
+    const aggregated = await service.apply(boundApplyInput(aggregatedPreview, aggregatedInput, false));
+    assert.equal(aggregated.kind, "imported");
+    assert.notEqual(aggregated.runId, ranged.runId);
     console.log("Sisense track snapshot import fixture PASS");
   } finally {
     try {
