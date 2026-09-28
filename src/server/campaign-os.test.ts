@@ -5,6 +5,7 @@ import {
   createCampaignEngagementSchema,
   createCampaignPostSchema,
   setCampaignTerritoriesSchema,
+  updateCampaignEngagementSchema,
 } from "./campaign-os";
 
 describe("Campaign OS input contract", () => {
@@ -21,7 +22,18 @@ describe("Campaign OS input contract", () => {
       outreach_channel: "email",
       outreach_permission_status: "permitted",
       outreach_permission_basis: "Creator opted in during a direct conversation",
+      outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z",
     })).toMatchObject({ outreach_permission_status: "permitted" });
+  });
+
+  it("does not add status, channel, or permission defaults to a notes-only update", () => {
+    expect(updateCampaignEngagementSchema.parse({ id: "engagement-1", relationship_notes: "Follow up next week" })).toEqual({ id: "engagement-1", relationship_notes: "Follow up next week" });
+  });
+
+  it("requires recorded permission before creating a contacted engagement", () => {
+    expect(() => createCampaignEngagementSchema.parse({ contact_id: "contact-1", status: "contacted" })).toThrow("Recorded outreach permission is required before contact");
+    expect(() => createCampaignEngagementSchema.parse({ contact_id: "contact-1", outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in" })).toThrow("Permission recorded time is required");
+    expect(() => createCampaignEngagementSchema.parse({ contact_id: "contact-1", outreach_permission_status: "revoked" })).toThrow("Revocation time is required");
   });
 
   it("accepts only valid ISO country codes and manual post URLs", () => {
