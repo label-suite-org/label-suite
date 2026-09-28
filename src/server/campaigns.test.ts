@@ -181,6 +181,26 @@ describe("campaign rich-text persistence", () => {
     });
   });
 
+  it("requires both catalog links when editing them while allowing unrelated legacy edits", () => {
+    expect(() => updateCampaignSchema.parse({ id: "campaign-1", expected_revision: EXPECTED_REVISION, linked_artist_id: "artist-1", linked_release_id: null })).toThrow();
+    expect(() => updateCampaignSchema.parse({ id: "campaign-1", expected_revision: EXPECTED_REVISION, linked_artist_id: "artist-1" })).toThrow();
+    expect(updateCampaignSchema.parse({ id: "campaign-1", expected_revision: EXPECTED_REVISION, campaign_name: "Legacy name correction" })).toMatchObject({ campaign_name: "Legacy name correction" });
+  });
+
+  it("checks edited Artist and Release ownership before saving", async () => {
+    const input = updateCampaignSchema.parse({ id: "campaign-1", expected_revision: EXPECTED_REVISION, linked_artist_id: "artist-1", linked_release_id: "release-1" });
+    await expect(updateCampaign("org-a", input)).rejects.toThrow("Artist not found in active workspace");
+    expect(mocks.updateSets).toHaveLength(0);
+
+    mocks.detailRows.push({ id: "release-1", artist_id: "other-artist" });
+    await expect(updateCampaign("org-a", input)).rejects.toThrow("Campaign Artist must match the Release Artist");
+    expect(mocks.updateSets).toHaveLength(0);
+
+    mocks.detailRows[0].artist_id = "artist-1";
+    await expect(updateCampaign("org-a", input)).resolves.toEqual({ ok: true });
+    expect(mocks.updateSets[0]).toMatchObject({ linked_artist_id: "artist-1", linked_release_id: "release-1" });
+  });
+
   it("returns in-memory documents for legacy detail rows without writing them", async () => {
     mocks.detailRows.push({
       id: "campaign-1",

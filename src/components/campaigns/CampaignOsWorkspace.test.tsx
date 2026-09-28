@@ -26,7 +26,11 @@ it.each([
   document.body.append(container);
   root = createRoot(container);
   await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section={section} canMutate contacts={[{ id: "contact", name: "Test creator" }]} />));
-  const form = container.querySelectorAll("form")[index];
+  if (section === "creators") {
+    const label = action === "create_engagement" ? "Add creator engagement" : "Add deliverable";
+    await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent === label)!.click());
+  }
+  const form = container.querySelectorAll("form")[section === "creators" ? 0 : index];
   for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("[required]")) {
     if (field instanceof HTMLSelectElement) field.value = field.options[field.options.length - 1].value;
     else if (field instanceof HTMLInputElement && field.type === "url") field.value = "https://example.test/post";
@@ -51,6 +55,47 @@ it.each([
   }
   expect(container.querySelector('[role="alert"]')).toBeNull();
   if (action !== "finalize_report") expect(form.querySelector<HTMLInputElement>("input[required], textarea[required]")?.value ?? "").toBe("");
+});
+
+it("edits creator details and records fresh permission evidence without sending outreach", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "identified", relationship_notes: "Old note", outreach_channel: "email", outreach_permission_status: "unknown", outreach_permission_basis: null, outreach_permission_recorded_at: null, outreach_permission_revoked_at: null, agreed_rate: null, agreed_currency: null }], deliverables: [], posts: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null } };
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => workspace });
+  vi.stubGlobal("fetch", fetch);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate contacts={[]} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  const notes = container.querySelector<HTMLTextAreaElement>('[name="notes"]')!;
+  notes.value = "New note";
+  await act(async () => notes.closest("form")!.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+  const basis = container.querySelector<HTMLInputElement>('[name="basis"]')!;
+  basis.value = "Direct opt-in";
+  await act(async () => basis.closest("form")!.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+  const saves = fetch.mock.calls.filter(([, options]) => options?.method === "POST").map(([, options]) => JSON.parse(options.body));
+  expect(saves).toHaveLength(2);
+  expect(saves[0]).toMatchObject({ action: "update_engagement", input: { id: "engagement", relationship_notes: "New note" } });
+  expect(saves[1]).toMatchObject({ action: "update_engagement", input: { id: "engagement", outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: expect.any(String), outreach_permission_revoked_at: null } });
+  expect(fetch).toHaveBeenCalledWith("/api/campaigns/campaign/os", expect.objectContaining({ method: "POST" }));
+});
+
+it("records a revocation timestamp and hides edit controls for read-only viewers", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "contacted", relationship_notes: null, outreach_channel: "email", outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in", outreach_permission_recorded_at: "2026-09-28T10:00:00.000Z", outreach_permission_revoked_at: null, agreed_rate: null, agreed_currency: null }], deliverables: [], posts: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null } };
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => workspace });
+  vi.stubGlobal("fetch", fetch);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate={false} contacts={[]} />));
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("Direct opt-in");
+  expect(container.textContent).not.toContain("Revoke permission");
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate contacts={[]} />));
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Revoke permission")!.click());
+  const save = JSON.parse(fetch.mock.calls.find(([, options]) => options?.method === "POST")![1].body);
+  expect(save).toMatchObject({ action: "update_engagement", input: { id: "engagement", outreach_permission_status: "revoked", outreach_permission_revoked_at: expect.any(String) } });
 });
 
 it("shows the captured observation date beside a recorded post", async () => {
