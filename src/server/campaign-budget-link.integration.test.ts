@@ -64,7 +64,7 @@ describe.skipIf(!enabled)("Campaign creator Budget links on disposable PostgreSQ
   it("claims only same-workspace available lines, counts distinct links, and preserves Budget paid evidence after unlink", async () => {
     const initial = await get();
     expect(initial.cost).toEqual({ planned: 0, committed: 0, paid: 0 });
-    expect(initial.budgetLineOptions.map((line: { id: string }) => line.id)).toEqual([lines.available, lines.otherLinked, lines.rollback, lines.unrelated]);
+    expect(initial.budgetLineOptions.map((line: { id: string }) => line.id)).toEqual([lines.available, lines.rollback, lines.unrelated]);
     expect((await post("member", engagements[0], lines.available)).status).toBe(403);
     expect((await post("fundraiser", engagements[0], lines.available)).status).toBe(403);
     expect((await post("operator", engagements[0], lines.otherCampaign)).status).toBe(404);

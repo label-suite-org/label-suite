@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lt, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import {
   budget_line_items,
@@ -119,7 +119,7 @@ async function claimBudgetLine(orgId: string, campaignId: string, budgetLineId: 
 
 export async function getCampaignOsWorkspace(orgId: string, campaignId: string, database: Pick<typeof db, "select"> = db) {
   const campaign = await requireCampaign(orgId, campaignId, database);
-  const [territories, engagements, posts, availableBudgetLines] = await Promise.all([
+  const [territories, engagements, posts, availableBudgetLines, otherCampaignLinks] = await Promise.all([
     database.select({ id: campaign_territories.id, country_code: campaign_territories.country_code }).from(campaign_territories)
       .where(and(eq(campaign_territories.org_id, orgId), eq(campaign_territories.campaign_id, campaignId))).orderBy(asc(campaign_territories.country_code)),
     database.select({
@@ -134,10 +134,13 @@ export async function getCampaignOsWorkspace(orgId: string, campaignId: string, 
     database.select().from(campaign_posts).where(and(eq(campaign_posts.org_id, orgId), eq(campaign_posts.campaign_id, campaignId))).orderBy(desc(campaign_posts.published_at)),
     database.select({ id: budget_line_items.id, name: budget_line_items.name, campaign_id: budget_line_items.campaign_id, planned_amount: budget_line_items.planned_amount, amount: budget_line_items.amount, committed_amount: budget_line_items.committed_amount, paid_amount: budget_line_items.paid_amount, status: budget_line_items.status })
       .from(budget_line_items).where(and(eq(budget_line_items.org_id, orgId), or(eq(budget_line_items.campaign_id, campaignId), isNull(budget_line_items.campaign_id)))).orderBy(asc(budget_line_items.name)),
+    database.select({ budget_line_id: campaign_creator_engagements.budget_line_id }).from(campaign_creator_engagements)
+      .where(and(eq(campaign_creator_engagements.org_id, orgId), ne(campaign_creator_engagements.campaign_id, campaignId), isNotNull(campaign_creator_engagements.budget_line_id))),
   ]);
   const linkedBudgetIds = new Set(engagements.map((engagement) => engagement.budget_line_id).filter(Boolean));
+  const unavailableBudgetIds = new Set(otherCampaignLinks.map((engagement) => engagement.budget_line_id));
   const budgetLines = availableBudgetLines.filter((line) => line.campaign_id === campaignId && linkedBudgetIds.has(line.id));
-  const budgetLineOptions = availableBudgetLines.map(({ id, name, campaign_id }) => ({ id, name, campaign_id }));
+  const budgetLineOptions = availableBudgetLines.filter((line) => !unavailableBudgetIds.has(line.id)).map(({ id, name, campaign_id }) => ({ id, name, campaign_id }));
   const engagementIds = engagements.map((engagement) => engagement.id);
   const deliverables = engagementIds.length
     ? await database.select().from(campaign_creator_deliverables).where(and(eq(campaign_creator_deliverables.org_id, orgId), inArray(campaign_creator_deliverables.engagement_id, engagementIds))).orderBy(asc(campaign_creator_deliverables.due_date))
