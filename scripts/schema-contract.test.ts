@@ -149,21 +149,14 @@ describe("schema contract comparison", () => {
 });
 
 describe("schema drift policy", () => {
-  it("validates canonical migration and checkout-reachable Git policy sources without database configuration", async () => {
+  it.each(["migration", "Git"] as const)("validates %s policy sources without database configuration", async (kind) => {
     const directory = await mkdtemp(resolve(tmpdir(), "label-suite-schema-policy-"));
     const policyPath = resolve(directory, "policy.json");
     try {
-      await writeFile(policyPath, JSON.stringify(policy([policyEntry()])));
-      const output = execFileSync(
-        resolve(process.cwd(), "node_modules/.bin/tsx"),
-        ["scripts/schema-contract.ts", "policy-check", "--policy", policyPath],
-        { cwd: process.cwd(), encoding: "utf8", env: { PATH: process.env.PATH ?? "" } },
-      );
-
-      expect(output).toBe("");
-
-      const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: process.cwd(), encoding: "utf8" }).trim();
-      await writeFile(policyPath, JSON.stringify(policy([policyEntry({ source: `https://github.com/label-suite-org/label-suite/commit/${commit}` })])));
+      const source = kind === "migration"
+        ? policyEntry().source
+        : `https://github.com/label-suite-org/label-suite/commit/${execFileSync("git", ["rev-parse", "HEAD"], { cwd: process.cwd(), encoding: "utf8" }).trim()}`;
+      await writeFile(policyPath, JSON.stringify(policy([policyEntry({ source })])));
       expect(execFileSync(
         resolve(process.cwd(), "node_modules/.bin/tsx"),
         ["scripts/schema-contract.ts", "policy-check", "--policy", policyPath],
