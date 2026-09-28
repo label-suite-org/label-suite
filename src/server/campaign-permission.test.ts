@@ -62,6 +62,14 @@ describe("Creator Engagement permission updates", () => {
     expect(saved).not.toHaveProperty("outreach_permission_status");
   });
 
+  it("cannot reuse old channel evidence after resetting permission and changing channels", async () => {
+    current = { ...current, outreach_permission_status: "permitted", outreach_permission_basis: "Email opt-in", outreach_permission_recorded_at: new Date("2026-09-28T10:00:00.000Z") };
+    await updateCampaignEngagement(orgId, campaignId, updateCampaignEngagementSchema.parse({ id: "engagement-1", outreach_channel: "DM", outreach_permission_status: "unknown" }));
+    expect(saved).toMatchObject({ outreach_channel: "DM", outreach_permission_status: "unknown" });
+    current = { ...current, outreach_channel: "DM", outreach_permission_status: "unknown" };
+    await expect(updateCampaignEngagement(orgId, campaignId, updateCampaignEngagementSchema.parse({ id: "engagement-1", outreach_permission_status: "permitted" }))).rejects.toMatchObject({ status: 409 });
+  });
+
   it("blocks moving an already contacted engagement to another channel with unknown permission", async () => {
     current = { ...current, status: "contacted", outreach_permission_status: "permitted", outreach_permission_basis: "Email opt-in", outreach_permission_recorded_at: new Date("2026-09-28T10:00:00.000Z") };
     await expect(updateCampaignEngagement(orgId, campaignId, updateCampaignEngagementSchema.parse({ id: "engagement-1", outreach_channel: "DM", outreach_permission_status: "unknown" }))).rejects.toMatchObject({ status: 409 });
