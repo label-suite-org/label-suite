@@ -1,4 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   data_quality_issues,
@@ -113,23 +114,32 @@ export async function exportReleaseDelivery(
       })
       .returning();
 
+    await tx.update(data_quality_issues).set({status:"resolved",updated_at:new Date()}).where(and(
+      eq(data_quality_issues.org_id,orgId),eq(data_quality_issues.source,"manual_delivery_export"),
+      sql`exists(select 1 from ${release_delivery_attempts} where ${release_delivery_attempts.org_id}=${orgId}
+        and ${release_delivery_attempts.release_id}=${releaseId} and ${release_delivery_attempts.provider_key}=${input.provider_key}
+        and ${release_delivery_attempts.account_label}=${input.account_label}
+        and ${release_delivery_attempts.id}=${data_quality_issues.details}->>'attempt_id')`,
+    ));
     for (const warning of warnings) {
+      const warningKey = createHash("sha256").update(JSON.stringify([releaseId,input.provider_key,input.account_label,warning.code,warning.track_id??null])).digest("hex");
+      const details = {message:warning.message,release_id:releaseId,provider_key:input.provider_key,account_label:input.account_label,attempt_id:attempt.id};
       await tx
         .insert(data_quality_issues)
         .values({
-          id: `dq_delivery_${releaseId}_${warning.code}${warning.track_id ? `_${warning.track_id}` : ""}`,
+          id: `dq_delivery_${warningKey}`,
           org_id: orgId,
           source: "manual_delivery_export",
           issue_type: warning.code,
-          idempotency_key: `manual_delivery_export:${releaseId}:${warning.code}:${warning.track_id ?? "release"}`,
+          idempotency_key: `manual_delivery_export:${warningKey}`,
           priority: "P2",
           status: "open",
           label_suite_object_type: warning.track_id ? "track" : "release",
           label_suite_object_id: warning.track_id ?? releaseId,
-          details: { message: warning.message, provider_key: input.provider_key, attempt_id: attempt.id },
+          details,
           updated_at: new Date(),
         })
-        .onConflictDoNothing({ target: [data_quality_issues.org_id, data_quality_issues.idempotency_key] });
+        .onConflictDoUpdate({ target: [data_quality_issues.org_id, data_quality_issues.idempotency_key], set:{details,status:"open",updated_at:new Date()} });
     }
 
     return { attempt, payload, warnings };

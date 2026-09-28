@@ -36,6 +36,14 @@ describe.skipIf(process.env.CI !== "true")("manual delivery on disposable Postgr
     expect(history).toHaveLength(3);
     expect(history.find(row=>row.id===first.attempt.id)?.payload).toEqual(first.payload);
     expect(history.every(row=>row.response_evidence.mode==='manual_export')).toBe(true);
+    const warnings = await sql`select status,details from label_suite.data_quality_issues where org_id=${org}`;
+    expect(warnings).toHaveLength(2);
+    expect(warnings.find(row=>row.details.account_label==='Account A')?.details.attempt_id).toBe(patched[0].attempt.id);
+    await sql`update label_suite.releases set upc_ean='012345678905' where id=${org}`;
+    await delivery.exportReleaseDelivery(org,org,{account_label:'Account A'});
+    const correctedWarnings = await sql`select status,details from label_suite.data_quality_issues where org_id=${org}`;
+    expect(correctedWarnings.find(row=>row.details.account_label==='Account A')?.status).toBe('resolved');
+    expect(correctedWarnings.find(row=>row.details.account_label==='Account B')?.status).toBe('open');
     expect(await delivery.listReleaseDeliveryAttempts('foreign',org)).toEqual([]);
     await expect(delivery.exportReleaseDelivery('foreign',org,{})).rejects.toMatchObject({status:404});
   });

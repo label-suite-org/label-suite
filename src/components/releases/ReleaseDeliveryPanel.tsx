@@ -24,7 +24,7 @@ export function ReleaseDeliveryPanel({releaseId,canManage,compact=false,onOpen,o
   },[releaseId,revision]);
   const groups=new Map<string,Attempt[]>();
   for(const attempt of attempts??[]) {const key=JSON.stringify([attempt.provider_key,attempt.account_label]);const history=groups.get(key);if(history)history.push(attempt);else groups.set(key,[attempt]);}
-  if(compact)return <div className="flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm"><p>Manual DSP delivery · {error?"History unavailable":attempts===null?"Loading…":attempts.length?statusLabel(attempts[0].status):"No exports yet"}</p><Button type="button" variant="outline" size="sm" onClick={onOpen}>Open delivery</Button></div>;
+  if(compact)return <div className="flex flex-wrap items-center justify-between gap-2 border-y py-3 text-sm"><p>Latest manual export · {error?"History unavailable":attempts===null?"Loading…":attempts.length?`${providerName(attempts[0].provider_key)} · ${attempts[0].account_label} · ${statusLabel(attempts[0].status)}`:"No exports yet"}</p><Button type="button" variant="outline" size="sm" onClick={onOpen}>Open delivery</Button></div>;
   function renderAttempt(attempt:Attempt) {
     const evidence=attempt.response_evidence;
     const warnings=Array.isArray(evidence.warnings)?evidence.warnings as Array<{code:string;message:string;track_id?:string}>:[];
@@ -43,9 +43,9 @@ export function ReleaseDeliveryPanel({releaseId,canManage,compact=false,onOpen,o
     {notice&&<p role="status" className="text-sm">{notice}</p>}
     {canManage&&<form className="flex flex-wrap items-end gap-3" onSubmit={async event=>{
       event.preventDefault();const fields=new FormData(event.currentTarget);setBusy(true);setError("");setNotice("");
-      try {const response=await fetch(`/api/releases/${encodeURIComponent(releaseId)}/delivery/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider_key:String(fields.get("provider")).trim()==="Manual export"?"manual_dsp":String(fields.get("provider")).trim().toLowerCase().replace(/\s+/g,"_"),account_label:fields.get("account")})});const body=await response.json();if(!response.ok)throw new Error(body.error??"Could not prepare export");setNotice("Export prepared. Download its JSON below; nothing was submitted to a DSP.");setRevision(value=>value+1);}catch(reason){setError(reason instanceof Error?reason.message:"Could not prepare export");}finally{setBusy(false);}
+      try {const response=await fetch(`/api/releases/${encodeURIComponent(releaseId)}/delivery/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider_key:String(fields.get("provider")).trim().toLowerCase()==="manual export"?"manual_dsp":String(fields.get("provider")).trim().toLowerCase().replace(/\s+/g,"_"),account_label:fields.get("account")})});const body=await response.json();if(!response.ok)throw new Error(body.error??"Could not prepare export");setNotice("Export prepared. Download its JSON below; nothing was submitted to a DSP.");setRevision(value=>value+1);}catch(reason){setError(reason instanceof Error?reason.message:"Could not prepare export");}finally{setBusy(false);}
     }}>
-      <label className="min-w-0 flex-1 text-sm">Distributor / platform<Input name="provider" defaultValue="Manual export" pattern="[A-Za-z0-9][A-Za-z0-9 _-]*" required /></label>
+      <label className="min-w-0 flex-1 text-sm">Distributor / destination<Input name="provider" defaultValue="Manual export" pattern="[A-Za-z0-9][A-Za-z0-9 _-]*" required /></label>
       <label className="min-w-0 flex-1 text-sm">Distributor account<Input name="account" defaultValue="Manual export" required /></label>
       <Button type="submit" disabled={busy}>Prepare JSON export</Button>
     </form>}
