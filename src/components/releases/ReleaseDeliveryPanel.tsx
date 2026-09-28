@@ -41,12 +41,12 @@ export function ReleaseDeliveryPanel({releaseId,canManage,compact=false,onOpen,o
     <header><h2 className="text-lg font-semibold">Manual DSP delivery</h2><p className="mt-1 text-sm text-muted-foreground">Prepare a versioned metadata file for your distributor. Exporting does not submit a release to any DSP.</p></header>
     {error&&<p role="alert" className="text-sm text-destructive">{error} <Button type="button" size="sm" variant="outline" onClick={()=>setRevision(value=>value+1)}>Reload history</Button></p>}
     {notice&&<p role="status" className="text-sm">{notice}</p>}
-    {canManage&&<form className="flex flex-wrap items-end gap-3" onSubmit={async event=>{
+    {canManage&&<form className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={async event=>{
       event.preventDefault();const fields=new FormData(event.currentTarget);setBusy(true);setError("");setNotice("");
       try {const response=await fetch(`/api/releases/${encodeURIComponent(releaseId)}/delivery/export`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider_key:String(fields.get("provider")).trim().toLowerCase()==="manual export"?"manual_dsp":String(fields.get("provider")).trim().toLowerCase().replace(/\s+/g,"_"),account_label:fields.get("account")})});const body=await response.json();if(!response.ok)throw new Error(body.error??"Could not prepare export");setNotice("Export prepared. Download its JSON below; nothing was submitted to a DSP.");setRevision(value=>value+1);}catch(reason){setError(reason instanceof Error?reason.message:"Could not prepare export");}finally{setBusy(false);}
     }}>
-      <label className="min-w-0 flex-1 text-sm">Distributor / destination<Input name="provider" defaultValue="Manual export" pattern="[A-Za-z0-9][A-Za-z0-9 _-]*" required /></label>
-      <label className="min-w-0 flex-1 text-sm">Distributor account<Input name="account" defaultValue="Manual export" required /></label>
+      <label className="min-w-0 text-sm">Distributor / destination<Input name="provider" defaultValue="Manual export" pattern="[A-Za-z0-9][A-Za-z0-9 _-]*" required /></label>
+      <label className="min-w-0 text-sm">Distributor account<Input name="account" defaultValue="Manual export" required /></label>
       <Button type="submit" disabled={busy}>Prepare JSON export</Button>
     </form>}
     {attempts===null&&!error&&<p role="status">Loading delivery history…</p>}
