@@ -106,6 +106,47 @@ try {
   if (replay.status !== 0 || !replay.output.includes("0 inserted, 0 updated, 2 unchanged")) {
     throw new Error(`Playlist replay was not idempotent: ${replay.output}`);
   }
+
+  // Fail completion only after the real importer has written normalized rows
+  // and change evidence. All publication writes must roll back together while
+  // the previously committed raw file and failed run remain inspectable.
+  const beforePublication = await client.query(`select * from ${schema}.analytics_metric_rows order by id`);
+  const beforeChanges = await client.query(`select * from ${schema}.analytics_metric_changes order by id`);
+  await client.query(`
+    create function ${schema}.reject_completion() returns trigger language plpgsql as $$
+    begin
+      if new.status = 'completed' then
+        if not exists (select 1 from ${schema}.analytics_metric_rows where last_seen_run_id = new.id)
+          or not exists (select 1 from ${schema}.analytics_metric_changes where run_id = new.id) then
+          raise exception 'Fixture did not reach normalized publication';
+        end if;
+        raise exception 'Fixture rejected completion after normalized publication';
+      end if;
+      return new;
+    end $$;
+    create trigger reject_completion before update on ${schema}.analytics_import_runs
+      for each row execute function ${schema}.reject_completion();
+  `);
+  await writeFile(playlistPath, 'playlist__name,playlist__source_uri,streams\n"",,999\n"New",,42\n');
+  const rejected = await runImporter(playlistArgs, playlistEnv);
+  if (rejected.status !== 1 || !rejected.output.includes("Fixture rejected completion after normalized publication")) {
+    throw new Error(`Actual importer did not reach the publication rollback probe: ${rejected.output}`);
+  }
+  const afterPublication = await client.query(`select * from ${schema}.analytics_metric_rows order by id`);
+  const afterChanges = await client.query(`select * from ${schema}.analytics_metric_changes order by id`);
+  if (JSON.stringify(afterPublication.rows) !== JSON.stringify(beforePublication.rows)
+    || JSON.stringify(afterChanges.rows) !== JSON.stringify(beforeChanges.rows)) {
+    throw new Error("Failed completion retained normalized publication or changed existing evidence");
+  }
+  const failedPublication = await client.query(`
+    select r.status, f.row_count, f.storage_status from ${schema}.analytics_import_runs r
+    join ${schema}.analytics_import_files f on f.run_id = r.id and f.org_id = r.org_id
+    where r.org_id = $1 and r.error like '%Fixture rejected completion after normalized publication%'
+  `, [tenant]);
+  if (failedPublication.rows.length !== 1 || failedPublication.rows[0]?.status !== "failed"
+    || failedPublication.rows[0]?.row_count !== 2 || failedPublication.rows[0]?.storage_status !== "not_requested") {
+    throw new Error("Failed publication did not retain its failed run and staged raw provenance");
+  }
   console.log("analytics ingestion fixture passed");
 } finally {
   await client.query(`drop schema if exists ${schema} cascade`).catch(() => undefined);
