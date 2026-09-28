@@ -7,8 +7,10 @@ const enabled = process.env.CAMPAIGN_OS_FOUNDATION_INTEGRATION === "1";
 describe.skipIf(!enabled)("Campaign OS foundation on disposable PostgreSQL", () => {
   it("isolates all four tables for a non-owner role and enforces references and audit", async () => {
     const target = new URL(process.env.DATABASE_URL!);
-    if (!["127.0.0.1", "localhost"].includes(target.hostname)
+    if (!["postgres:", "postgresql:"].includes(target.protocol)
+      || !["127.0.0.1", "localhost"].includes(target.hostname)
       || decodeURIComponent(target.pathname) !== "/label_suite"
+      || target.search || target.hash
       || process.env.RELEASE_GATE_FIXTURE_DISPOSABLE !== "1") throw new Error("Disposable local label_suite database required");
     const sql = postgres(target.toString(), { max: 1 });
     const suffix = randomUUID().replaceAll("-", "");

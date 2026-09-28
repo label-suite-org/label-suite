@@ -100,7 +100,7 @@ describe.skipIf(!enabled)("Campaign report finalisation on disposable PostgreSQL
     vi.unstubAllGlobals();
   });
 
-  it("requires fresh Campaign, Contact, and channel permission before contact and after revocation", async () => {
+  it("requires fresh Contact and channel permission before contact and after revocation", async () => {
     const fetch = vi.fn(() => { throw new Error("Campaign OS must not send outreach"); });
     vi.stubGlobal("fetch", fetch);
     const command = (role: string, action: string, input: Record<string, unknown>) => scoped({ userId: actorId, orgId }, async () => route.POST({
