@@ -38,6 +38,17 @@ describe("finance reconciliation core", () => {
     expect(compareDecimalStrings("9.99", "10")).toBe(-1);
   });
 
+  it("preserves whole-number zeros while removing only fractional trailing zeros", () => {
+    for (const amount of ["100", "100.00", "100.00000000"]) {
+      const normalized = normalizeFinanceTransaction({
+        source_provider: "bank", account_label: "Operating",
+        occurred_at: "2026-08-01T00:00:00.000Z", amount,
+        currency: "DKK", direction: "credit", raw_evidence: {},
+      });
+      expect(normalized.amount).toBe("100");
+    }
+  });
+
   it("derives a stable tenant queue key", () => {
     expect(deriveFinanceExceptionIdempotencyKey("fin_tx_1")).toBe("finance_reconciliation:unmatched:fin_tx_1");
   });
