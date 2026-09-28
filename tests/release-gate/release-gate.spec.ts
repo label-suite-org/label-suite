@@ -594,6 +594,18 @@ test("analytics-workspace-hierarchy", async ({ page }) => {
   const analyticsSections = page.getByRole("navigation", { name: "Analytics sections" });
   await expect(analyticsSections).toBeVisible();
 
+  const operations = page.locator("details").filter({ has: page.getByRole("heading", { name: "Royalties, campaigns, and tasks", exact: true }) });
+  const summary = operations.locator("summary");
+  await expect(summary).toBeVisible();
+  await expect(operations.locator(".recharts-responsive-container")).toHaveCount(0);
+  for (let cycle = 0; cycle < 2; cycle += 1) {
+    await summary.press("Enter");
+    await expect(operations.getByRole("heading", { name: "Campaign pipeline", exact: true })).toBeVisible();
+    await expect.poll(() => operations.locator(".recharts-responsive-container").count()).toBeGreaterThan(0);
+    await summary.press("Enter");
+    await expect(operations.locator(".recharts-responsive-container")).toHaveCount(0);
+  }
+
   const expected = [
     ["Overview", "overview", () => page.getByRole("heading", { name: "Overview", exact: true })],
     ["Trends", "trends", () => page.getByRole("heading", { name: "Trends", exact: true })],
