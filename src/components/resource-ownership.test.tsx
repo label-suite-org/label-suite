@@ -1,7 +1,10 @@
+// @vitest-environment jsdom
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { DocumentManager } from "./documents/DocumentManager";
 import { MediaAssetManager } from "./media-assets/MediaAssetManager";
+import { DocumentForm } from "./documents/DocumentForm";
+import { MediaAssetForm } from "./media-assets/MediaAssetForm";
 import BudgetDepartment from "./budget/BudgetDepartment";
 
 const projects = [{ id: "project-1", name: "Autumn tour" }];
@@ -60,5 +63,21 @@ describe("global resource ownership queues", () => {
 
     expect(html).toContain("Music video project");
     expect(html).not.toContain("Release project");
+  });
+});
+
+
+describe("resource form accessibility", () => {
+  it.each([
+    ["document", <DocumentForm artists={[]} releases={[]} contacts={[]} projects={[]} onClose={() => undefined} />],
+    ["media asset", <MediaAssetForm artists={[]} releases={[]} projects={[]} onClose={() => undefined} />],
+  ])("associates every %s field with a visible label", (_, form) => {
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(form);
+    const controls = container.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea");
+    expect(controls.length).toBeGreaterThan(0);
+    for (const control of controls) {
+      expect(Array.from(control.labels ?? []).some((label) => Boolean(label.textContent?.trim()))).toBe(true);
+    }
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { uploadFileToStorage } from "../../lib/storage-client";
 
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,7 @@ export function MediaAssetForm({
   onClose: () => void;
 }) {
   const isEdit = !!initial;
+  const formId = useId();
   const [assetName, setAssetName] = useState(initial?.asset_name || "");
   const [assetType, setAssetType] = useState(initial?.asset_type || "cover_art");
   const [linkedArtistId, setLinkedArtistId] = useState(initial?.linked_artist_id || "");
@@ -117,8 +118,8 @@ export function MediaAssetForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Asset name *</label>
-        <Input
+        <label htmlFor={`${formId}-asset-name`} className="block text-sm font-medium text-foreground mb-1">Asset name *</label>
+        <Input id={`${formId}-asset-name`}
           value={assetName}
           onChange={(e) => setAssetName(e.target.value)}
           required
@@ -127,8 +128,8 @@ export function MediaAssetForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Project</label>
-        <NativeSelect value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+        <label htmlFor={`${formId}-project`} className="block text-sm font-medium text-foreground mb-1">Project</label>
+        <NativeSelect id={`${formId}-project`} value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
           <option value="">— None —</option>
           {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
         </NativeSelect>
@@ -136,8 +137,8 @@ export function MediaAssetForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Asset type</label>
-          <NativeSelect
+          <label htmlFor={`${formId}-asset-type`} className="block text-sm font-medium text-foreground mb-1">Asset type</label>
+          <NativeSelect id={`${formId}-asset-type`}
             value={assetType}
             onChange={(e) => setAssetType(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
@@ -148,8 +149,8 @@ export function MediaAssetForm({
           </NativeSelect>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Version</label>
-          <Input
+          <label htmlFor={`${formId}-version`} className="block text-sm font-medium text-foreground mb-1">Version</label>
+          <Input id={`${formId}-version`}
             value={version}
             onChange={(e) => setVersion(e.target.value)}
             placeholder="v1, master, square crop..."
@@ -160,8 +161,8 @@ export function MediaAssetForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Linked artist</label>
-          <NativeSelect
+          <label htmlFor={`${formId}-linked-artist`} className="block text-sm font-medium text-foreground mb-1">Linked artist</label>
+          <NativeSelect id={`${formId}-linked-artist`}
             value={linkedArtistId}
             onChange={(e) => setLinkedArtistId(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
@@ -173,8 +174,8 @@ export function MediaAssetForm({
           </NativeSelect>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Linked release</label>
-          <NativeSelect
+          <label htmlFor={`${formId}-linked-release`} className="block text-sm font-medium text-foreground mb-1">Linked release</label>
+          <NativeSelect id={`${formId}-linked-release`}
             value={linkedReleaseId}
             onChange={(e) => setLinkedReleaseId(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
@@ -189,8 +190,8 @@ export function MediaAssetForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Approval status</label>
-          <NativeSelect
+          <label htmlFor={`${formId}-approval-status`} className="block text-sm font-medium text-foreground mb-1">Approval status</label>
+          <NativeSelect id={`${formId}-approval-status`}
             value={approvalStatus}
             onChange={(e) => setApprovalStatus(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
@@ -201,8 +202,8 @@ export function MediaAssetForm({
           </NativeSelect>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Delivery status</label>
-          <NativeSelect
+          <label htmlFor={`${formId}-delivery-status`} className="block text-sm font-medium text-foreground mb-1">Delivery status</label>
+          <NativeSelect id={`${formId}-delivery-status`}
             value={deliveryStatus}
             onChange={(e) => setDeliveryStatus(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
@@ -216,26 +217,27 @@ export function MediaAssetForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Upload file</label>
-          <label className="flex items-center justify-center w-full min-h-24 border-2 border-dashed border-border rounded-xl px-4 py-3 text-sm text-muted-foreground cursor-pointer hover:bg-accent/50 transition-colors">
+          <label className="block text-sm font-medium text-foreground mb-1" htmlFor={`${formId}-file`}>Upload file</label>
+          <label className="flex items-center justify-center w-full min-h-24 border-2 border-dashed border-border rounded-xl px-4 py-3 text-sm text-muted-foreground cursor-pointer hover:bg-accent/50 transition-colors focus-within:ring-2 focus-within:ring-ring">
             <Input
+              id={`${formId}-file`}
               type="file"
-              className="hidden"
+              className="sr-only"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
             <span>{file ? `${file.name} (${Math.round(file.size / 1024)} KB)` : "Choose file or drop here later"}</span>
           </label>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Upload date</label>
-          <Input
+          <label htmlFor={`${formId}-upload-date`} className="block text-sm font-medium text-foreground mb-1">Upload date</label>
+          <Input id={`${formId}-upload-date`}
             type="date"
             value={dateUploaded}
             onChange={(e) => setDateUploaded(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
           />
-          <label className="block text-sm font-medium text-foreground mt-3 mb-1">Manual file link / storage key</label>
-          <Input
+          <label htmlFor={`${formId}-manual-file-link-storage-key`} className="block text-sm font-medium text-foreground mt-3 mb-1">Manual file link / storage key</label>
+          <Input id={`${formId}-manual-file-link-storage-key`}
             value={fileLink}
             onChange={(e) => setFileLink(e.target.value)}
             placeholder="https://... or media-assets/..."
@@ -245,8 +247,8 @@ export function MediaAssetForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Notes</label>
-        <Textarea
+        <label htmlFor={`${formId}-notes`} className="block text-sm font-medium text-foreground mb-1">Notes</label>
+        <Textarea id={`${formId}-notes`}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}

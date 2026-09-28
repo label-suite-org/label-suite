@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { uploadFileToStorage } from "../../lib/storage-client";
 
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,7 @@ export function DocumentForm({
   onClose: () => void;
 }) {
   const isEdit = !!initial;
+  const formId = useId();
   const [name, setName] = useState(initial?.name || "");
   const [docType, setDocType] = useState(initial?.doc_type || "contract");
   const [releaseId, setReleaseId] = useState(initial?.release_id || "");
@@ -103,8 +104,8 @@ export function DocumentForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Document name *</label>
-        <Input
+        <label htmlFor={`${formId}-document-name`} className="block text-sm font-medium text-foreground mb-1">Document name *</label>
+        <Input id={`${formId}-document-name`}
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
@@ -114,16 +115,16 @@ export function DocumentForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Document type</label>
-          <NativeSelect value={docType} onChange={(e) => setDocType(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+          <label htmlFor={`${formId}-document-type`} className="block text-sm font-medium text-foreground mb-1">Document type</label>
+          <NativeSelect id={`${formId}-document-type`} value={docType} onChange={(e) => setDocType(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
             {DOC_TYPES.map((value) => (
               <option key={value} value={value}>{value.replace(/_/g, " ")}</option>
             ))}
           </NativeSelect>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Status</label>
-          <NativeSelect value={status} onChange={(e) => setStatus(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+          <label htmlFor={`${formId}-status`} className="block text-sm font-medium text-foreground mb-1">Status</label>
+          <NativeSelect id={`${formId}-status`} value={status} onChange={(e) => setStatus(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
             {STATUSES.map((value) => (
               <option key={value} value={value}>{value.replace(/_/g, " ")}</option>
             ))}
@@ -133,22 +134,22 @@ export function DocumentForm({
 
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Artist</label>
-          <NativeSelect value={artistId} onChange={(e) => setArtistId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+          <label htmlFor={`${formId}-artist`} className="block text-sm font-medium text-foreground mb-1">Artist</label>
+          <NativeSelect id={`${formId}-artist`} value={artistId} onChange={(e) => setArtistId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
             <option value="">— None —</option>
             {artists.map((artist) => <option key={artist.id} value={artist.id}>{artist.name}</option>)}
           </NativeSelect>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Release</label>
-          <NativeSelect value={releaseId} onChange={(e) => setReleaseId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+          <label htmlFor={`${formId}-release`} className="block text-sm font-medium text-foreground mb-1">Release</label>
+          <NativeSelect id={`${formId}-release`} value={releaseId} onChange={(e) => setReleaseId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
             <option value="">— None —</option>
             {releases.map((release) => <option key={release.id} value={release.id}>{release.title}</option>)}
           </NativeSelect>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Contact</label>
-          <NativeSelect value={contactId} onChange={(e) => setContactId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+          <label htmlFor={`${formId}-contact`} className="block text-sm font-medium text-foreground mb-1">Contact</label>
+          <NativeSelect id={`${formId}-contact`} value={contactId} onChange={(e) => setContactId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
             <option value="">— None —</option>
             {contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.name}</option>)}
           </NativeSelect>
@@ -156,8 +157,8 @@ export function DocumentForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Project</label>
-        <NativeSelect value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
+        <label htmlFor={`${formId}-project`} className="block text-sm font-medium text-foreground mb-1">Project</label>
+        <NativeSelect id={`${formId}-project`} value={projectId} onChange={(e) => setProjectId(e.target.value)} className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background">
           <option value="">— None —</option>
           {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
         </NativeSelect>
@@ -165,15 +166,15 @@ export function DocumentForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Upload file</label>
-          <label className="flex items-center justify-center w-full min-h-24 border-2 border-dashed border-border rounded-xl px-4 py-3 text-sm text-muted-foreground cursor-pointer hover:bg-accent/50 transition-colors">
-            <Input type="file" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <label className="block text-sm font-medium text-foreground mb-1" htmlFor={`${formId}-file`}>Upload file</label>
+          <label className="flex items-center justify-center w-full min-h-24 border-2 border-dashed border-border rounded-xl px-4 py-3 text-sm text-muted-foreground cursor-pointer hover:bg-accent/50 transition-colors focus-within:ring-2 focus-within:ring-ring">
+            <Input id={`${formId}-file`} type="file" className="sr-only" onChange={(e) => setFile(e.target.files?.[0] || null)} />
             <span>{file ? `${file.name} (${Math.round(file.size / 1024)} KB)` : "Choose file"}</span>
           </label>
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Manual file link / storage key</label>
-          <Input
+          <label htmlFor={`${formId}-manual-file-link-storage-key`} className="block text-sm font-medium text-foreground mb-1">Manual file link / storage key</label>
+          <Input id={`${formId}-manual-file-link-storage-key`}
             value={fileLink}
             onChange={(e) => setFileLink(e.target.value)}
             placeholder="https://... or documents/..."
@@ -183,8 +184,8 @@ export function DocumentForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Notes</label>
-        <Textarea
+        <label htmlFor={`${formId}-notes`} className="block text-sm font-medium text-foreground mb-1">Notes</label>
+        <Textarea id={`${formId}-notes`}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
