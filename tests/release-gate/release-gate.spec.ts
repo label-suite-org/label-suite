@@ -1641,3 +1641,21 @@ test("campaign overview and outreach have responsive accessible editor surfaces"
     await expectNoHorizontalPageOverflow(page);
   }
 });
+
+test("enabled campaign controls immediately regain full contrast", async ({ page }) => {
+  await login(page);
+  await page.goto(`/campaigns/${RADIO_CAMPAIGN_ID}?tab=outreach`);
+  const focused = page.getByRole("tab", { name: "Focused", exact: true });
+  await expect(focused).toBeEnabled();
+  const opacities = await focused.evaluate(async (tab) => {
+    const fieldset = tab.closest("fieldset")!;
+    fieldset.disabled = true;
+    await Promise.all(fieldset.getAnimations({ subtree: true }).map((animation) => animation.finished));
+    fieldset.disabled = false;
+    // The same native state change happens when this island hydrates.
+    await new Promise(requestAnimationFrame);
+    return [...fieldset.querySelectorAll("button:not(:disabled)")].map((button) => getComputedStyle(button).opacity);
+  });
+  expect(opacities.length).toBeGreaterThan(0);
+  expect(opacities.every((opacity) => opacity === "1")).toBe(true);
+});
