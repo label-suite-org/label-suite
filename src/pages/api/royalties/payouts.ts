@@ -21,7 +21,7 @@ export const GET: APIRoute = async ({ locals }) => {
 export const POST: APIRoute = async ({request,locals}) => {
   try {
     requireSameOrigin(request);
-    const orgId = requireCapability(locals,"royalties.mutate");
+    const orgId = requireCapability(locals, "royalties.mutate");
     if (!locals.user?.id) throw new HttpError("Sign in to record a payout",401);
     const result = await recordPayoutBatch(orgId,locals.user.id,await parseJson(request,recordPayoutBatchSchema));
     return json(result,result.duplicate ? 200 : 201);

@@ -9,7 +9,7 @@ export const prerender = false;
 export const POST: APIRoute = async ({request,locals,params}) => {
   try {
     requireSameOrigin(request);
-    const orgId = requireCapability(locals,"royalties.mutate");
+    const orgId = requireCapability(locals, "royalties.mutate");
     if (!locals.user?.id) throw new HttpError("Sign in to reverse a recording",401);
     const result = await reversePayoutBatch(orgId,locals.user.id,idSchema.parse(params.id),await parseJson(request,reversePayoutBatchSchema));
     return json(result,result.duplicate ? 200 : 201);
