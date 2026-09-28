@@ -78,6 +78,18 @@ export default function IntegrationsWorkspace({ initialData, spotifyIdentityEnab
     setData(await response.json() as IntegrationsWorkspaceData);
   }
 
+  async function refreshConsole() {
+    setBusy("refresh");
+    setError(null);
+    try {
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not refresh integrations");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function syncNow(connectionId: string) {
     setBusy(`sync:${connectionId}`);
     setError(null);
@@ -124,7 +136,7 @@ export default function IntegrationsWorkspace({ initialData, spotifyIdentityEnab
             Inspect connected providers, queue a bounded sync, and pause a connection without exposing credentials or raw payloads.
           </p>
         </div>
-        <Button type="button" onClick={() => void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : "Could not refresh integrations"))} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent" disabled={busy !== null}>
+        <Button type="button" onClick={() => void refreshConsole()} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-accent" disabled={busy !== null}>
           <RefreshCw className="size-4" /> Refresh
         </Button>
       </header>
