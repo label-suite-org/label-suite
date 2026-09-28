@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import type { getFinanceReconciliationView } from "../../server/finance-reconciliation";
@@ -14,6 +14,8 @@ function residual(amount: string, allocated: string) {
 }
 
 export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
+  const workbench = useRef<HTMLElement>(null);
+  const focusSelection = useRef(false);
   const [filter,setFilter] = useState("unmatched");
   const [offset,setOffset] = useState(0);
   const [selected,setSelected] = useState("");
@@ -36,6 +38,9 @@ export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
     }).catch(reason=>{if(!controller.signal.aborted)setError(reason instanceof Error?reason.message:"Could not load reconciliation");});
     return ()=>controller.abort();
   },[filter,offset,selected,search,revision]);
+  useEffect(()=>{
+    if(data?.detail && focusSelection.current) { workbench.current?.focus(); focusSelection.current=false; }
+  },[data]);
   async function submit(path:string,body:unknown,message:string) {
     setBusy(true);setError("");setNotice("");
     try {
@@ -55,7 +60,7 @@ export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
   const after=detail&&amount?residual(detail.remaining,amount):null;
   return <section className="space-y-5" aria-label="Finance reconciliation">
     <header><h1 className="text-2xl font-semibold">Money &amp; budgets</h1><p className="mt-1 text-sm text-muted-foreground">Match imported transactions to the work they paid for. No payments or bookkeeping entries are made here.</p></header>
-    {error&&<p role="alert" className="text-sm text-destructive">{error} <Button variant="outline" size="sm" onClick={()=>setRevision(value=>value+1)} disabled={busy}>Retry loading</Button></p>}
+    {error&&<p role="alert" className="text-sm text-destructive">{error} {!data&&<Button variant="outline" size="sm" onClick={()=>setRevision(value=>value+1)} disabled={busy}>Retry loading</Button>}</p>}
     {notice&&<p role="status" className="text-sm">{notice}</p>}
     {canMutate&&<details className="border-b pb-4"><summary className="cursor-pointer text-sm font-medium">Import a transaction manually</summary>
       <p className="my-3 text-sm text-muted-foreground">Copy one transaction from your bank or accounting export. Keep its original reference; the entered fields are retained as source evidence.</p>
@@ -72,18 +77,19 @@ export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
         <Button type="submit" disabled={busy} className="sm:col-span-2">Import transaction</Button>
       </form>
     </details>}
-    <div className="flex flex-wrap gap-2" aria-label="Transaction filters">{[["unmatched","Unmatched"],["partially_matched","Partial"],["matched","Matched"],["all","All"]].map(([value,label])=><Button key={value} variant={filter===value?"default":"outline"} size="sm" aria-pressed={filter===value} disabled={busy} onClick={()=>{setFilter(value);setOffset(0);setSelected("");setSearch("");}}>{label}</Button>)}</div>
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Transaction filters">{[["unmatched","Unmatched"],["partially_matched","Partial"],["matched","Matched"],["all","All"]].map(([value,label])=><Button key={value} variant={filter===value?"default":"outline"} size="sm" aria-pressed={filter===value} disabled={busy} onClick={()=>{setFilter(value);setOffset(0);setSelected("");setSearch("");}}>{label}</Button>)}</div>
     {!data&&!error&&<p role="status" className="text-sm text-muted-foreground">Loading transactions…</p>}
     {data&&<div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,2fr)]">
-      <section aria-label="Transactions" className="min-w-0"><h2 className="sr-only">Transactions</h2>
+      <section aria-label="Transactions" className={`min-w-0 ${detail?"hidden lg:block":""}`}><h2 className="sr-only">Transactions</h2>
         {!data.transactions.length&&<p className="py-6 text-sm text-muted-foreground">No transactions in this view.</p>}
-        <ul className="divide-y">{data.transactions.map(row=><li key={row.id}><button disabled={busy} aria-pressed={selected===row.id} className={`w-full min-w-0 py-4 text-left ${selected===row.id?"border-l-2 border-primary pl-3":""}`} onClick={()=>{setSelected(row.id);setSearch("");setNotice("");}}>
+        <ul className="divide-y">{data.transactions.map(row=><li key={row.id}><button disabled={busy} aria-pressed={selected===row.id} className={`w-full min-w-0 py-4 text-left ${selected===row.id?"border-l-2 border-primary pl-3":""}`} onClick={()=>{focusSelection.current=true;setSelected(row.id);setSearch("");setNotice("");}}>
           <span className="block text-xs text-muted-foreground">{date(row.occurredAt)} · {row.account}</span><span className="block break-words font-medium">{row.description||"Transaction"}</span>
           <span className="block text-sm">{row.direction==="credit"?"Incoming":"Outgoing"} · {row.currency} {row.amount}</span><span className="text-xs text-muted-foreground">Remaining {row.currency} {row.remaining}</span>
         </button></li>)}</ul>
         <div className="mt-3 flex justify-between"><Button variant="outline" size="sm" disabled={offset===0||busy} onClick={()=>setOffset(value=>Math.max(0,value-50))}>Previous</Button><Button variant="outline" size="sm" disabled={!data.hasMore||busy} onClick={()=>setOffset(value=>value+50)}>Next</Button></div>
       </section>
-      <section className="min-w-0 space-y-5" aria-label="Selected transaction">
+      <section ref={workbench} tabIndex={-1} className="min-w-0 space-y-5" aria-label="Selected transaction">
+        {detail&&<Button variant="outline" className="lg:hidden" onClick={()=>{setSelected("");setSearch("");}}>Back to transactions</Button>}
         {!detail?<p className="py-6 text-sm text-muted-foreground">Select a transaction to inspect its evidence and matches.</p>:<>
           <header><h2 className="break-words text-lg font-semibold">{detail.description||"Transaction details"}</h2><p className="text-sm">{detail.source_provider} · {detail.account_label} · {date(detail.occurred_at)}</p><p className="mt-2 font-medium">Remaining {detail.currency} {detail.remaining}</p></header>
           <details className="border-y py-3"><summary className="cursor-pointer text-sm font-medium">Source evidence</summary><dl className="mt-3 space-y-2 break-all text-xs"><dt>Reference</dt><dd>{detail.external_transaction_id||"—"}</dd><dt>Source hash</dt><dd>{detail.raw_source_hash}</dd></dl><pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(detail.raw_evidence,null,2)}</pre></details>
@@ -91,6 +97,7 @@ export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
             <form className="my-3 flex gap-2" onSubmit={event=>{event.preventDefault();setSearch(String(new FormData(event.currentTarget).get("search")||""));}}><Input aria-label="Find matching records" name="search" defaultValue={search} placeholder="Find an import, batch or budget line" /><Button variant="outline" disabled={busy}>Search</Button></form>
             <form className="space-y-3" onSubmit={async event=>{event.preventDefault();if(!candidate)return;const fields=new FormData(event.currentTarget);await submit(`/api/finance/reconciliation/${encodeURIComponent(detail.id)}/match`,{match_type:candidate.type,target_id:candidate.id,allocated_amount:amount,rationale:fields.get("rationale")},"Match recorded.");}}>
               <label className="block text-sm">Match to<select required className="mt-1 w-full min-w-0 rounded-md border bg-background p-2" value={target} onChange={event=>setTarget(event.target.value)}><option value="">Choose a record</option>{Object.entries(matchNames).map(([type,label])=><optgroup key={type} label={label}>{data.candidates.filter(row=>row.type===type).map(row=><option key={row.id} value={`${row.type}:${row.id}`}>{row.label}</option>)}</optgroup>)}</select></label>
+              {candidate&&<div className="space-y-1 border-l-2 pl-3 text-sm" aria-label="Selected match target"><p className="break-words font-medium">{candidate.label}</p><p>{candidate.type==="budget_spend"?"Budget amount":"Source total"}: {candidate.amount===null?"Not recorded":`${candidate.currency} ${candidate.amount}`}</p><p className="break-all text-xs text-muted-foreground">Reference: {candidate.id}</p></div>}
               {!data.candidates.length&&<p className="text-sm text-muted-foreground">No eligible records found. Records must be in this workspace with a matching currency and direction.</p>}
               <label className="block text-sm">Allocation amount ({detail.currency})<Input required inputMode="decimal" value={amount} onChange={event=>setAmount(event.target.value)} /></label>
               <label className="block text-sm">Reason<Input name="rationale" required /></label><p className="text-sm text-muted-foreground">Remaining after match: {after===null?"Enter a valid amount within the remaining balance":`${detail.currency} ${after}`}</p>

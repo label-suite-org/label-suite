@@ -23,7 +23,7 @@ const legacyItems = await listBudgetItems(orgId);
 
 <AppLayout>
   <div class="space-y-6">
-    <nav aria-label="Money views" class="flex gap-4 border-b pb-3 text-sm">
+    <nav aria-label="Money views" class="flex gap-4 border-b pb-3 text-sm [&_a[aria-current=page]]:font-semibold [&_a[aria-current=page]]:underline [&_a[aria-current=page]]:underline-offset-8">
       <a href="/budget" aria-current={!reconciliation ? "page" : undefined}>Budgets</a>
       <a href="/budget?section=reconciliation" aria-current={reconciliation ? "page" : undefined}>Reconciliation</a>
     </nav>

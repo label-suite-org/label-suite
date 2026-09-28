@@ -246,29 +246,29 @@ export async function getFinanceReconciliationView(orgId: string, input: z.infer
   const allocated = matches.filter(match=>match.status === "active").reduce((sum,match)=>sum+decimalUnits(match.allocated_amount),0n);
   const units = decimalUnits(transaction.amount)-allocated;
   const detail = {...transaction,matches,remaining:`${units / 100_000_000n}.${(units % 100_000_000n).toString().padStart(8,"0")}`};
-  const candidates: Array<{id:string;type:"royalty_receipt"|"payout_batch"|"budget_spend";label:string;currency:string}> = [];
+  const candidates: Array<{id:string;type:"royalty_receipt"|"payout_batch"|"budget_spend";label:string;currency:string;amount:string|null}> = [];
   const search = `%${input.search}%`;
   if (transaction.direction === "credit") {
-    const imports = await db.select({id:royalty_imports.id,source:royalty_imports.source,file:royalty_imports.file_name,period:royalty_imports.period_start})
+    const imports = await db.select({id:royalty_imports.id,source:royalty_imports.source,file:royalty_imports.file_name,period:royalty_imports.period_start,amount:sql<string|null>`(select ${royalty_import_currency_totals.net_total}::text from ${royalty_import_currency_totals} where ${royalty_import_currency_totals.org_id}=${orgId} and ${royalty_import_currency_totals.import_id}=${royalty_imports.id} and ${royalty_import_currency_totals.currency}=${transaction.currency})`})
       .from(royalty_imports).where(and(eq(royalty_imports.org_id,orgId),eq(royalty_imports.status,"parsed"),
-        or(eq(royalty_imports.currency,transaction.currency),sql`exists(select 1 from ${royalty_import_currency_totals} where ${royalty_import_currency_totals.org_id}=${orgId} and ${royalty_import_currency_totals.import_id}=${royalty_imports.id} and ${royalty_import_currency_totals.currency}=${transaction.currency})`),
+        or(and(eq(royalty_imports.currency,transaction.currency),sql`not exists(select 1 from ${royalty_import_currency_totals} where ${royalty_import_currency_totals.org_id}=${orgId} and ${royalty_import_currency_totals.import_id}=${royalty_imports.id})`),sql`exists(select 1 from ${royalty_import_currency_totals} where ${royalty_import_currency_totals.org_id}=${orgId} and ${royalty_import_currency_totals.import_id}=${royalty_imports.id} and ${royalty_import_currency_totals.currency}=${transaction.currency})`),
         or(ilike(royalty_imports.source,search),ilike(royalty_imports.file_name,search),ilike(royalty_imports.id,search))))
       .orderBy(desc(royalty_imports.created_at),royalty_imports.id).limit(25);
-    for (const row of imports) candidates.push({id:row.id,type:"royalty_receipt",label:[row.source,row.file,row.period].filter(Boolean).join(" · "),currency:transaction.currency});
+    for (const row of imports) candidates.push({id:row.id,type:"royalty_receipt",label:[row.source,row.file,row.period].filter(Boolean).join(" · "),currency:transaction.currency,amount:row.amount});
   } else {
-    const batches = await db.select({id:royalty_ledger_transactions.id,reference:royalty_ledger_transactions.evidence_reference,date:royalty_ledger_transactions.effective_date})
+    const batches = await db.select({id:royalty_ledger_transactions.id,reference:royalty_ledger_transactions.evidence_reference,date:royalty_ledger_transactions.effective_date,amount:sql<string>`(select abs(sum(${royalty_ledger_entries.amount}))::text from ${royalty_ledger_entries} where ${royalty_ledger_entries.org_id}=${orgId} and ${royalty_ledger_entries.transaction_id}=${royalty_ledger_transactions.id} and ${royalty_ledger_entries.currency}=${transaction.currency})`})
       .from(royalty_ledger_transactions).where(and(eq(royalty_ledger_transactions.org_id,orgId),eq(royalty_ledger_transactions.posting_status,"posted"),
         sql`${royalty_ledger_transactions.reversal_of_transaction_id} is null`,
         sql`exists(select 1 from ${royalty_ledger_entries} where ${royalty_ledger_entries.org_id}=${orgId} and ${royalty_ledger_entries.transaction_id}=${royalty_ledger_transactions.id} and ${royalty_ledger_entries.entry_type}='payout' and ${royalty_ledger_entries.currency}=${transaction.currency})`,
         sql`not exists(select 1 from ${royalty_ledger_entries} where ${royalty_ledger_entries.org_id}=${orgId} and ${royalty_ledger_entries.transaction_id}=${royalty_ledger_transactions.id} and ${royalty_ledger_entries.entry_type}<>'payout')`,
         or(ilike(royalty_ledger_transactions.evidence_reference,search),ilike(royalty_ledger_transactions.id,search))))
       .orderBy(desc(royalty_ledger_transactions.created_at),royalty_ledger_transactions.id).limit(25);
-    for (const row of batches) candidates.push({id:row.id,type:"payout_batch",label:`${row.reference ?? row.id} · ${row.date}`,currency:transaction.currency});
-    const lines = await db.select({id:budget_line_items.id,name:budget_line_items.name,project:budget_projects.name})
+    for (const row of batches) candidates.push({id:row.id,type:"payout_batch",label:`${row.reference ?? row.id} · ${row.date}`,currency:transaction.currency,amount:row.amount});
+    const lines = await db.select({id:budget_line_items.id,name:budget_line_items.name,project:budget_projects.name,amount:sql<string>`${budget_line_items.amount}::text`})
       .from(budget_line_items).innerJoin(budget_projects,and(eq(budget_projects.id,budget_line_items.project_id),eq(budget_projects.org_id,orgId)))
       .where(and(eq(budget_line_items.org_id,orgId),eq(budget_projects.currency,transaction.currency),or(ilike(budget_line_items.name,search),ilike(budget_projects.name,search))))
       .orderBy(budget_line_items.name,budget_line_items.id).limit(25);
-    for (const row of lines) candidates.push({id:row.id,type:"budget_spend",label:`${row.name} · ${row.project}`,currency:transaction.currency});
+    for (const row of lines) candidates.push({id:row.id,type:"budget_spend",label:`${row.name} · ${row.project}`,currency:transaction.currency,amount:row.amount});
   }
   return {...result,detail,candidates};
 }

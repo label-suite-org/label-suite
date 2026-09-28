@@ -49,6 +49,7 @@ describe.skipIf(process.env.CI !== "true")("finance reconciliation on disposable
     expect(partialView.detail?.remaining).toBe('40.00000000');
     expect(partialView.detail?.matches[0].actorName).toBe('Synthetic operator');
     expect(partialView.candidates.map(row=>row.id)).toEqual([org]);
+    expect(partialView.candidates[0]).toMatchObject({amount:'100',currency:'USD'});
     await expect(finance.getFinanceReconciliationView(org+'foreign',finance.financeViewSchema.parse({transaction:first.id}))).rejects.toMatchObject({status:404});
     expect((await sql`select status from label_suite.finance_transactions where id=${first.id}`)[0].status).toBe('partially_matched');
     await expect(finance.reverseFinanceMatch(org+'foreign',{id:saved.value.id,reversal_reason:'No authority'},org)).rejects.toMatchObject({status:404});
@@ -69,7 +70,11 @@ describe.skipIf(process.env.CI !== "true")("finance reconciliation on disposable
     await sql`update label_suite.royalty_imports set status='parsed' where id=${org}`;
     const receipt = await finance.importFinanceTransaction(org,{...input,idempotency_key:'receipt',direction:'credit'},org);
     const receiptView = await finance.getFinanceReconciliationView(org,finance.financeViewSchema.parse({transaction:receipt.id}));
-    expect(receiptView.candidates).toEqual([{id:org,type:'royalty_receipt',label:'Synthetic royalties',currency:'USD'}]);
+    expect(receiptView.candidates).toEqual([{id:org,type:'royalty_receipt',label:'Synthetic royalties',currency:'USD',amount:null}]);
+    await sql`insert into label_suite.royalty_import_currency_totals (id,org_id,import_id,currency,gross_total,fees_total,net_total) values (${org},${org},${org},'EUR','100','0','100')`;
+    expect((await finance.getFinanceReconciliationView(org,finance.financeViewSchema.parse({transaction:receipt.id}))).candidates).toEqual([]);
+    await sql`update label_suite.royalty_import_currency_totals set currency='USD' where id=${org}`;
+    expect((await finance.getFinanceReconciliationView(org,finance.financeViewSchema.parse({transaction:receipt.id}))).candidates[0]).toMatchObject({amount:'100.00000000',currency:'USD'});
     await expect(finance.matchFinanceTransaction(org,receipt.id,match,org)).rejects.toMatchObject({status:409});
     expect((await finance.matchFinanceTransaction(org,receipt.id,{...match,match_type:'royalty_receipt',allocated_amount:'100'},org)).status).toBe('active');
   });
