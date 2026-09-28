@@ -7,6 +7,7 @@ import { PayoutView } from "./PayoutView";
 import { StatementGroupedView } from "./StatementGroupedView";
 import { RoyaltiesOverview } from "./RoyaltiesOverview";
 import { RoyaltyDataQualityPanel } from "./RoyaltyDataQualityPanel";
+import { StatementReview } from "./StatementReview";
 import { StatementRunsView } from "./StatementRunsView";
 import type { MasterPayoutPreview, RoyaltiesDashboard } from "../../server/royalties-dashboard-core";
 import type { getRoyaltyPipelineSummary } from "../../server/royalty-ledger";
@@ -175,7 +176,7 @@ export function RoyaltyManager({
         </div>
       )}
 
-      {activeTab === "statementRuns" && <StatementRunsView dashboard={dashboard} />}
+      {activeTab === "statementRuns" && <div className="space-y-8"><StatementReview canMutate={canMutate} /><StatementRunsView dashboard={dashboard} /></div>}
 
       {activeTab === "trackRevenue" && (
         <div className="space-y-6">
