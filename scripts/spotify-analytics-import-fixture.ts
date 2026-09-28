@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import * as databaseSchema from "../src/db/schema";
 import {
   createSpotifyAnalyticsImportProductionService,
+  createSpotifyAnalyticsImportService,
   type SpotifySourceArchive,
 } from "../src/server/spotify-analytics-import";
 import { parseSpotifyAudienceTimeline } from "../src/server/spotify-audience-timeline";
@@ -121,6 +122,32 @@ try {
   const initialBytes = csv(1);
   const initialPreview = parseSpotifyAudienceTimeline(initialBytes, "Audience timeline.csv");
   const fixtureInput = { orgId: orgA, artistId: artistA, fileName: "Audience timeline.csv" };
+  const unchangedRuns = async () => Number((await pool.query(
+    `select count(*)::int as total from "label_suite"."analytics_import_runs" where org_id = $1`, [orgA],
+  )).rows[0].total);
+  await assert.rejects(service.applySpotifyAudienceTimeline({
+    ...fixtureInput, bytes: initialBytes, expectedSha256: "0".repeat(64),
+  }), /preview no longer matches/);
+  await assert.rejects(service.applySpotifyAudienceTimeline({
+    ...fixtureInput, orgId: orgB, bytes: initialBytes, expectedSha256: initialPreview.sha256,
+  }), /Artist not found/);
+  assert.equal(await unchangedRuns(), 0);
+  assert.equal(archived, 0);
+
+  const unavailable = createSpotifyAnalyticsImportService({
+    database: async () => database, archive,
+    now: () => new Date("2026-08-10T11:00:00Z"), randomId: randomUUID,
+    assertArchiveReady: () => { throw new Error("private archive unavailable"); },
+  });
+  await assert.rejects(unavailable.applySpotifyAudienceTimeline({
+    ...fixtureInput, bytes: initialBytes, expectedSha256: initialPreview.sha256,
+  }), /private archive unavailable/);
+  const unavailableEvidence = await pool.query(
+    `select artist_id, error from "label_suite"."analytics_import_runs" where org_id = $1`, [orgA],
+  );
+  assert.deepEqual(unavailableEvidence.rows, [{ artist_id: null, error: "Spotify audience import failed during private archive" }]);
+  assert.equal(archived, 0);
+
   const first = await service.applySpotifyAudienceTimeline({
     ...fixtureInput,
     bytes: initialBytes,
@@ -180,7 +207,7 @@ try {
   assert.equal(await countMetricRows(orgB, artistA), 0);
   assert.deepEqual(await service.listLatestSpotifyAudienceImports(orgB), []);
 
-  const highBytes = highVolumeCsv(10_000);
+  const highBytes = highVolumeCsv(100_000);
   const highPreview = parseSpotifyAudienceTimeline(highBytes, "Audience timeline.csv");
   const high = await service.applySpotifyAudienceTimeline({
     orgId: orgA,
@@ -193,9 +220,9 @@ try {
   if (high.kind !== "imported") throw new Error("Expected high-volume import to apply rows");
   assert.deepEqual(
     { inserted: high.inserted, updated: high.updated, unchanged: high.unchanged },
-    { inserted: 10_000, updated: 0, unchanged: 0 },
+    { inserted: 100_000, updated: 0, unchanged: 0 },
   );
-  assert.equal(await countMetricRows(orgA, highVolumeArtist), 10_000);
+  assert.equal(await countMetricRows(orgA, highVolumeArtist), 100_000);
 
   // Latest Spotify history intentionally includes successful non-manual runs.
   await pool.query(
@@ -284,6 +311,42 @@ try {
   assert.equal(await countMetricRows(orgA, failureArtist), 0);
   assert.equal(archived, 4);
   assert.equal(lockProofs, 4);
+  // A partial correction must keep dates absent from the new source file.
+  const partialBytes = new TextEncoder().encode(`${csvHeaders}\n2026-06-24,42,2,3,4,5,6,7,8\n`);
+  const partial = await service.applySpotifyAudienceTimeline({
+    ...fixtureInput, bytes: partialBytes,
+    expectedSha256: parseSpotifyAudienceTimeline(partialBytes, fixtureInput.fileName).sha256,
+  });
+  assert.equal(partial.kind, "imported");
+  assert.equal(await countMetricRows(orgA, artistA), 2);
+  const correctedRaw = await pool.query(
+    `select previous_raw_row->>'listeners' as previous, current_raw_row->>'listeners' as current
+     from "label_suite"."analytics_metric_changes" where org_id = $1 and run_id = $2 and change_type = 'update'`,
+    [orgA, partial.runId],
+  );
+  assert.deepEqual(correctedRaw.rows, [{ previous: "2", current: "42" }]);
+
+  const archiveError = new Error("fixture archive dependency detail");
+  const archiveFailure = createSpotifyAnalyticsImportProductionService({
+    database, archive: async () => { throw archiveError; },
+  });
+  const failureInput = { ...fixtureInput, artistId: failureArtist, bytes: csv(7), expectedSha256: parseSpotifyAudienceTimeline(csv(7), fixtureInput.fileName).sha256 };
+  await assert.rejects(archiveFailure.applySpotifyAudienceTimeline(failureInput), (error) => error === archiveError);
+  const safeError = await pool.query(
+    `select error, files_downloaded from "label_suite"."analytics_import_runs" where org_id = $1 and artist_id = $2 and error = $3`,
+    [orgA, failureArtist, "Spotify audience import failed during private archive"],
+  );
+  assert.deepEqual(safeError.rows, [{ error: "Spotify audience import failed during private archive", files_downloaded: 0 }]);
+  assert.equal(await countMetricRows(orgA, failureArtist), 0);
+  // A second failure writing evidence must not replace the original caller error.
+  const errorIds = [randomUUID(), randomUUID(), first.runId.slice(4), randomUUID()];
+  const evidenceFailure = createSpotifyAnalyticsImportProductionService({
+    database, archive: async () => { throw archiveError; },
+    randomId: () => { const id = errorIds.shift(); assert.ok(id); return id; },
+  });
+  const beforeFailure = await unchangedRuns();
+  await assert.rejects(evidenceFailure.applySpotifyAudienceTimeline(failureInput), (error) => error === archiveError);
+  assert.equal(await unchangedRuns(), beforeFailure);
   console.log("Spotify analytics import fixture PASS");
 } finally {
   await cleanupFixtureData().catch(() => undefined);

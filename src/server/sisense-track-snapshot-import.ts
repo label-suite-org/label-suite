@@ -1,3 +1,4 @@
+import { runAnalyticsSourceImport } from "./analytics-source-import-legacy";
 import { createHash, randomUUID } from "node:crypto";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -12,7 +13,6 @@ import {
 } from "../db/schema";
 import { HttpError } from "./errors";
 import {
-  runAnalyticsSourceImport,
   withAnalyticsSourceTransaction,
   type AnalyticsSourceImportDatabase,
   type AnalyticsSourceImportFailurePhase,
