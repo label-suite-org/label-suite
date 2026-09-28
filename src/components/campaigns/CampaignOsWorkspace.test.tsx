@@ -32,12 +32,29 @@ it.each([
     else if (field instanceof HTMLInputElement && field.type === "url") field.value = "https://example.test/post";
     else if (!field.value) field.value = "Test value";
   }
+  if (action === "create_post") form.querySelector<HTMLInputElement>('[name="metrics_captured_at"]')!.value = "2026-09-28";
   await act(async () => form.querySelector<HTMLButtonElement>("button")!.click());
   const saves = fetch.mock.calls.filter(([, options]) => options?.method === "POST");
   expect(saves).toHaveLength(1);
   expect(JSON.parse(saves[0][1].body).action).toBe(action);
+  if (action === "create_post") expect(JSON.parse(saves[0][1].body).input.metrics_captured_at).toBe("2026-09-28T00:00:00.000Z");
   expect(container.querySelector('[role="alert"]')).toBeNull();
   if (action !== "finalize_report") expect(form.querySelector<HTMLInputElement>("input[required], textarea[required]")?.value ?? "").toBe("");
+});
+
+it("shows the captured observation date beside a recorded post", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+    territories: [], engagements: [], deliverables: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null },
+    posts: [{ id: "post-1", url: "https://example.test/post", platform: "TikTok", published_at: "2026-09-26T00:00:00.000Z", metrics_captured_at: "2026-09-28T00:00:00.000Z", manual_metrics: { views: 120 } }],
+  }) }));
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="posts" canMutate={false} contacts={[]} />));
+  expect(container.textContent).toContain(`Published ${new Date("2026-09-26T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
+  expect(container.textContent).toContain(`Metrics captured ${new Date("2026-09-28T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
+  expect(container.textContent).toContain("views: 120");
 });
 
 it("shows saved report figures beside live figures without offering finalisation again", async () => {
