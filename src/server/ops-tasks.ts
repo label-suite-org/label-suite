@@ -198,6 +198,7 @@ async function createOpsTaskInTransaction(db: TaskTransaction, orgId: string, in
   await assertReleaseMilestoneLink(db, orgId, input.linked_release_id, input.release_milestone_id);
   await assertEventInOrg(db, orgId, input.event_id);
   await assertCampaignLeadLink(db, orgId, input.linked_campaign_id, input.linked_campaign_lead_id);
+  await assertTaskLinksInOrg(db, orgId, input);
 
   await db.insert(ops_tasks).values({
     id,
@@ -254,6 +255,7 @@ async function updateOpsTaskInTransaction(db: TaskTransaction, orgId: string, in
   const effectiveCampaignId = hasOwn(input, "linked_campaign_id") ? input.linked_campaign_id as string | null | undefined : existing.linked_campaign_id;
   const effectiveCampaignLeadId = hasOwn(input, "linked_campaign_lead_id") ? input.linked_campaign_lead_id as string | null | undefined : existing.linked_campaign_lead_id;
   await assertCampaignLeadLink(db, orgId, effectiveCampaignId, effectiveCampaignLeadId);
+  await assertTaskLinksInOrg(db, orgId, input);
 
   const updates: Record<string, unknown> = { updated_at: new Date() };
   for (const key of ["assignee_ids", "labels", "dependency_ids"] as const) if (hasOwn(input, key)) updates[key] = input[key];
@@ -347,6 +349,22 @@ async function assertReleaseMilestoneLink(
   )[0];
 
   if (!milestone || milestone.release_id !== releaseId) throw new NotFoundError("Release milestone not found");
+}
+
+async function assertTaskLinksInOrg(tx: TaskTransaction, orgId: string, input: Partial<CreateOpsTaskInput>) {
+  for (const [id, table, label] of [
+    [input.linked_artist_id, artists, "Artist"],
+    [input.linked_release_id, releases, "Release"],
+    [input.linked_campaign_id, campaigns, "Campaign"],
+    [input.linked_contact_id, contacts, "Contact"],
+    [input.owner_contact_id, contacts, "Owner contact"],
+    [input.project_id, budget_projects, "Project"],
+  ] as const) {
+    if (!id) continue;
+    const [record] = await tx.select({ id: table.id }).from(table)
+      .where(and(eq(table.id, id), eq(table.org_id, orgId)));
+    if (!record) throw new NotFoundError(`${label} not found in active workspace`);
+  }
 }
 
 async function assertEventInOrg(db: TaskTransaction, orgId: string, eventId: string | null | undefined) {
