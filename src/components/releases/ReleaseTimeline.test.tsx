@@ -25,7 +25,7 @@ afterEach(async () => { await act(async () => root?.unmount()); container?.remov
 
 describe("release workback UI", () => {
   it("loads current task and release-date data each time the schedule opens", async () => {
-    const latest = { ...timeline, releaseDate: "2026-12-04", unphasedTasks: [{ ...timeline.unphasedTasks[0], title: "Newly saved task" }] };
+    const latest = { ...timeline, releaseDate: "2026-12-04", unphasedTasks: [{ ...timeline.unphasedTasks![0], title: "Newly saved task" }] };
     const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => latest });
     vi.stubGlobal("fetch", fetch);
     await render();
