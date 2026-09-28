@@ -93,6 +93,13 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
     expect((await readScoped(() => getNativeRoyaltyStatement(org,issued[0].id))).statement.posted_balance).toBe('0.60000000');
     expect((await sql`select sum(amount)::text as amount from label_suite.royalty_ledger_entries where org_id=${org}`)[0].amount).toBe('1.60000000');
     expect(await sql`select id from label_suite.royalty_payouts where org_id=${org} and status='reversed'`).toHaveLength(1);
+    const {getRoyaltyPipelineSummary} = await import('./royalty-ledger');
+    await sql`insert into label_suite.royalty_earnings (id,org_id,source,source_row_id,report_period,currency,net_amount) values (${org+'eur'},${org},'fixture',${org+'eur'},'2026-08','EUR',3)`;
+    await sql`insert into label_suite.royalty_ledger_transactions (id,org_id,idempotency_key,effective_date) values (${org+'draft'},${org},${org+'draft'},'2026-09-02')`;
+    await sql`insert into label_suite.royalty_ledger_entries (id,org_id,transaction_id,contact_id,entry_type,amount,currency,effective_date) values (${org+'draft'},${org},${org+'draft'},${issued[0].contact_id},'adjustment',99,'USD','2026-09-02')`;
+    const summary = await readScoped(() => getRoyaltyPipelineSummary(org));
+    expect(summary.earningTotals).toEqual([{currency:'EUR',amount:'3.00000000'},{currency:'USD',amount:'2.00000000'}]);
+    expect(summary.postedTotals).toEqual([{currency:'USD',amount:'1.60000000'}]);
     await expect(scoped(() => recordPayoutBatch(org,org,batch))).rejects.toMatchObject({status:409});
     await expect(scoped(() => reversePayoutBatch(org,org,repeats[0].batch_id,{...reversal,reference:'different'}))).rejects.toMatchObject({status:409});
 

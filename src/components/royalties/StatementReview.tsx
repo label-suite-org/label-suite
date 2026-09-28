@@ -19,7 +19,7 @@ async function request<T>(url: string, body?: unknown): Promise<T> {
   return result;
 }
 
-export function StatementReview({ canMutate }: { canMutate: boolean }) {
+export function StatementReview({ canMutate, onChanged }: { canMutate: boolean; onChanged?: () => Promise<void> }) {
   const [page, setPage] = useState<Page>({ rows: [], next_offset: null });
   const [selected, setSelected] = useState<Record<string, { statement: Statement; amount: string }>>({});
   const [batch, setBatch] = useState<Awaited<ReturnType<typeof getPayoutBatch>> | null>(null);
@@ -55,7 +55,7 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
       expected_updated_at: detail.statement.updated_at, ...(action === "issue" ? { evidence_reference: evidence } : {}),
     });
     setMessage(action === "issue" ? "Statement issued and allocation recorded. No payment sent." : "Statement reviewed.");
-    await open(id); await loadPage(offset);
+    await open(id); await loadPage(offset); await onChanged?.();
   }
   return <section className="space-y-4" aria-label="Payee statements" aria-busy={busy}>
     <div><h2 className="text-lg font-semibold">Payee statements</h2><p className="text-sm text-[var(--muted-foreground)]">Calculate earnings, inspect source lines, then review and issue each statement.</p></div>
@@ -63,7 +63,7 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
       event.preventDefault(); const data = new FormData(event.currentTarget);
       void perform(async () => {
         const result = await request<PreparedRoyaltyStatements>("/api/royalties/statements/prepare", Object.fromEntries(data));
-        setPrepared(result); setDetail(null); setSelected({}); await loadPage(0);
+        setPrepared(result); setDetail(null); setSelected({}); await loadPage(0); await onChanged?.();
       });
     }}>
       <label>From<Input name="period_start" type="date" required disabled={busy} /></label>
@@ -102,7 +102,7 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
         const result=await request<{batch_id:string}>("/api/royalties/payouts",{...payload,idempotency_key:key});
         setSelected({}); payoutAttempt.current=null; setMessage("Payout batch recorded. No money was sent.");
         setBatch(await request(`/api/royalties/payouts/${encodeURIComponent(result.batch_id)}`));
-        await loadPage(offset); if (detail) await open(detail.statement.id);
+        await loadPage(offset); if (detail) await open(detail.statement.id); await onChanged?.();
       });
     }}>
       <h3 className="font-semibold">Record completed payments</h3>
@@ -127,7 +127,7 @@ export function StatementReview({ canMutate }: { canMutate: boolean }) {
           await request(`/api/royalties/payouts/${encodeURIComponent(id)}/reverse`,Object.fromEntries(data));
           setMessage("Batch recording reversed. No money was moved.");
           setBatch(await request(`/api/royalties/payouts/${encodeURIComponent(id)}`));
-          await loadPage(offset); if (detail) await open(detail.statement.id);
+          await loadPage(offset); if (detail) await open(detail.statement.id); await onChanged?.();
         });
       }}>
         <p className="text-sm">Reversal restores the balances for every payment listed above. Original entries remain in the audit history.</p>

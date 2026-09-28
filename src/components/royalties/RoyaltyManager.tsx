@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { RoyaltyForm, type RoyaltyRecord } from "./RoyaltyForm";
 import { StatementImport } from "./StatementImport";
 import { PayoutView } from "./PayoutView";
@@ -24,7 +24,7 @@ const STATUS_STYLES: Record<string, string> = {
 type ViewMode = "grouped" | "flat";
 type ActiveTab = "overview" | "statementRuns" | "trackRevenue" | "payouts" | "dataQuality";
 
-function formatMoney(value: string | number | null | undefined): string {
+function formatMoney(value: string | number | null | undefined, currency?: string): string {
   if (value == null) return "—";
   if (typeof value === "number") {
     return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -36,12 +36,12 @@ function formatMoney(value: string | number | null | undefined): string {
   const groupedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const visibleFraction = fraction.replace(/0+$/, "");
   const formattedFraction = visibleFraction.length === 0 ? "00" : visibleFraction.length === 1 ? `${visibleFraction}0` : visibleFraction;
-  return `${sign}$${groupedWhole}.${formattedFraction}`;
+  return `${currency ? currency + " " : "$"}${sign}${groupedWhole}.${formattedFraction}`;
 }
 
 export function RoyaltyManager({
   dashboard,
-  pipeline,
+  pipeline: initialPipeline,
   initialRecords,
   payoutPreview,
   artists,
@@ -56,6 +56,12 @@ export function RoyaltyManager({
   releases: Array<{ id: string; title: string }>;
   canMutate?: boolean;
 }) {
+  const [pipeline, setPipeline] = useState(initialPipeline);
+  async function refreshPipeline() {
+    const response = await fetch("/api/royalties/pipeline");
+    if (!response.ok) throw new Error("The action succeeded, but summary refresh failed. Reload to see current balances.");
+    setPipeline(await response.json());
+  }
   const [records, setRecords] = useState(initialRecords);
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -128,8 +134,8 @@ export function RoyaltyManager({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <PipelineStat label="Raw earnings" value={pipeline.earnings.rowCount.toLocaleString()} detail={`${pipeline.earnings.matchedCount.toLocaleString()} matched`} />
         <PipelineStat label="Unmatched" value={pipeline.earnings.unmatchedCount.toLocaleString()} detail="needs attribution" />
-        <PipelineStat label="Imported net" value={formatMoney(pipeline.earnings.netAmount)} detail={`${pipeline.imports.length} recent imports`} />
-        <PipelineStat label="Payee balances" value={formatMoney(pipeline.statements.closingBalance)} detail={`${pipeline.statements.openCount} open statements`} />
+        <PipelineStat label="Imported net" value={pipeline.earningTotals.length ? pipeline.earningTotals.map(total => <span className="block break-all" key={total.currency}>{formatMoney(total.amount,total.currency)}</span>) : "No earnings"} detail={`${pipeline.imports.length} recent imports`} />
+        <PipelineStat label="Payee balances" value={pipeline.postedTotals.length ? pipeline.postedTotals.map(total => <span className="block break-all" key={total.currency}>{formatMoney(total.amount,total.currency)}</span>) : "No posted balances"} detail="Issued allocations less recorded payouts" />
       </div>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -176,7 +182,7 @@ export function RoyaltyManager({
         </div>
       )}
 
-      {activeTab === "statementRuns" && <div className="space-y-8"><StatementReview canMutate={canMutate} /><StatementRunsView dashboard={dashboard} /></div>}
+      {activeTab === "statementRuns" && <div className="space-y-8"><StatementReview canMutate={canMutate} onChanged={refreshPipeline} /><StatementRunsView dashboard={dashboard} /></div>}
 
       {activeTab === "trackRevenue" && (
         <div className="space-y-6">
@@ -323,7 +329,7 @@ export function RoyaltyManager({
   );
 }
 
-function PipelineStat({ label, value, detail }: { label: string; value: string; detail: string }) {
+function PipelineStat({ label, value, detail }: { label: string; value: ReactNode; detail: string }) {
   return (
     <div className="bg-muted/20 p-4">
       <p className="text-xs text-muted-foreground">{label}</p>

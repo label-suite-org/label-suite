@@ -36,6 +36,7 @@ it("records multiple selected statements with one stable key when a response is 
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);
   const rows=[{...statement,status:"issued",posted_balance:"1.00000000"},{...statement,id:"statement-b",contact_name:"Second payee",status:"issued",posted_balance:"1.00000000"}];
   let attempts=0;
+  const changed=vi.fn().mockResolvedValue(undefined);
   const fetch=vi.fn(async(url:string,options?:RequestInit)=>{
     if(options?.method==="POST") {
       if(++attempts===1) throw new TypeError("Network response lost");
@@ -47,7 +48,7 @@ it("records multiple selected statements with one stable key when a response is 
   const element=document.createElement("div");document.body.append(element);const root=createRoot(element);
   const input=(field:HTMLInputElement,value:string)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(field,value);field.dispatchEvent(new Event("input",{bubbles:true}));};
   try {
-    await act(async()=>root.render(<StatementReview canMutate />));
+    await act(async()=>root.render(<StatementReview canMutate onChanged={changed} />));
     await act(async()=>{element.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach(field=>field.click());});
     const form=[...element.querySelectorAll("form")].find(item=>item.textContent?.includes("Record completed payments"))!;
     await act(async()=>{
@@ -60,6 +61,7 @@ it("records multiple selected statements with one stable key when a response is 
     expect(element.querySelector('[role="alert"]')?.textContent).toContain("Network response lost");
     await act(async()=>form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
     const requests=fetch.mock.calls.filter(([,options])=>options?.method==="POST").map(([,options])=>JSON.parse(String(options?.body)));
+    expect(changed).toHaveBeenCalledTimes(1);
     expect(requests).toHaveLength(2);expect(requests[0]).toEqual(requests[1]);
     expect(requests[0].lines).toEqual([{statement_id:"statement-a",amount:"0.25"},{statement_id:"statement-b",amount:"0.25"}]);
     expect(element.textContent).toContain("Payout batch recorded. No money was sent.");
