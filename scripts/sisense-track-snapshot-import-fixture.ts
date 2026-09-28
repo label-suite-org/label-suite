@@ -443,6 +443,22 @@ async function main(): Promise<void> {
       ].sort(),
     );
     assert.deepEqual(await service.listLatestByArtist(namespace.orgB), []);
+
+    // Sisense latest-import history deliberately excludes successful sync runs.
+    await pool.query(
+      `update "label_suite"."analytics_import_runs" set mode = 'sync' where org_id = $1 and id = $2`,
+      [namespace.orgA, other.runId],
+    );
+    try {
+      const manualOnly = await service.listLatestByArtist(namespace.orgA);
+      assert.equal(manualOnly.some((item) => item.artistId === namespace.artistOther), false);
+      assert.equal(manualOnly.find((item) => item.artistId === namespace.artistA)?.runId, correction.runId);
+    } finally {
+      await pool.query(
+        `update "label_suite"."analytics_import_runs" set mode = 'manual_import' where org_id = $1 and id = $2`,
+        [namespace.orgA, other.runId],
+      );
+    }
     const orgBMetricCount = await pool.query<{ total: number }>(
       `select count(*)::int as total from "label_suite"."analytics_metric_rows" where org_id = $1`,
       [namespace.orgB],
