@@ -199,6 +199,7 @@ function ProposalCard({
           <Button
             type="button"
             aria-label="Dismiss recommendation"
+            variant="outline"
             disabled={decisionPending || disabled}
             onClick={() => void onDecision(proposal, "dismissed")}
             className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted disabled:cursor-wait disabled:opacity-60"
@@ -210,7 +211,7 @@ function ProposalCard({
             aria-label="Mark handled"
             disabled={decisionPending || disabled}
             onClick={() => void onDecision(proposal, "resolved")}
-            className="rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+            className="rounded-md px-3 py-2 text-sm font-medium disabled:cursor-wait disabled:opacity-60"
           >
             Mark handled
           </Button>

@@ -1659,3 +1659,22 @@ test("enabled campaign controls immediately regain full contrast", async ({ page
   expect(opacities.length).toBeGreaterThan(0);
   expect(opacities.every((opacity) => opacity === "1")).toBe(true);
 });
+
+test("campaign recommendation actions retain contrast on hover", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-gate", "Hover requires a mouse pointer");
+  await login(page);
+  await page.goto(`/campaigns/${RADIO_CAMPAIGN_ID}?tab=outreach`);
+  for (const dark of [false, true]) {
+    await setTheme(page, dark);
+    for (const name of ["Dismiss recommendation", "Mark handled"]) {
+      const button = page.getByRole("button", { name, exact: true }).first();
+      await expect(button).toBeEnabled();
+      await button.hover();
+      await button.evaluate(async (element) => {
+        await Promise.all(element.getAnimations().map((animation) => animation.finished));
+      });
+      const result = await new AxeBuilder({ page }).include(`[aria-label="${name}"]`).analyze();
+      expect(result.violations).toEqual([]);
+    }
+  }
+});
