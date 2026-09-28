@@ -100,7 +100,7 @@ describe("Sisense forced-failure fixture safety", () => {
   });
 
   it("checks the target contract before the importer can query or mutate", () => {
-    const importer = readFileSync(new URL("./sisense-sync.ts", import.meta.url), "utf8");
+    const importer = readFileSync(new URL("./sisense-ingestion-run.ts", import.meta.url), "utf8");
     const seamCheck = importer.indexOf("assertForcedFailureSeamTarget();");
     const firstDatabaseQuery = importer.indexOf("successfulRunExists(pool, orgId)");
     const firstDatabaseConnection = importer.indexOf("const client = pool ? await pool.connect() : null;");
