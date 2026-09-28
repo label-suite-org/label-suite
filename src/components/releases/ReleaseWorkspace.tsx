@@ -1,5 +1,7 @@
 "use client";
 
+import { ReleaseDeliveryPanel } from "./ReleaseDeliveryPanel";
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   ArrowUpRight,
@@ -194,7 +196,7 @@ const RELEASE_SECTIONS: Array<{ key: ReleaseSection; label: string; description:
   { key: "timeline", label: "Timeline", description: "Milestones, tasks, and phase budget" },
   { key: "campaigns", label: "Campaigns", description: "Linked promotion and channels" },
   { key: "budget", label: "Budget", description: "Spend plan and DSP pitches" },
-  { key: "assets", label: "Assets & documents", description: "Release-linked files" },
+  { key: "assets", label: "Assets & delivery", description: "Release-linked files and manual delivery" },
   { key: "analytics", label: "Analytics", description: "Scoped performance data" },
 ];
 
@@ -656,6 +658,8 @@ export function ReleaseWorkspace({
         </div>
       </nav>
 
+      {activeSection === "overview" && <ReleaseDeliveryPanel compact releaseId={release.id} canManage={canManage} onOpen={()=>selectSection("assets")} onInspect={tracks=>tracks?selectSection("tracks"):selectSection("overview","upc")} />}
+
       {activeSection === "overview" && <ReleaseOperationsBrief brief={operationsBrief} onAction={handleBriefAction} />}
 
       {activeSection === "overview" && (
@@ -736,7 +740,7 @@ export function ReleaseWorkspace({
           </div>
         </div>}
 
-        {activeSection === "assets" && <ReleaseAssetsPanel documents={documents} mediaAssets={mediaAssets} />}
+        {activeSection === "assets" && <div className="space-y-5"><ReleaseDeliveryPanel releaseId={release.id} canManage={canManage} onOpen={()=>selectSection("assets")} onInspect={tracks=>tracks?selectSection("tracks"):selectSection("overview","upc")} /><ReleaseAssetsPanel documents={documents} mediaAssets={mediaAssets} /></div>}
 
         {activeSection === "analytics" && <div id="performance-data" className="scroll-mt-4">
           <Panel title="Performance data" action={<span className="text-xs text-muted-foreground">{cockpit?.dataWindow.from ? `${formatDate(cockpit.dataWindow.from)} to ${cockpit.dataWindow.to ? formatDate(cockpit.dataWindow.to) : "now"}` : "No scoped window"}</span>}>
