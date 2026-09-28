@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt } from "drizzle-orm";
 import { z } from "zod";
 import {
   budget_line_items,
@@ -64,15 +64,15 @@ export const updateCampaignEngagementSchema = z.object(campaignEngagementFields)
   outreach_channel: campaignEngagementFields.outreach_channel.unwrap().optional(),
   outreach_permission_status: campaignEngagementFields.outreach_permission_status.unwrap().optional(),
 });
-export const createCampaignDeliverableSchema = z.object({
-  id: idSchema.optional(),
-  engagement_id: idSchema,
+const deliverableFields = {
   description: z.string().trim().min(1).max(5_000),
   due_date: dateTime,
-  approval_status: z.enum(["pending", "approved", "changes_requested", "rejected"]).default("pending"),
-  evidence_url: z.string().url().max(2_000).nullable().optional(),
+  approval_status: z.enum(["pending", "approved", "changes_requested", "rejected"]),
+  evidence_url: url.nullable().optional(),
   notes: nullableText,
-});
+};
+export const createCampaignDeliverableSchema = z.object({ id: idSchema.optional(), engagement_id: idSchema, ...deliverableFields, approval_status: deliverableFields.approval_status.default("pending") });
+export const updateCampaignDeliverableSchema = z.object(deliverableFields).partial().extend({ id: idSchema, expected_updated_at: z.string().datetime().nullable() });
 export const createCampaignPostSchema = z.object({
   id: idSchema.optional(),
   engagement_id: nullableText,
@@ -187,6 +187,25 @@ export async function createCampaignDeliverable(orgId: string, campaignId: strin
   const id = input.id ?? crypto.randomUUID();
   await db.insert(campaign_creator_deliverables).values({ ...input, id, org_id: orgId, due_date: input.due_date ? new Date(input.due_date) : null });
   return { id, ok: true };
+}
+
+export async function updateCampaignDeliverable(orgId: string, campaignId: string, input: z.infer<typeof updateCampaignDeliverableSchema>) {
+  const rows = await db.select({ engagement_id: campaign_creator_deliverables.engagement_id, updated_at: campaign_creator_deliverables.updated_at })
+    .from(campaign_creator_deliverables).where(and(eq(campaign_creator_deliverables.id, input.id), eq(campaign_creator_deliverables.org_id, orgId))).limit(1);
+  if (!rows.length) throw new NotFoundError("Deliverable not found");
+  await requireEngagement(orgId, campaignId, rows[0].engagement_id);
+  const { id, expected_updated_at, due_date, ...fields } = input;
+  const expected = expected_updated_at ? new Date(expected_updated_at) : null;
+  // ponytail: JSON dates have millisecond precision; use a revision column if writers need finer concurrency.
+  const updatedAt = new Date(Math.max(Date.now(), (rows[0].updated_at?.getTime() ?? 0) + 1));
+  const updated = await db.update(campaign_creator_deliverables).set({ ...fields,
+    ...(due_date !== undefined ? { due_date: due_date ? new Date(due_date) : null } : {}),
+    updated_at: updatedAt,
+  }).where(and(eq(campaign_creator_deliverables.id, id), eq(campaign_creator_deliverables.org_id, orgId), eq(campaign_creator_deliverables.engagement_id, rows[0].engagement_id),
+    expected ? and(gte(campaign_creator_deliverables.updated_at, expected), lt(campaign_creator_deliverables.updated_at, new Date(expected.getTime() + 1))) : isNull(campaign_creator_deliverables.updated_at)))
+    .returning({ id: campaign_creator_deliverables.id });
+  if (!updated.length) throw new ConflictError("Deliverable changed since it was loaded. Reload before saving again.");
+  return { ok: true };
 }
 
 export async function createCampaignPost(orgId: string, campaignId: string, input: z.infer<typeof createCampaignPostSchema>) {

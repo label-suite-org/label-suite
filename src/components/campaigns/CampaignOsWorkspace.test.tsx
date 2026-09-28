@@ -37,6 +37,10 @@ it.each([
     form.querySelector<HTMLSelectElement>('[name="permission"]')!.value = "permitted";
     form.querySelector<HTMLInputElement>('[name="basis"]')!.value = "Direct opt-in";
   }
+  if (action === "create_deliverable") {
+    form.querySelector<HTMLSelectElement>('[name="approval_status"]')!.value = "approved";
+    form.querySelector<HTMLInputElement>('[name="evidence_url"]')!.value = "https://example.test/evidence";
+  }
   await act(async () => form.querySelector<HTMLButtonElement>("button")!.click());
   const saves = fetch.mock.calls.filter(([, options]) => options?.method === "POST");
   expect(saves).toHaveLength(1);
@@ -49,8 +53,33 @@ it.each([
       outreach_permission_recorded_at: expect.any(String),
     });
   }
+  if (action === "create_deliverable") expect(JSON.parse(saves[0][1].body).input).toMatchObject({ approval_status: "approved", evidence_url: "https://example.test/evidence" });
   expect(container.querySelector('[role="alert"]')).toBeNull();
   if (action !== "finalize_report") expect(form.querySelector<HTMLInputElement>("input[required], textarea[required]")?.value ?? "").toBe("");
+});
+
+it("shows deliverable evidence read-only and edits due date, approval, evidence, and notes for operators", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const workspace = { territories: [], engagements: [{ id: "engagement", contact_id: "contact", contact_name: "Test creator", status: "identified", outreach_channel: "email", outreach_permission_status: "unknown" }], deliverables: [{ id: "deliverable", engagement_id: "engagement", description: "Launch video", due_date: "2026-10-01T00:00:00.000Z", approval_status: "pending", evidence_url: "https://example.test/draft", notes: "First cut", updated_at: "2026-09-28T10:00:00.000Z" }], posts: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null } };
+  const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => workspace });
+  vi.stubGlobal("fetch", fetch);
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate={false} contacts={[]} />));
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent?.includes("Launch video"))!.click());
+  expect(container.textContent).toContain("First cut");
+  expect(container.querySelector<HTMLAnchorElement>('a[href="https://example.test/draft"]')).not.toBeNull();
+  expect(container.textContent).not.toContain("Save deliverable");
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="creators" canMutate contacts={[]} />));
+  const form = [...container.querySelectorAll<HTMLFormElement>("form")].find((candidate) => candidate.querySelector('[name="approval_status"]'))!;
+  form.querySelector<HTMLInputElement>('[name="due_date"]')!.value = "2026-10-02";
+  form.querySelector<HTMLSelectElement>('[name="approval_status"]')!.value = "approved";
+  form.querySelector<HTMLInputElement>('[name="evidence_url"]')!.value = "https://example.test/final";
+  form.querySelector<HTMLTextAreaElement>('[name="notes"]')!.value = "Approved cut";
+  await act(async () => form.querySelector<HTMLButtonElement>('button[type="submit"]')!.click());
+  const save = JSON.parse(fetch.mock.calls.find(([, options]) => options?.method === "POST")![1].body);
+  expect(save).toMatchObject({ action: "update_deliverable", input: { id: "deliverable", expected_updated_at: "2026-09-28T10:00:00.000Z", due_date: "2026-10-02T00:00:00.000Z", approval_status: "approved", evidence_url: "https://example.test/final", notes: "Approved cut" } });
 });
 
 it("shows the captured observation date beside a recorded post", async () => {
