@@ -8,7 +8,7 @@ vi.mock("../lib/db", () => {
 });
 import { reviewRoyaltyStatement } from "./royalty-statement-review";
 const stamp = "2026-09-28T00:00:00.000Z";
-beforeEach(() => { vi.clearAllMocks(); mocks.lock.mockResolvedValue([{ status: "calculated", updated_at: new Date(stamp) }]); });
+beforeEach(() => { vi.clearAllMocks(); mocks.lock.mockResolvedValue([{ status: "calculated", period_start: "2026-08-01", period_end: "2026-08-31", updated_at: new Date(stamp) }]); });
 it("rejects missing workspace statements before mutation", async () => {
   mocks.lock.mockResolvedValue([]);
   await expect(reviewRoyaltyStatement("org", "foreign", stamp)).rejects.toMatchObject({ status: 404 });

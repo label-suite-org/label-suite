@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { royalty_statements, royalty_calculation_runs, royalty_ledger_transactions, royalty_ledger_entries } from "../db/schema";
+import { buildCalculationRunId } from "./royalty-statements-core";
 import { db } from "../lib/db";
 import { ConflictError, NotFoundError } from "./errors";
 
@@ -17,11 +18,14 @@ export async function reviewRoyaltyStatement(orgId: string, statementId: string,
       throw new ConflictError("Statement changed; reload it before reviewing");
     }
     if (statement.status !== (issuance ? "reviewed" : "calculated")) throw new ConflictError(issuance ? "Only a reviewed statement can be issued" : "Only a calculated statement can be reviewed");
-    // Serialize issuances sharing source earnings before checking prior allocations.
+    // Lock the complete period in a stable order before checking any allocation.
     await tx.execute(sql`select earning.id from label_suite.royalty_earnings earning
-      join label_suite.royalty_statement_lines line on line.earning_id = earning.id and line.org_id = earning.org_id
-      where line.org_id = ${orgId} and line.statement_id = ${statementId}
-      order by earning.id for update of earning`);
+      where earning.org_id = ${orgId} and (
+        (${Boolean(issuance)} and earning.currency = ${statement.currency}
+          and earning.report_period >= ${statement.period_start.slice(0, 7)} and earning.report_period <= ${statement.period_end.slice(0, 7)})
+        or (${!issuance} and exists (select 1 from label_suite.royalty_statement_lines line
+          where line.org_id = ${orgId} and line.statement_id = ${statementId} and line.earning_id = earning.id)))
+      order by earning.id for update`);
     const result = await tx.execute<{ valid: boolean }>(sql`
       select count(*) > 0
         and bool_and(coalesce(line.line_type = 'earning'
@@ -62,6 +66,28 @@ export async function reviewRoyaltyStatement(orgId: string, statementId: string,
       if (overlap.rows.length) throw new ConflictError("Source earnings have already been issued to this payee");
       const runId = /^Calculation run (royalty_calculation_[a-f0-9]{24})$/.exec(statement.notes ?? "")?.[1];
       if (!runId) throw new ConflictError("Statement calculation evidence is missing");
+      // The notes field is editable; prove its run id against current calculation inputs.
+      const earnings = await tx.execute<{ id: string; work_id: string | null; report_period: string; currency: string; net_amount: string }>(sql`
+        select id, work_id, report_period, currency, net_amount from label_suite.royalty_earnings
+        where org_id = ${orgId} and currency = ${statement.currency}
+          and report_period >= ${statement.period_start.slice(0, 7)} and report_period <= ${statement.period_end.slice(0, 7)}
+        order by id for update`);
+      const roles = await tx.execute<{ id: string; work_id: string; contact_id: string; percent_share: string; payee_name: string | null }>(sql`
+        select role.id, role.work_id, role.contact_id, role.percent_share, contact.name as payee_name
+        from label_suite.roles role left join label_suite.contacts contact on contact.id = role.contact_id and contact.org_id = role.org_id
+        where role.org_id = ${orgId} and role.scope = 'Master' and role.ownership_type = 'Rights'
+          and role.percent_share is not null and role.work_id in (
+            select work_id from label_suite.royalty_earnings where org_id = ${orgId} and currency = ${statement.currency}
+              and report_period >= ${statement.period_start.slice(0, 7)} and report_period <= ${statement.period_end.slice(0, 7)})
+        order by role.id for share of role`);
+      const signature = JSON.stringify({
+        earnings: earnings.rows.map(row => [row.id, row.work_id, row.report_period, row.currency, row.net_amount]).sort(),
+        roles: roles.rows.map(row => [row.id, row.work_id, row.contact_id, row.percent_share, row.payee_name])
+          .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
+      });
+      if (runId !== buildCalculationRunId(orgId, statement.period_start, statement.period_end, statement.currency, signature)) {
+        throw new ConflictError("Calculation inputs changed; prepare and review a fresh statement");
+      }
       const [run] = await tx.select().from(royalty_calculation_runs)
         .where(and(eq(royalty_calculation_runs.org_id, orgId), eq(royalty_calculation_runs.id, runId))).for("update");
       if (!run || !["draft", "approved"].includes(run.status)) throw new ConflictError("Calculation run cannot be issued");
