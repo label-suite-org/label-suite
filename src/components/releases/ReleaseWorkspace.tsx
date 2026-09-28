@@ -1198,7 +1198,8 @@ function CoverWorkbench({
         type="button"
         onClick={onOpen}
         id="release-cover-button"
-        className={`group relative block aspect-square w-full overflow-hidden rounded-lg border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${active ? "border-foreground" : "border-border hover:border-foreground/60"}`}
+        variant="outline"
+        className={`group relative block aspect-square h-auto w-full overflow-hidden rounded-lg border p-0 text-left whitespace-normal transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${active ? "border-foreground" : "border-border hover:border-foreground/60"}`}
       >
         {src && !failed ? (
           <img
