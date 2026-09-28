@@ -15,7 +15,7 @@ import { idSchema, nullableNumber, nullableText } from "./validation";
 
 const isoCountryCode = z.string().regex(/^[A-Z]{2}$/, "Use a two-letter ISO country code");
 const dateTime = z.string().datetime().nullable().optional();
-const url = z.string().url().max(2_000);
+const url = z.url({ protocol: /^https?$/ }).max(2_000);
 
 const campaignEngagementFields = {
   contact_id: idSchema,
