@@ -30,6 +30,7 @@ const STATUSES = ["draft", "review", "sent", "signed", "filed", "archived"];
 
 export function DocumentForm({
   initial,
+  defaultContactId = "",
   artists,
   releases,
   contacts,
@@ -37,6 +38,7 @@ export function DocumentForm({
   onClose,
 }: {
   initial?: DocumentRecord | null;
+  defaultContactId?: string;
   artists: Array<{ id: string; name: string }>;
   releases: Array<{ id: string; title: string }>;
   contacts: Array<{ id: string; name: string }>;
@@ -49,7 +51,7 @@ export function DocumentForm({
   const [docType, setDocType] = useState(initial?.doc_type || "contract");
   const [releaseId, setReleaseId] = useState(initial?.release_id || "");
   const [artistId, setArtistId] = useState(initial?.artist_id || "");
-  const [contactId, setContactId] = useState(initial?.contact_id || "");
+  const [contactId, setContactId] = useState(initial ? initial.contact_id || "" : defaultContactId);
   const [projectId, setProjectId] = useState(initial?.project_id || "");
   const [status, setStatus] = useState(initial?.status || "draft");
   const [fileLink, setFileLink] = useState(initial?.file_link || "");

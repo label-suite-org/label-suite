@@ -50,6 +50,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 
 export function DocumentManager({
   initialDocuments,
+  defaultContactId,
   artists,
   releases,
   contacts,
@@ -57,6 +58,7 @@ export function DocumentManager({
   canMutate = true,
 }: {
   initialDocuments: DocumentRecord[];
+  defaultContactId?: string;
   artists: Array<{ id: string; name: string }>;
   releases: Array<{ id: string; title: string }>;
   contacts: Array<{ id: string; name: string }>;
@@ -245,7 +247,7 @@ export function DocumentManager({
 
       {canMutate && creating && (
         <ModalShell title="Add document" onClose={() => setCreating(false)}>
-          <DocumentForm artists={artists} releases={releases} contacts={contacts} projects={projectOptions} onClose={() => setCreating(false)} />
+          <DocumentForm defaultContactId={defaultContactId} artists={artists} releases={releases} contacts={contacts} projects={projectOptions} onClose={() => setCreating(false)} />
         </ModalShell>
       )}
 

@@ -81,3 +81,15 @@ describe("resource form accessibility", () => {
     }
   });
 });
+
+
+describe("contact document creation", () => {
+  it("preselects the contact for a new document without changing an existing document owner", () => {
+    const props = { artists: [], releases: [], projects: [], contacts: [{ id: "contact-1", name: "Vendor" }], defaultContactId: "contact-1", onClose: () => undefined };
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(<DocumentForm {...props} />);
+    expect(container.querySelector<HTMLSelectElement>('select[id$="-contact"]')?.value).toBe("contact-1");
+    container.innerHTML = renderToStaticMarkup(<DocumentForm {...props} initial={{ id: "existing", name: "Unassigned agreement", contact_id: null }} />);
+    expect(container.querySelector<HTMLSelectElement>('select[id$="-contact"]')?.value).toBe("");
+  });
+});
