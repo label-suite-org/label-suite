@@ -15,6 +15,7 @@ import {
   type SpotifyCatalogCandidate,
   type SpotifyIdentityInput,
 } from "./spotify-identity-core";
+import { resolveSpotifyIdentityLink } from "./spotify-identity-link";
 import { idSchema, nullableText, requiredText } from "./validation";
 
 export const spotifyIdentityInputSchema = z.object({
@@ -26,6 +27,11 @@ export const spotifyIdentityInputSchema = z.object({
   isrc: nullableText,
   upc_ean: nullableText,
 }).strict();
+
+export const spotifyIdentityProposalSchema = z.union([
+  z.object({ spotify_url: z.string().trim().min(1).max(2048) }).strict(),
+  spotifyIdentityInputSchema,
+]);
 
 export const confirmSpotifyIdentitySchema = z.object({
   connection_id: idSchema,
@@ -69,9 +75,10 @@ async function listCandidates(orgId: string, objectType: SpotifyIdentityInput["o
   return rows.map((row) => ({ object_type: "track", object_id: row.id, title: row.title, artist_name: row.artist_name, isrc: row.isrc }));
 }
 
-export async function proposeSpotifyIdentity(orgId: string, raw: z.input<typeof spotifyIdentityInputSchema>) {
+export async function proposeSpotifyIdentity(orgId: string, raw: z.input<typeof spotifyIdentityProposalSchema>) {
   requireSpotifyIdentityFlag();
-  const input = spotifyIdentityInputSchema.parse(raw);
+  const request = spotifyIdentityProposalSchema.parse(raw);
+  const input = "spotify_url" in request ? await resolveSpotifyIdentityLink(request.spotify_url) : request;
   const proposal = proposeSpotifyIdentityCore(input, await listCandidates(orgId, input.object_type));
   return {
     provider_key: "spotify",
