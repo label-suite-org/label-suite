@@ -51,6 +51,9 @@ export const createCampaignEngagementSchema = z.object({ ...campaignEngagementFi
   if (value.outreach_permission_status === "permitted" && value.outreach_permission_revoked_at) {
     ctx.addIssue({ code: "custom", path: ["outreach_permission_revoked_at"], message: "Revoked permission cannot be used for outreach" });
   }
+  if (value.outreach_permission_status === "revoked" && !value.outreach_permission_revoked_at) {
+    ctx.addIssue({ code: "custom", path: ["outreach_permission_revoked_at"], message: "Revocation time is required" });
+  }
   if (contactStatuses.has(value.status) && !hasRecordedPermission(value)) {
     ctx.addIssue({ code: "custom", path: ["status"], message: "Recorded outreach permission is required before contact" });
   }
@@ -89,7 +92,7 @@ async function requireCampaign(orgId: string, campaignId: string) {
 }
 
 async function requireEngagement(orgId: string, campaignId: string, engagementId: string) {
-  const rows = await db.select({ id: campaign_creator_engagements.id, status: campaign_creator_engagements.status, outreach_permission_status: campaign_creator_engagements.outreach_permission_status, outreach_permission_basis: campaign_creator_engagements.outreach_permission_basis, outreach_permission_recorded_at: campaign_creator_engagements.outreach_permission_recorded_at, outreach_permission_revoked_at: campaign_creator_engagements.outreach_permission_revoked_at }).from(campaign_creator_engagements)
+  const rows = await db.select({ id: campaign_creator_engagements.id, contact_id: campaign_creator_engagements.contact_id, status: campaign_creator_engagements.status, outreach_channel: campaign_creator_engagements.outreach_channel, outreach_permission_status: campaign_creator_engagements.outreach_permission_status, outreach_permission_basis: campaign_creator_engagements.outreach_permission_basis, outreach_permission_recorded_at: campaign_creator_engagements.outreach_permission_recorded_at, outreach_permission_revoked_at: campaign_creator_engagements.outreach_permission_revoked_at }).from(campaign_creator_engagements)
     .where(and(eq(campaign_creator_engagements.id, engagementId), eq(campaign_creator_engagements.campaign_id, campaignId), eq(campaign_creator_engagements.org_id, orgId))).limit(1);
   if (!rows.length) throw new NotFoundError("Creator Engagement not found");
   return rows[0];
@@ -160,7 +163,11 @@ export async function updateCampaignEngagement(orgId: string, campaignId: string
     outreach_permission_revoked_at: input.outreach_permission_revoked_at === undefined ? current.outreach_permission_revoked_at : input.outreach_permission_revoked_at,
   };
   const permissionChanged = input.outreach_permission_status !== undefined || input.outreach_permission_basis !== undefined || input.outreach_permission_recorded_at !== undefined || input.outreach_permission_revoked_at !== undefined;
+  const scopeChanged = (input.contact_id !== undefined && input.contact_id !== current.contact_id) || (input.outreach_channel !== undefined && input.outreach_channel !== current.outreach_channel);
+  if (scopeChanged && ((input.outreach_permission_status === undefined && current.outreach_permission_status !== "unknown") || (input.outreach_permission_status === "permitted" && (!input.outreach_permission_basis || !input.outreach_permission_recorded_at)))) throw new HttpError("Changing Contact or channel requires an explicit permission status and fresh evidence when permitted", 409);
   if (permissionChanged && permission.outreach_permission_status === "permitted" && !hasRecordedPermission(permission)) throw new HttpError("Permitted outreach requires a basis, recorded time, and no revocation", 409);
+  if (input.outreach_permission_status === "revoked" && current.outreach_permission_status !== "revoked" && !input.outreach_permission_revoked_at) throw new HttpError("Revocation time is required", 409);
+  if (scopeChanged && contactStatuses.has(input.status ?? current.status) && !hasRecordedPermission(permission)) throw new HttpError("Recorded outreach permission is required before changing a contacted engagement's Contact or channel", 409);
   if (input.status && input.status !== current.status && contactStatuses.has(input.status) && !hasRecordedPermission(permission)) throw new HttpError("Recorded outreach permission is required before contact", 409);
   if (input.contact_id) await requireContact(orgId, input.contact_id);
   const budgetLineId = await requireBudgetLine(orgId, campaignId, input.budget_line_id);

@@ -33,6 +33,7 @@ describe("Campaign OS input contract", () => {
   it("requires recorded permission before creating a contacted engagement", () => {
     expect(() => createCampaignEngagementSchema.parse({ contact_id: "contact-1", status: "contacted" })).toThrow("Recorded outreach permission is required before contact");
     expect(() => createCampaignEngagementSchema.parse({ contact_id: "contact-1", outreach_permission_status: "permitted", outreach_permission_basis: "Direct opt-in" })).toThrow("Permission recorded time is required");
+    expect(() => createCampaignEngagementSchema.parse({ contact_id: "contact-1", outreach_permission_status: "revoked" })).toThrow("Revocation time is required");
   });
 
   it("accepts only valid ISO country codes and manual post URLs", () => {
