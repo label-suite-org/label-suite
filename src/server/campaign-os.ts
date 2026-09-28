@@ -2,18 +2,28 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or } from 
 import { z } from "zod";
 import {
   budget_line_items,
+  artists,
   campaign_creator_deliverables,
   campaign_creator_engagements,
   campaign_posts,
   campaign_territories,
   campaigns,
   contacts,
+  releases,
 } from "../db/schema";
 import { db } from "../lib/db";
 import { ConflictError, HttpError, isPostgresSerializationFailure, NotFoundError } from "./errors";
 import { idSchema, nullableNumber, nullableText } from "./validation";
 
-const isoCountryCode = z.string().regex(/^[A-Z]{2}$/, "Use a two-letter ISO country code");
+// ISO 3166-1 alpha-2 codes, checked against the UN M49 list on 2026-09-28; TW is ISO-assigned but absent from M49.
+const isoCountryCodes = new Set(`
+AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ
+DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT
+JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG
+NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ
+TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW
+`.trim().split(/\s+/));
+const isoCountryCode = z.string().refine((value) => isoCountryCodes.has(value), "Use an assigned two-letter ISO country code");
 const dateTime = z.string().datetime().nullable().optional();
 const url = z.url({ protocol: /^https?$/ }).max(2_000);
 const contactStatuses = new Set(["permission_confirmed", "contacted", "negotiating", "agreed", "delivering", "complete"]);
@@ -87,7 +97,13 @@ export const setCampaignTerritoriesSchema = z.object({ country_codes: z.array(is
 export const finalizeCampaignReportSchema = z.object({ report: z.string().trim().min(1).max(20_000) });
 
 async function requireCampaign(orgId: string, campaignId: string, database: Pick<typeof db, "select"> = db) {
-  const rows = await database.select({ id: campaigns.id, final_report: campaigns.final_report, final_report_snapshot: campaigns.final_report_snapshot, final_report_finalized_at: campaigns.final_report_finalized_at }).from(campaigns).where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId))).limit(1);
+  const rows = await database.select({
+    id: campaigns.id, campaign_name: campaigns.campaign_name, linked_artist_id: campaigns.linked_artist_id,
+    linked_release_id: campaigns.linked_release_id, start_date: campaigns.start_date, end_date: campaigns.end_date,
+    brief: campaigns.brief, goal: campaigns.goal, notes: campaigns.notes,
+    final_report: campaigns.final_report, final_report_snapshot: campaigns.final_report_snapshot,
+    final_report_finalized_at: campaigns.final_report_finalized_at,
+  }).from(campaigns).where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId))).limit(1);
   if (!rows.length) throw new NotFoundError("Campaign not found");
   return rows[0];
 }
@@ -119,7 +135,7 @@ async function claimBudgetLine(orgId: string, campaignId: string, budgetLineId: 
 
 export async function getCampaignOsWorkspace(orgId: string, campaignId: string, database: Pick<typeof db, "select"> = db) {
   const campaign = await requireCampaign(orgId, campaignId, database);
-  const [territories, engagements, posts, availableBudgetLines, otherCampaignLinks] = await Promise.all([
+  const [territories, engagements, posts, availableBudgetLines, otherCampaignLinks, artistRows, releaseRows] = await Promise.all([
     database.select({ id: campaign_territories.id, country_code: campaign_territories.country_code }).from(campaign_territories)
       .where(and(eq(campaign_territories.org_id, orgId), eq(campaign_territories.campaign_id, campaignId))).orderBy(asc(campaign_territories.country_code)),
     database.select({
@@ -136,7 +152,18 @@ export async function getCampaignOsWorkspace(orgId: string, campaignId: string, 
       .from(budget_line_items).where(and(eq(budget_line_items.org_id, orgId), or(eq(budget_line_items.campaign_id, campaignId), isNull(budget_line_items.campaign_id)))).orderBy(asc(budget_line_items.name)),
     database.select({ budget_line_id: campaign_creator_engagements.budget_line_id }).from(campaign_creator_engagements)
       .where(and(eq(campaign_creator_engagements.org_id, orgId), ne(campaign_creator_engagements.campaign_id, campaignId), isNotNull(campaign_creator_engagements.budget_line_id))),
+    campaign.linked_artist_id ? database.select({ name: artists.name }).from(artists)
+      .where(and(eq(artists.org_id, orgId), eq(artists.id, campaign.linked_artist_id))).limit(1) : [],
+    campaign.linked_release_id ? database.select({ title: releases.title }).from(releases)
+      .where(and(eq(releases.org_id, orgId), eq(releases.id, campaign.linked_release_id))).limit(1) : [],
   ]);
+  const campaignContext = {
+    id: campaign.id, name: campaign.campaign_name, artist_id: campaign.linked_artist_id,
+    artist_name: artistRows[0]?.name ?? null, release_id: campaign.linked_release_id,
+    release_title: releaseRows[0]?.title ?? null, start_date: campaign.start_date,
+    end_date: campaign.end_date, territories: territories.map((item) => item.country_code),
+    brief: campaign.brief, goal: campaign.goal, notes: campaign.notes,
+  };
   const linkedBudgetIds = new Set(engagements.map((engagement) => engagement.budget_line_id).filter(Boolean));
   const unavailableBudgetIds = new Set(otherCampaignLinks.map((engagement) => engagement.budget_line_id));
   const budgetLines = availableBudgetLines.filter((line) => line.campaign_id === campaignId && linkedBudgetIds.has(line.id));
@@ -150,7 +177,7 @@ export async function getCampaignOsWorkspace(orgId: string, campaignId: string, 
     committed: total.committed + Number(line.committed_amount ?? 0),
     paid: total.paid + Number(line.paid_amount ?? 0),
   }), { planned: 0, committed: 0, paid: 0 });
-  return { territories, engagements, deliverables, posts, budgetLines, budgetLineOptions, cost, report: { narrative: campaign.final_report, snapshot: campaign.final_report_snapshot, finalized_at: campaign.final_report_finalized_at } };
+  return { campaign: campaignContext, territories, engagements, deliverables, posts, budgetLines, budgetLineOptions, cost, report: { narrative: campaign.final_report, snapshot: campaign.final_report_snapshot, finalized_at: campaign.final_report_finalized_at } };
 }
 
 export async function createCampaignEngagement(orgId: string, campaignId: string, input: z.infer<typeof createCampaignEngagementSchema>) {
@@ -247,7 +274,7 @@ export async function finalizeCampaignReport(orgId: string, campaignId: string, 
     return await db.transaction(async (tx) => {
       const workspace = await getCampaignOsWorkspace(orgId, campaignId, tx);
       const finalizedAt = new Date();
-      const snapshot = { finalized_at: finalizedAt.toISOString(), cost: workspace.cost, deliverable_count: workspace.deliverables.length, approved_deliverable_count: workspace.deliverables.filter((item) => item.approval_status === "approved").length, post_count: workspace.posts.length, manual_metrics: workspace.posts.reduce<Record<string, number>>((all, post) => {
+      const snapshot = { finalized_at: finalizedAt.toISOString(), campaign: workspace.campaign, cost: workspace.cost, deliverable_count: workspace.deliverables.length, approved_deliverable_count: workspace.deliverables.filter((item) => item.approval_status === "approved").length, post_count: workspace.posts.length, manual_metrics: workspace.posts.reduce<Record<string, number>>((all, post) => {
         for (const [key, value] of Object.entries(post.manual_metrics ?? {})) all[key] = (all[key] ?? 0) + Number(value);
         return all;
       }, {}), creator_delivery: workspace.engagements.map((engagement) => ({

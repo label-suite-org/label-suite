@@ -79,6 +79,13 @@ describe("campaign rich-text persistence", () => {
     vi.clearAllMocks();
   });
 
+  it("rejects impossible Campaign dates at the API schema while accepting empty legacy fields", () => {
+    const base = { campaign_name: "Launch", linked_artist_id: "artist-1", linked_release_id: "release-1" };
+    expect(() => createCampaignSchema.parse({ ...base, start_date: "2026-02-30" })).toThrow();
+    expect(() => updateCampaignSchema.parse({ id: "campaign-1", expected_revision: 1, end_date: "2026-13-01" })).toThrow();
+    expect(createCampaignSchema.parse({ ...base, start_date: null, end_date: "" })).toMatchObject({ start_date: null, end_date: null });
+  });
+
   it("accepts a goal document and atomically derives compatibility text on update", async () => {
     const input = updateCampaignSchema.parse({ id: "campaign-1", expected_revision: EXPECTED_REVISION, goal_document: doc("Earn airplay") });
 

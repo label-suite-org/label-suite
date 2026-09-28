@@ -181,9 +181,11 @@ it("shows the captured observation date beside a recorded post", async () => {
 
 it("shows saved report figures beside live figures without offering finalisation again", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const savedCampaign = { id: "campaign", name: "First launch", artist_id: "artist", artist_name: "Alex", release_id: "release", release_title: "First EP", start_date: "2026-09-01", end_date: "2026-09-30", territories: ["DK"], brief: "Original brief", goal: "First goal", notes: "Original notes" };
+  const liveCampaign = { ...savedCampaign, name: "Revised launch", artist_name: "Alex New", territories: ["DK", "DE"], brief: "Revised brief", goal: "New goal", notes: "Later correction" };
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
-    territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 20, committed: 10, paid: 5 },
-    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T00:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
+    campaign: liveCampaign, territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 20, committed: 10, paid: 5 },
+    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", campaign: savedCampaign, cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T00:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
   }) }));
   container = document.createElement("div");
   document.body.append(container);
@@ -196,6 +198,13 @@ it("shows saved report figures beside live figures without offering finalisation
   expect(container.textContent).toContain("views: 100");
   expect(container.textContent).toContain("no platform monitoring occurs");
   await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("First launch · campaign");
+  expect(container.textContent).toContain("Revised launch · campaign");
+  expect(container.textContent).toContain("Original brief");
+  expect(container.textContent).toContain("Revised brief");
+  expect(container.textContent).toContain("Alex · artist");
+  expect(container.textContent).toContain("Alex New · artist");
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent === "Saved evidence at finalisation")!.click());
   expect(container.textContent).toContain("One video");
   expect(container.textContent).toContain("https://example.test/post");
   expect(container.textContent).toContain(`Published ${new Date("2026-09-27T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
@@ -215,5 +224,7 @@ it("labels older snapshots without item-level evidence honestly", async () => {
   root = createRoot(container);
   await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="report" canMutate contacts={[]} />));
   await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
+  expect(container.textContent).toContain("Campaign details were not saved with this older snapshot.");
+  await act(async () => [...container.querySelectorAll<HTMLButtonElement>('[data-slot="accordion-trigger"]')].find((button) => button.textContent === "Saved evidence at finalisation")!.click());
   expect(container.textContent).toContain("Item-level evidence was not saved with this older snapshot.");
 });

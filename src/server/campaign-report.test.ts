@@ -23,7 +23,7 @@ describe("Campaign report finalisation", () => {
     database.select.mockImplementation(() => ({
       from: (table: unknown) => ({
         where: (condition: Parameters<PgDialect["sqlToQuery"]>[0]) => ({
-          limit: async () => table === campaigns && new PgDialect().sqlToQuery(condition).params.includes(orgId) ? [{ id: campaignId, final_report: saved?.final_report ?? null, final_report_snapshot: saved?.final_report_snapshot ?? null, final_report_finalized_at: saved?.final_report_finalized_at ?? null }] : [],
+          limit: async () => table === campaigns && new PgDialect().sqlToQuery(condition).params.includes(orgId) ? [{ id: campaignId, campaign_name: "Original Campaign", linked_artist_id: null, linked_release_id: null, start_date: "2026-09-01", end_date: "2026-09-30", brief: "Original brief", goal: "Original goal", notes: "Original notes", final_report: saved?.final_report ?? null, final_report_snapshot: saved?.final_report_snapshot ?? null, final_report_finalized_at: saved?.final_report_finalized_at ?? null }] : [],
           orderBy: async () => table === campaign_posts ? posts : table === campaign_creator_deliverables ? [{ engagement_id: "engagement-1", description: "One video", approval_status: "approved", evidence_url: "https://example.test/evidence" }] : table === budget_line_items ? [{ id: "line-1", campaign_id: campaignId, name: "Creator fee", planned_amount: "100", amount: "100", committed_amount: "50", paid_amount: "25" }] : [],
           then: (resolve: (rows: unknown[]) => void) => resolve([]),
         }),
@@ -49,6 +49,7 @@ describe("Campaign report finalisation", () => {
     await expect(finalizeCampaignReport(orgId, campaignId, "Changed report", "actor-2")).rejects.toMatchObject({ status: 409 });
     expect(saved).toBe(first);
     expect(saved).toMatchObject({ final_report: "First report", final_report_finalized_by: "actor-1", final_report_snapshot: {
+      campaign: { id: campaignId, name: "Original Campaign", start_date: "2026-09-01", territories: [], brief: "Original brief", goal: "Original goal", notes: "Original notes" },
       cost: { planned: 100, committed: 50, paid: 25 },
       creator_delivery: [{ contact_name: "Alex", deliverables: [{ description: "One video", approval_status: "approved" }] }],
       post_evidence: [{ url: "https://example.test/post", manual_metrics: { views: 100 } }],

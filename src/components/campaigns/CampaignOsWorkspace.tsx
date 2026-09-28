@@ -8,8 +8,15 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+type CampaignContext = {
+  id: string; name: string; artist_id: string | null; artist_name: string | null;
+  release_id: string | null; release_title: string | null; start_date: string | null;
+  end_date: string | null; territories: string[]; brief: string | null;
+  goal: string | null; notes: string | null;
+};
 type ReportSnapshot = {
   finalized_at: string;
+  campaign?: CampaignContext;
   cost: { planned: number; committed: number; paid: number };
   deliverable_count: number;
   approved_deliverable_count: number;
@@ -20,6 +27,7 @@ type ReportSnapshot = {
   budget_lines?: Array<{ name: string; planned_amount: string | number | null; committed_amount: string | number | null; paid_amount: string | number | null }>;
 };
 type Workspace = {
+  campaign?: CampaignContext;
   territories: Array<{ id: string; country_code: string }>;
   engagements: Array<{ id: string; contact_id: string; contact_name: string; status: string; relationship_notes: string | null; outreach_channel: string; outreach_permission_status: string; outreach_permission_basis: string | null; outreach_permission_recorded_at: string | null; outreach_permission_revoked_at: string | null; agreed_rate: number | null; agreed_currency: string | null; budget_line_id: string | null }>;
   deliverables: Array<{ id: string; engagement_id: string; description: string; due_date: string | null; approval_status: string; evidence_url: string | null; notes: string | null; updated_at: string | null }>;
@@ -36,6 +44,19 @@ function metricsFromForm(form: FormData) {
     const raw = String(form.get(name) ?? "").trim();
     return raw ? [[name, Number(raw)]] : [];
   }));
+}
+
+function campaignContextRows(value: CampaignContext) {
+  return [
+    ["Campaign", `${value.name} · ${value.id}`],
+    ["Artist", value.artist_id ? `${value.artist_name ?? "Unknown artist"} · ${value.artist_id}` : "None linked"],
+    ["Release", value.release_id ? `${value.release_title ?? "Unknown release"} · ${value.release_id}` : "None linked"],
+    ["Dates", [value.start_date, value.end_date].filter(Boolean).join(" – ") || "None recorded"],
+    ["Territories", value.territories.join(", ") || "None recorded"],
+    ["Brief", value.brief || "None recorded"],
+    ["Goal", value.goal || "None recorded"],
+    ["Internal notes", value.notes || "None recorded"],
+  ];
 }
 
 export default function CampaignOsWorkspace({ campaignId, section, canMutate, canLinkBudget = false, contacts }: Props) {
@@ -144,6 +165,11 @@ export default function CampaignOsWorkspace({ campaignId, section, canMutate, ca
             <div><p className="font-medium">Saved at finalisation</p><p className="text-muted-foreground">Planned {snapshot.cost.planned} · Committed {snapshot.cost.committed} · Paid {snapshot.cost.paid}</p><p className="text-muted-foreground">Deliverables {snapshot.deliverable_count} · Approved {snapshot.approved_deliverable_count} · Posts {snapshot.post_count}</p><p className="text-muted-foreground">Manually captured metrics: {Object.entries(snapshot.manual_metrics).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p></div>
             <div><p className="font-medium">Current Campaign record</p><p className="text-muted-foreground">Planned {workspace.cost.planned} · Committed {workspace.cost.committed} · Paid {workspace.cost.paid}</p><p className="text-muted-foreground">Deliverables {workspace.deliverables.length} · Approved {workspace.deliverables.filter((item) => item.approval_status === "approved").length} · Posts {workspace.posts.length}</p><p className="text-muted-foreground">Manually captured metrics: {Object.entries(liveMetrics).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p></div>
           </div>
+          <Accordion><AccordionItem value="campaign-context"><AccordionTrigger>Campaign details at finalisation</AccordionTrigger><AccordionContent>
+            {snapshot.campaign && workspace.campaign ? <div className="grid gap-4 text-sm md:grid-cols-2">
+              {([ ["Saved at finalisation", snapshot.campaign], ["Current Campaign record", workspace.campaign] ] as const).map(([title, context]) => <div key={title} className="space-y-2 rounded-lg border p-3"><p className="font-medium">{title}</p><dl className="space-y-2">{campaignContextRows(context).map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="whitespace-pre-wrap break-words">{value}</dd></div>)}</dl></div>)}
+            </div> : <p className="text-muted-foreground">Campaign details were not saved with this older snapshot.</p>}
+          </AccordionContent></AccordionItem></Accordion>
           <Accordion><AccordionItem value="evidence"><AccordionTrigger>Saved evidence at finalisation</AccordionTrigger><AccordionContent>
             {snapshot.post_evidence && snapshot.creator_delivery && snapshot.budget_lines ? <div className="space-y-3 text-muted-foreground">
               <div><p className="font-medium text-foreground">Creator delivery</p>{snapshot.creator_delivery.length ? snapshot.creator_delivery.map((creator, index) => <div key={index}><p>{creator.contact_name} · {creator.status}</p>{creator.deliverables.map((item, itemIndex) => <p key={itemIndex} className="pl-3">{item.description} · {item.approval_status}{item.evidence_url ? ` · Evidence: ${item.evidence_url}` : ""}</p>)}</div>) : <p>None recorded</p>}</div>
