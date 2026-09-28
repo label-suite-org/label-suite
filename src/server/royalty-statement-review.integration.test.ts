@@ -64,5 +64,19 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
     expect(await sql`select id from label_suite.royalty_ledger_transactions where org_id=${org} and posting_status='posted'`).toHaveLength(2);
     expect((await sql`select sum(amount)::text as amount from label_suite.royalty_ledger_entries where org_id=${org}`)[0].amount).toBe('2.00000000');
     expect(await sql`select id from label_suite.audit_logs where org_id=${org} and actor_user_id=${org} and entity_type='royalty_statements' and after_data->>'status'='issued'`).toHaveLength(2);
+    const { recordPayoutBatch, recordPayoutBatchSchema } = await import('./royalty-payout-recording');
+    const batch = { idempotency_key: randomUUID(), reference:'fixture://external-payment', effective_date:'2026-09-01', lines:[{statement_id:issued[0].id,amount:'0.6'}] };
+    expect(recordPayoutBatchSchema.safeParse({...batch,lines:[{statement_id:issued[0].id,amount:'-1'}]}).success).toBe(false);
+    await expect(scoped(() => recordPayoutBatch(org,org,{...batch,lines:[...batch.lines,{statement_id:issued[1].id,amount:'2'}]}))).rejects.toMatchObject({status:409});
+    expect(await sql`select id from label_suite.royalty_payouts where org_id=${org}`).toHaveLength(0);
+    const repeats = await Promise.all([scoped(() => recordPayoutBatch(org,org,batch)),scoped(() => recordPayoutBatch(org,org,batch))]);
+    expect(repeats.map(result => result.duplicate).sort()).toEqual([false,true]);
+    await expect(scoped(() => recordPayoutBatch(org,org,{...batch,reference:'changed'}))).rejects.toMatchObject({status:409});
+    const competing = await Promise.allSettled([1,2].map(() => scoped(() => recordPayoutBatch(org,org,{...batch,idempotency_key:randomUUID(),lines:[{statement_id:issued[0].id,amount:'0.4'}]}))));
+    expect(competing.filter(result => result.status==='fulfilled')).toHaveLength(1);
+    expect(await sql`select id from label_suite.royalty_payouts where org_id=${org} and status='recorded'`).toHaveLength(2);
+    expect((await sql`select sum(amount)::text as amount from label_suite.royalty_ledger_entries where org_id=${org}`)[0].amount).toBe('1.00000000');
+    expect(await sql`select id from label_suite.audit_logs where org_id=${org} and actor_user_id=${org} and entity_type='royalty_payouts' and after_data->>'status'='recorded'`).toHaveLength(2);
+
   });
 });
