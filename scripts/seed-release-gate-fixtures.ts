@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { writeFileSync } from "node:fs";
 import { and, eq, sql } from "drizzle-orm";
 import { auth } from "../src/lib/auth";
 import { db } from "../src/lib/db";
@@ -21,14 +22,11 @@ import {
 } from "../src/server/campaign-communicator";
 import { deriveCampaignDocument, legacyTextToCampaignDocument } from "../src/lib/campaign-rich-text";
 import { assertDisposableReleaseGateTarget } from "./release-gate-fixture-safety";
-import { releaseGateFixtureWorld } from "./release-gate-fixture-world";
+import { configuredReleaseGateFixtureWorld, releaseGateFixtureManifest } from "./release-gate-fixture-world";
+const releaseGateFixtureWorld = configuredReleaseGateFixtureWorld();
 
 const { orgId: ORG_ID, foreignTenant: FOREIGN_TENANT_FIXTURE, ids: FIXTURE_IDS, relationships: FIXTURE_RELATIONSHIPS, radio } = releaseGateFixtureWorld;
-const FIXTURE_USER = {
-  name: "Release Gate Operator",
-  email: process.env.E2E_USER_EMAIL?.trim() ?? "",
-  password: process.env.E2E_USER_PASSWORD?.trim() ?? "",
-} as const;
+const FIXTURE_USER = releaseGateFixtureWorld.operator;
 const READ_ONLY_FIXTURE_USER = releaseGateFixtureWorld.readOnlyUser;
 const RADIO_REVIEW_SLUG = radio.reviewSlug;
 const RADIO_PUBLIC_SLUG = radio.publicSlug;
@@ -214,7 +212,7 @@ async function ensureCatalogFixtures() {
 
   await db.execute(sql`
     update label_suite.releases
-    set title = ${"Release Gate Single"}, release_date = ${"2026-08-05"}, updated_at = coalesce(updated_at, now())
+    set title = ${"Release Gate Single"}, release_date = ${releaseGateFixtureWorld.dates.release}, updated_at = coalesce(updated_at, now())
     where id = ${FIXTURE_IDS.release} and org_id = ${ORG_ID}
   `);
 
@@ -319,13 +317,9 @@ async function ensureCampaignActivityFixtures(userId: string) {
     where org_id = ${ORG_ID} and campaign_id = ${FIXTURE_IDS.campaign}
   `);
 
-  const operatorLeads = [
-    { key: "desktop", leadId: FIXTURE_IDS.activityLeads.desktop, taskId: FIXTURE_IDS.activityTasks.desktop, eventId: FIXTURE_IDS.activityEvents.desktop, runId: FIXTURE_IDS.activityRuns.desktop, suggestionId: FIXTURE_IDS.activitySuggestions.desktop, at: "2026-08-06T10:00:00.000Z" },
-    { key: "mobile390", leadId: FIXTURE_IDS.activityLeads.mobile390, taskId: FIXTURE_IDS.activityTasks.mobile390, eventId: FIXTURE_IDS.activityEvents.mobile390, runId: FIXTURE_IDS.activityRuns.mobile390, suggestionId: FIXTURE_IDS.activitySuggestions.mobile390, at: "2026-08-06T11:00:00.000Z" },
-    { key: "mobile320", leadId: FIXTURE_IDS.activityLeads.mobile320, taskId: FIXTURE_IDS.activityTasks.mobile320, eventId: FIXTURE_IDS.activityEvents.mobile320, runId: FIXTURE_IDS.activityRuns.mobile320, suggestionId: FIXTURE_IDS.activitySuggestions.mobile320, at: "2026-08-06T12:00:00.000Z" },
-  ] as const;
+  const operatorLeads = releaseGateFixtureWorld.activity;
 
-  for (const fixture of [...operatorLeads, { key: "read-only", leadId: FIXTURE_IDS.activityLeads.readOnly, taskId: null, eventId: null, at: "2026-08-06T13:00:00.000Z" }] as const) {
+  for (const fixture of [...operatorLeads, { key: "read-only", leadId: FIXTURE_IDS.activityLeads.readOnly, taskId: null, eventId: null, at: releaseGateFixtureWorld.dates.readOnlyActivity }] as const) {
     await db.execute(sql`
       insert into label_suite.campaign_leads (
         id, org_id, campaign_id, source_id, station_id, exact_edit_track_id,
@@ -406,7 +400,7 @@ async function ensureCampaignActivityFixtures(userId: string) {
           linked_campaign_id, linked_campaign_lead_id, next_action, updated_at
         ) values (
           ${fixture.taskId}, ${ORG_ID}, ${"Release-gate activity review"}, ${"completed"}, ${null},
-          ${FIXTURE_USER.name}, ${"2026-08-12"}, ${FIXTURE_IDS.campaign}, ${fixture.leadId},
+          ${FIXTURE_USER.name}, ${releaseGateFixtureWorld.dates.taskDue}, ${FIXTURE_IDS.campaign}, ${fixture.leadId},
           ${"Review the deterministic activity proposal"}, ${fixture.at}::timestamp
         )
         on conflict (id) do update set
@@ -426,7 +420,7 @@ async function ensureCampaignActivityFixtures(userId: string) {
     ) values (
       ${FIXTURE_IDS.activityEmail}, ${ORG_ID}, ${FIXTURE_IDS.campaign}, ${FIXTURE_IDS.station},
       ${"Release-gate activity fixture"}, ${"Synthetic evidence only; no message was delivered."},
-      ${"sent"}, ${"fixture"}, ${userId}, ${"2026-08-06T14:00:00.000Z"}::timestamp
+      ${"sent"}, ${"fixture"}, ${userId}, ${releaseGateFixtureWorld.dates.sentEmail}::timestamp
     )
     on conflict (id) do update set
       subject = excluded.subject,
@@ -901,16 +895,9 @@ async function main() {
   await ensureAnalyticsDataHealthFixture();
 
   console.log("[release-gate:seed] fixture user and records ready");
-  console.log(JSON.stringify({
-    userEmail: FIXTURE_USER.email,
-    readOnlyUserEmail: READ_ONLY_FIXTURE_USER.email,
-    artistId: FIXTURE_IDS.artist,
-    releaseId: FIXTURE_IDS.release,
-    eventId: FIXTURE_IDS.event,
-    campaignId: FIXTURE_IDS.campaign,
-    foreignTenantLeadId: FOREIGN_TENANT_FIXTURE.lead,
-    stationId: FIXTURE_IDS.station,
-  }));
+  const manifest = releaseGateFixtureManifest(releaseGateFixtureWorld);
+  if (process.env.RELEASE_GATE_FIXTURE_MANIFEST) writeFileSync(process.env.RELEASE_GATE_FIXTURE_MANIFEST, JSON.stringify(manifest), { mode: 0o600 });
+  console.log(JSON.stringify(manifest));
 }
 
 main()

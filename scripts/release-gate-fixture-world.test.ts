@@ -1,6 +1,5 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { createReleaseGateFixtureWorld, validateReleaseGateFixtureWorld } from "./release-gate-fixture-world";
+import { createReleaseGateFixtureWorld, validateReleaseGateFixtureWorld, configuredReleaseGateFixtureWorld, releaseGateFixtureManifest, assertReleaseGateFixtureManifest } from "./release-gate-fixture-world";
 
 describe("release-gate fixture world", () => {
   it("derives the same overrideable catalog identities and validates relationships", () => {
@@ -29,12 +28,30 @@ describe("release-gate fixture world", () => {
     expect(() => validateReleaseGateFixtureWorld({ ...world, ids: { ...world.ids, campaignStation: world.ids.campaign } })).toThrow("IDs must be unique");
   });
 
-  it("passes the deletion test by being the sole identity source for both consumers", () => {
-    const seed = readFileSync(new URL("./seed-release-gate-fixtures.ts", import.meta.url), "utf8");
-    const browser = readFileSync(new URL("../tests/release-gate/release-gate.spec.ts", import.meta.url), "utf8");
-    expect(seed).toContain("./release-gate-fixture-world");
-    expect(browser).toContain("../../scripts/release-gate-fixture-world");
-    expect(seed).not.toContain("const FIXTURE_IDS = {");
-    expect(browser).not.toContain('const RADIO_CAMPAIGN_ID = "e2e-campaign-release-gate"');
+  it("rejects missing prerequisites and an operator reused as the read-only member", () => {
+    expect(() => configuredReleaseGateFixtureWorld({})).toThrow("E2E_USER_EMAIL");
+    const env = { E2E_USER_EMAIL: "operator@example.test", E2E_USER_PASSWORD: "fixture-secret", E2E_ARTIST_ID: "artist", E2E_RELEASE_ID: "release", E2E_TRACK_ID: "track", E2E_EVENT_ID: "event" };
+    expect(configuredReleaseGateFixtureWorld(env).operator.email).toBe("operator@example.test");
+    expect(() => configuredReleaseGateFixtureWorld({ ...env, E2E_READ_ONLY_USER_EMAIL: env.E2E_USER_EMAIL })).toThrow("identities must differ");
+  });
+
+  it("verifies serialized seed identity and topology without sharing passwords or UI expectations", () => {
+    const world = createReleaseGateFixtureWorld({ E2E_USER_EMAIL: "operator@example.test", E2E_USER_PASSWORD: "never-serialize-this" });
+    const manifest = JSON.parse(JSON.stringify(releaseGateFixtureManifest(world)));
+    expect(JSON.stringify(manifest)).not.toContain("never-serialize-this");
+    expect(manifest).not.toHaveProperty("radio");
+    expect(() => assertReleaseGateFixtureManifest(world, manifest)).not.toThrow();
+    expect(() => assertReleaseGateFixtureManifest(world, { ...manifest, releaseId: "another-release" })).toThrow("seed manifest");
+    expect(() => assertReleaseGateFixtureManifest(world, { ...manifest, activity: [] })).toThrow("seed manifest");
+    expect(() => assertReleaseGateFixtureManifest(world, null)).toThrow("seed manifest");
+  });
+
+  it("keeps activity identities related and rejects broken public or activity topology", () => {
+    const world = createReleaseGateFixtureWorld();
+    expect(world.activity.map(entry => [entry.project, entry.leadId])).toEqual([
+      ["desktop-gate", world.ids.activityLeads.desktop], ["mobile-390-gate", world.ids.activityLeads.mobile390], ["mobile-320-gate", world.ids.activityLeads.mobile320],
+    ]);
+    expect(() => validateReleaseGateFixtureWorld({ ...world, relationships: { ...world.relationships, publicCampaign: { ...world.relationships.publicCampaign, releaseId: "wrong" } } })).toThrow("topology");
+    expect(() => validateReleaseGateFixtureWorld({ ...world, activity: [{ ...world.activity[0], taskId: "wrong" }] })).toThrow("topology");
   });
 });

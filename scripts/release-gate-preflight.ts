@@ -1,18 +1,12 @@
 #!/usr/bin/env node
 import { assertDisposableReleaseGateTarget } from "./release-gate-fixture-safety";
 
-export {};
+import { configuredReleaseGateFixtureWorld, verifyReleaseGateFixtureManifest } from "./release-gate-fixture-world";
 
 const requiredEnv: string[] = [
   "DATABASE_URL",
   "BETTER_AUTH_SECRET",
   "PUBLIC_SITE_URL",
-  "E2E_USER_EMAIL",
-  "E2E_USER_PASSWORD",
-  "E2E_ARTIST_ID",
-  "E2E_RELEASE_ID",
-  "E2E_TRACK_ID",
-  "E2E_EVENT_ID",
   "RELEASE_GATE_FIXTURE_DISPOSABLE",
 ];
 
@@ -90,6 +84,7 @@ async function ensureAuthEntryPoint(url: string) {
 }
 
 async function main() {
+  verifyReleaseGateFixtureManifest(configuredReleaseGateFixtureWorld());
   if (!baseUrl) {
     fail("E2E_BASE_URL and PUBLIC_SITE_URL are not configured");
   }

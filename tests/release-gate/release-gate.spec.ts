@@ -8,9 +8,13 @@ import {
   canonicalLeadEvidence,
   requireCompleteActivitySourceStates,
 } from "../campaign-enrichment-release-evidence";
-import { releaseGateFixtureWorld } from "../../scripts/release-gate-fixture-world";
+import { releaseGateFixtureWorld, configuredReleaseGateFixtureWorld, verifyReleaseGateFixtureManifest } from "../../scripts/release-gate-fixture-world";
 
 test.describe.configure({ mode: "serial" });
+
+test.beforeAll(() => {
+  verifyReleaseGateFixtureManifest(configuredReleaseGateFixtureWorld());
+});
 
 const requiredFlows = [
   "sidebar-collapse-reopen",
@@ -58,11 +62,8 @@ const ARTWORK_FIXTURE_URL = releaseGateFixtureWorld.radio.artworkUrl;
 const RADIO_SUBJECT = releaseGateFixtureWorld.radio.subject;
 const RADIO_BODY = releaseGateFixtureWorld.radio.body;
 const ACTIVITY_CAMPAIGN_ID = RADIO_CAMPAIGN_ID;
-const ACTIVITY_OPERATOR_LEAD_BY_PROJECT = {
-  "desktop-gate": releaseGateFixtureWorld.ids.activityLeads.desktop,
-  "mobile-390-gate": releaseGateFixtureWorld.ids.activityLeads.mobile390,
-  "mobile-320-gate": releaseGateFixtureWorld.ids.activityLeads.mobile320,
-} as const;
+const ACTIVITY_OPERATOR_LEAD_BY_PROJECT = Object.fromEntries(releaseGateFixtureWorld.activity.map(entry => [entry.project, entry.leadId]));
+
 const FOREIGN_TENANT_LEAD_ID = releaseGateFixtureWorld.foreignTenant.lead;
 
 type AxeNodeEvidence = {
@@ -81,7 +82,8 @@ type AxeRuleEvidence = {
 };
 
 function requiredFixture(name: RequiredReleaseFixtureName, reason: string): string {
-  const value = process.env[name]?.trim();
+  const key = ({ E2E_ARTIST_ID: "artist", E2E_RELEASE_ID: "release", E2E_TRACK_ID: "track", E2E_EVENT_ID: "event" } as const)[name];
+  const value = releaseGateFixtureWorld.ids[key];
   if (!value) {
     throw new Error(reason);
   }
@@ -90,8 +92,7 @@ function requiredFixture(name: RequiredReleaseFixtureName, reason: string): stri
 }
 
 async function login(page: Page) {
-  const email = process.env.E2E_USER_EMAIL;
-  const password = process.env.E2E_USER_PASSWORD;
+  const { email, password } = releaseGateFixtureWorld.operator;
 
   if (!email?.trim() || !password?.trim()) {
     throw new Error("Release-gate auth preconditions missing: set E2E_USER_EMAIL and E2E_USER_PASSWORD.");
