@@ -2,6 +2,7 @@
 import AppLayout from "../layouts/AppLayout.astro";
 import { Ban, Calendar, CalendarRange, Landmark, PhoneCall } from "lucide-react";
 import { getTodayHubData } from "../server/today";
+import { listDataQualityIssues } from "../server/integrations";
 import { listTodayHub } from "../server/analytics";
 import { listUpcomingGrantDeadlines } from "../server/grants";
 import { getGrantsWorklist } from "../server/grants-worklist";
@@ -11,12 +12,13 @@ import TodayDecisionCards from "../components/analytics/TodayDecisionCards";
 import { formatCoverageMoney } from "../components/funding/money";
 
 const orgId = Astro.locals.orgId!;
-const [{ callRows, taskRows, bugRows, blockedRows, reportingWeekRows, eventRows }, todayHubData, grantDeadlines, grantsWorklist, fundingCoverage] = await Promise.all([
+const [{ callRows, taskRows, bugRows, blockedRows, reportingWeekRows, eventRows }, todayHubData, grantDeadlines, grantsWorklist, fundingCoverage, deliveryIssues] = await Promise.all([
   getTodayHubData(orgId),
   listTodayHub(orgId),
   listUpcomingGrantDeadlines(orgId),
   getGrantsWorklist(orgId, { horizonDays: 7, limit: 6 }),
   getFundingCoverage(orgId),
+  listDataQualityIssues(orgId, { source: "manual_delivery_export" }).then(rows => rows.filter(row => row.status === "open" || row.status === "triaged")),
 ]);
 const coverageSummary = summarizeCoverageByCurrency(fundingCoverage.values());
 ---
@@ -24,6 +26,21 @@ const coverageSummary = summarizeCoverageByCurrency(fundingCoverage.values());
 <AppLayout>
   <div class="space-y-8">
     <TodayDecisionCards client:load data={todayHubData} />
+
+    {deliveryIssues.length > 0 && <section class="space-y-3" aria-label="Delivery needs attention">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-lg font-semibold">Delivery needs attention ({deliveryIssues.length})</h2>
+        <a href="/data-quality" class="text-sm underline">Review all issues</a>
+      </div>
+      <ul class="divide-y border-y">
+        {deliveryIssues.slice(0, 6).map(issue => <li class="space-y-1 py-3 text-sm">
+          <p>{typeof issue.details.message === "string" ? issue.details.message : issue.issue_type.replaceAll("_", " ")}</p>
+          <p class="text-xs text-muted-foreground">{String(issue.details.provider_key ?? "Manual export").replaceAll("_", " ")} · {String(issue.details.account_label ?? "Delivery account")}</p>
+          <a class="inline-block underline underline-offset-4" href={typeof issue.details.release_id === "string" ? `/releases/${encodeURIComponent(issue.details.release_id)}?section=assets` : "/data-quality"}>Review export</a>
+        </li>)}
+      </ul>
+    </section>}
+
 
     <section class="space-y-3">
       <div class="flex items-center justify-between gap-3">
