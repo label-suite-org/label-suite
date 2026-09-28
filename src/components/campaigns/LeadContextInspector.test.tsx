@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import type { CampaignOutreachWorkspaceData } from "../../server/campaign-outreach";
 import type { CampaignActivityItem, CampaignActivityProposal } from "../../server/campaign-activity-core";
 import LeadContextInspector from "./LeadContextInspector";
@@ -84,6 +84,18 @@ function proposal(overrides: Partial<CampaignActivityProposal> = {}): CampaignAc
 }
 
 describe("LeadContextInspector", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  test("renders activity timestamps consistently across server and browser time zones", () => {
+    const content = <LeadContextInspector lead={lead} source={null} activityItems={[activityItem()]}
+      pendingProposals={[]} canMutate={false} busy={false} onOverrideStage={vi.fn()} onLogFinding={vi.fn()} />;
+    vi.stubEnv("TZ", "UTC");
+    const server = renderToStaticMarkup(content);
+    vi.stubEnv("TZ", "Europe/Copenhagen");
+    expect(renderToStaticMarkup(content)).toBe(server);
+    expect(server).toContain("1 Aug, 12:00");
+  });
+
   test("renders normalized shared activity and matching pending proposals without interpreting legacy events", () => {
     const html = renderToStaticMarkup(
       <LeadContextInspector
