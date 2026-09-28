@@ -54,6 +54,8 @@ describe("RoyaltyManager normalized pipeline display", () => {
       statements: { count: 0, openCount: 0, closingBalance: "0" },
       payouts: { count: 0, recordedAmount: "0", outstandingAmount: "0" },
       balances: [],
+      earningTotals: [{currency:"EUR",amount:"9007199254740993.12345678"},{currency:"USD",amount:"2.00"}],
+      postedTotals: [{currency:"EUR",amount:"0.25"}],
     } as unknown as Pipeline;
     const container = document.createElement("div");
     document.body.append(container);
@@ -75,7 +77,10 @@ describe("RoyaltyManager normalized pipeline display", () => {
         );
       });
 
-      expect(container.textContent).toContain("$9,007,199,254,740,993.12345678");
+      expect(container.textContent).toContain("EUR 9,007,199,254,740,993.12345678");
+      expect(container.textContent).toContain("USD 2.00");
+      expect(container.textContent).toContain("EUR 0.25");
+      expect(container.textContent).not.toContain("$9,007,199,254,740,993");
     } finally {
       await act(async () => root.unmount());
       container.remove();

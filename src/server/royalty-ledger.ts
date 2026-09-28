@@ -4,13 +4,14 @@ import {
   royalty_earnings,
   royalty_imports,
   royalty_ledger_entries,
+  royalty_ledger_transactions,
   royalty_payouts,
   royalty_statements,
 } from "../db/schema";
 import { db } from "../lib/db";
 
 export async function getRoyaltyPipelineSummary(orgId: string) {
-  const [earningRows, importRows, statementRows, payoutRows, balances] = await Promise.all([
+  const [earningRows, importRows, statementRows, payoutRows, balances, earningTotals, postedTotals] = await Promise.all([
     db
       .select({
         rowCount: sql<number>`count(*)::int`,
@@ -58,17 +59,26 @@ export async function getRoyaltyPipelineSummary(orgId: string) {
         balance: sql<string>`coalesce(sum(${royalty_ledger_entries.amount}), 0)`,
       })
       .from(royalty_ledger_entries)
+      .innerJoin(royalty_ledger_transactions, and(eq(royalty_ledger_transactions.id, royalty_ledger_entries.transaction_id), eq(royalty_ledger_transactions.org_id, orgId)))
       .leftJoin(contacts, and(eq(royalty_ledger_entries.contact_id, contacts.id), eq(contacts.org_id, orgId)))
-      .where(eq(royalty_ledger_entries.org_id, orgId))
+      .where(and(eq(royalty_ledger_entries.org_id, orgId), sql`${royalty_ledger_transactions.posting_status} in ('posted', 'reversed')`))
       .groupBy(royalty_ledger_entries.contact_id, contacts.name, royalty_ledger_entries.currency)
       .orderBy(desc(sql`sum(${royalty_ledger_entries.amount})`)),
+    db.select({ currency: royalty_earnings.currency, amount: sql<string>`sum(${royalty_earnings.net_amount})` })
+      .from(royalty_earnings).where(eq(royalty_earnings.org_id, orgId))
+      .groupBy(royalty_earnings.currency).orderBy(royalty_earnings.currency),
+    db.select({ currency: royalty_ledger_entries.currency, amount: sql<string>`sum(${royalty_ledger_entries.amount})` })
+      .from(royalty_ledger_entries)
+      .innerJoin(royalty_ledger_transactions, and(eq(royalty_ledger_transactions.id, royalty_ledger_entries.transaction_id), eq(royalty_ledger_transactions.org_id, orgId)))
+      .where(and(eq(royalty_ledger_entries.org_id, orgId), sql`${royalty_ledger_transactions.posting_status} in ('posted', 'reversed')`))
+      .groupBy(royalty_ledger_entries.currency).orderBy(royalty_ledger_entries.currency),
   ]);
 
   const earnings = earningRows[0] ?? { rowCount: 0, matchedCount: 0, unmatchedCount: 0, netAmount: "0" };
   const statements = statementRows[0] ?? { count: 0, openCount: 0, closingBalance: "0" };
   const payouts = payoutRows[0] ?? { count: 0, recordedAmount: "0", outstandingAmount: "0" };
 
-  return { earnings, imports: importRows, statements, payouts, balances };
+  return { earnings, imports: importRows, statements, payouts, balances, earningTotals, postedTotals };
 }
 
 export async function listUnmatchedRoyaltyEarnings(orgId: string, limit = 100) {

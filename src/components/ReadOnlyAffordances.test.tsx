@@ -15,7 +15,7 @@ import { buildMasterPayoutPreview, buildRoyaltiesDashboard } from "../server/roy
 
 const royaltyData = {
   dashboard: buildRoyaltiesDashboard([], []),
-  pipeline: { earnings: { rowCount: 0, matchedCount: 0, unmatchedCount: 0, netAmount: 0 }, imports: [], statements: { closingBalance: 0, openCount: 0 } },
+  pipeline: { earningTotals: [], postedTotals: [], earnings: { rowCount: 0, matchedCount: 0, unmatchedCount: 0, netAmount: 0 }, imports: [], statements: { closingBalance: 0, openCount: 0 } },
   payoutPreview: buildMasterPayoutPreview([], []),
 };
 
