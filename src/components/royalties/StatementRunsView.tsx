@@ -34,8 +34,8 @@ export function StatementRunsView({ dashboard }: { dashboard: RoyaltiesDashboard
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold">Statement Runs</h2>
-        <p className="text-sm text-[var(--muted-foreground)]">Derived from existing statement IDs — no extra ledger table yet.</p>
+        <h2 className="text-lg font-semibold">Imported statement groups</h2>
+        <p className="text-sm text-[var(--muted-foreground)]">Imported reporting rows grouped by statement, source, and period.</p>
       </div>
 
       <div className="overflow-x-auto">

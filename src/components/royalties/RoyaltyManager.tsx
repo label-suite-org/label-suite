@@ -140,7 +140,7 @@ export function RoyaltyManager({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <div className="text-sm text-[var(--muted-foreground)]">
-            {dashboard.summary.readyToPay ? "Ready" : "Blocked"} · {records.length} rows in ledger
+            {records.length} imported reporting rows · Preview {dashboard.summary.readyToPay ? "ready" : "needs attention"}
           </div>
         </div>
         {canMutate ? <div className="flex items-center gap-2">
