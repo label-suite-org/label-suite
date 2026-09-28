@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   contacts,
+  releases,
+  royalty_earnings,
   royalty_ledger_entries,
   royalty_ledger_transactions,
   royalty_payouts,
@@ -31,6 +33,14 @@ export interface PayeePortalData {
       amount: string | number;
       sharePercent: string | number | null;
     }>;
+  }>;
+  reports: Array<{
+    releaseId: string | null;
+    releaseTitle: string | null;
+    periodStart: string;
+    periodEnd: string;
+    currency: string;
+    amount: string;
   }>;
   payouts: Array<{
     id: string;
@@ -106,6 +116,35 @@ export async function getPayeePortalData(
     linesByStatement.set(line.statementId, lines);
   }
 
+  const reports = statementIds.length ? await db
+    .select({
+      releaseId: releases.id,
+      releaseTitle: releases.title,
+      periodStart: royalty_statements.period_start,
+      periodEnd: royalty_statements.period_end,
+      currency: royalty_statements.currency,
+      amount: sql<string>`sum(${royalty_statement_lines.amount})`,
+    })
+    .from(royalty_statement_lines)
+    .innerJoin(royalty_statements, and(
+      eq(royalty_statements.id, royalty_statement_lines.statement_id),
+      eq(royalty_statements.org_id, orgId),
+      eq(royalty_statements.contact_id, contact.id),
+      inArray(royalty_statements.status, [...PUBLISHED_STATEMENT_STATUSES]),
+    ))
+    .leftJoin(royalty_earnings, and(
+      eq(royalty_earnings.id, royalty_statement_lines.earning_id),
+      eq(royalty_earnings.org_id, orgId),
+    ))
+    .leftJoin(releases, and(eq(releases.id, royalty_earnings.release_id), eq(releases.org_id, orgId)))
+    .where(and(
+      eq(royalty_statement_lines.org_id, orgId),
+      inArray(royalty_statement_lines.statement_id, statementIds),
+      eq(royalty_statement_lines.line_type, "earning"),
+    ))
+    .groupBy(releases.id, releases.title, royalty_statements.period_start, royalty_statements.period_end, royalty_statements.currency)
+    .orderBy(desc(royalty_statements.period_start), releases.title, royalty_statements.currency) : [];
+
   const payoutRows = await db
     .select({
       id: royalty_payouts.id,
@@ -156,6 +195,7 @@ export async function getPayeePortalData(
       })),
     })),
     payouts: payoutRows,
+    reports,
   };
 }
 

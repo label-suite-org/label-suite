@@ -20,6 +20,7 @@ await auditPayeeRead({
     statementCount: portal.statements.length,
     payoutCount: portal.payouts.length,
     balanceCount: portal.balances.length,
+    reportCount: portal.reports.length,
   },
 });
 
@@ -99,6 +100,23 @@ const formatDate = (value: Date | string | null) => value ? new Intl.DateTimeFor
         </div>
       ) : (
         <p class="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No published statements yet.</p>
+      )}
+    </section>
+
+    <section aria-labelledby="reports-heading" class="space-y-3">
+      <div>
+        <h2 id="reports-heading" class="text-lg font-semibold">Earnings by release</h2>
+        <p class="text-sm text-muted-foreground">Your earnings from published statements, grouped by release and statement period. Adjustments and payouts are shown in your statements.</p>
+      </div>
+      {portal.reports.length ? (
+        <div class="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
+          <table class="w-full min-w-[32rem] text-left text-sm">
+            <thead class="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground"><tr><th scope="col" class="px-4 py-3">Release</th><th scope="col" class="px-4 py-3">Statement period</th><th scope="col" class="px-4 py-3 text-right">Your earnings</th></tr></thead>
+            <tbody>{portal.reports.map((report) => <tr class="border-t border-border"><th scope="row" class="px-4 py-3 text-left font-medium">{report.releaseTitle ?? "Release not linked"}</th><td class="px-4 py-3">{formatDate(report.periodStart)} – {formatDate(report.periodEnd)}</td><td class="px-4 py-3 text-right">{formatMoney(report.amount, report.currency)} <span class="text-muted-foreground">{report.currency}</span></td></tr>)}</tbody>
+          </table>
+        </div>
+      ) : (
+        <p class="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">No published earnings to report yet.</p>
       )}
     </section>
 

@@ -108,7 +108,13 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
     const { getPayeePortalData } = await import('./payee-portal');
     const payeeEmail = `${issued[0].contact_id}@example.test`;
     await sql`update label_suite.contacts set email=${payeeEmail} where id=${issued[0].contact_id} and org_id=${org}`;
+    await sql`insert into label_suite.releases (id,org_id,title) values (${org+'release'},${org},'Published fixture release')`;
+    await sql`update label_suite.royalty_earnings set release_id=${org+'release'} where id=${issued[0].contact_id} and org_id=${org}`;
     const portal = await readScoped(() => getPayeePortalData(org,payeeEmail));
+    expect(portal?.reports).toEqual([{
+      releaseId: org+'release', releaseTitle: 'Published fixture release',
+      periodStart: '2026-08-01', periodEnd: '2026-08-31', currency: 'USD', amount: '1.00000000',
+    }]);
     expect(portal?.balances).toEqual([{currency:'USD',balance:'0.60000000'}]);
     expect(portal?.statements.map(statement=>statement.id)).toEqual([issued[0].id]);
     expect(portal?.payouts.map(payout=>payout.amount)).toEqual(['0.40000000']);
