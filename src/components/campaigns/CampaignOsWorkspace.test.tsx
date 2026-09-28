@@ -32,6 +32,7 @@ it.each([
     else if (field instanceof HTMLInputElement && field.type === "url") field.value = "https://example.test/post";
     else if (!field.value) field.value = "Test value";
   }
+  if (action === "create_post") form.querySelector<HTMLInputElement>('[name="metrics_captured_at"]')!.value = "2026-09-28";
   if (action === "create_engagement") {
     form.querySelector<HTMLSelectElement>('[name="permission"]')!.value = "permitted";
     form.querySelector<HTMLInputElement>('[name="basis"]')!.value = "Direct opt-in";
@@ -40,6 +41,7 @@ it.each([
   const saves = fetch.mock.calls.filter(([, options]) => options?.method === "POST");
   expect(saves).toHaveLength(1);
   expect(JSON.parse(saves[0][1].body).action).toBe(action);
+  if (action === "create_post") expect(JSON.parse(saves[0][1].body).input.metrics_captured_at).toBe("2026-09-28T00:00:00.000Z");
   if (action === "create_engagement") {
     expect(JSON.parse(saves[0][1].body).input).toMatchObject({
       outreach_permission_status: "permitted",
@@ -51,11 +53,26 @@ it.each([
   if (action !== "finalize_report") expect(form.querySelector<HTMLInputElement>("input[required], textarea[required]")?.value ?? "").toBe("");
 });
 
+it("shows the captured observation date beside a recorded post", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+    territories: [], engagements: [], deliverables: [], cost: { planned: 0, committed: 0, paid: 0 }, report: { narrative: null, snapshot: null, finalized_at: null },
+    posts: [{ id: "post-1", url: "https://example.test/post", platform: "TikTok", published_at: "2026-09-26T00:00:00.000Z", metrics_captured_at: "2026-09-28T00:00:00.000Z", manual_metrics: { views: 120 } }],
+  }) }));
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="posts" canMutate={false} contacts={[]} />));
+  expect(container.textContent).toContain(`Published ${new Date("2026-09-26T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
+  expect(container.textContent).toContain(`Metrics captured ${new Date("2026-09-28T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
+  expect(container.textContent).toContain("views: 120");
+});
+
 it("shows saved report figures beside live figures without offering finalisation again", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({
     territories: [], engagements: [], deliverables: [], posts: [], cost: { planned: 20, committed: 10, paid: 5 },
-    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T12:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
+    report: { narrative: "Finished", finalized_at: "2026-09-27T12:00:00.000Z", snapshot: { finalized_at: "2026-09-27T12:00:00.000Z", cost: { planned: 10, committed: 4, paid: 2 }, deliverable_count: 1, approved_deliverable_count: 1, post_count: 1, manual_metrics: { views: 100 }, creator_delivery: [{ contact_name: "Alex", status: "complete", deliverables: [{ description: "One video", approval_status: "approved", evidence_url: null }] }], post_evidence: [{ url: "https://example.test/post", platform: "Instagram", published_at: "2026-09-27T00:00:00.000Z", metrics_captured_at: "2026-09-27T00:00:00.000Z", manual_metrics: { views: 100 }, notes: null }], budget_lines: [{ name: "Creator fee", planned_amount: 10, committed_amount: 4, paid_amount: 2 }] } },
   }) }));
   container = document.createElement("div");
   document.body.append(container);
@@ -71,6 +88,7 @@ it("shows saved report figures beside live figures without offering finalisation
   expect(container.textContent).toContain("One video");
   expect(container.textContent).toContain("https://example.test/post");
   expect(container.textContent).toContain(`Published ${new Date("2026-09-27T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
+  expect(container.textContent).toContain(`Metrics captured ${new Date("2026-09-27T00:00:00.000Z").toLocaleDateString(undefined, { timeZone: "UTC" })}`);
   expect(container.textContent).toContain("Creator fee");
   expect(container.textContent).not.toContain("Finalise report");
 });
