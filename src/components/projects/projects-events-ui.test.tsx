@@ -26,9 +26,23 @@ vi.mock("../ui/sheet", () => ({
 }));
 
 describe("Events workspace", () => {
+  it("keeps read-only records visible without create, edit or project-move controls", () => {
+    const project = { id: "project-1", name: "Autumn tour", project_type: "tour" };
+    const event = { id: "event-1", title: "Vega", event_type: "concert", start_date: "2026-08-20", project_id: project.id };
+    const workspace = renderToStaticMarkup(<ProjectsEventsWorkspace canMutate={false} projects={[project]} events={[event]} initialView="events" />);
+    const detail = renderToStaticMarkup(<ProjectEventDetail canMutate={false} event={event} projects={[project]} />);
+    expect(workspace).toContain("Vega");
+    expect(workspace).not.toContain("New event");
+    expect(workspace).not.toContain("New project");
+    expect(detail).toContain("Autumn tour");
+    expect(detail).not.toContain("Attach or move");
+    expect(detail).not.toContain("Detach from project");
+    expect(detail).not.toContain("Edit event");
+  });
+
   it("renders canonical workspace tabs and create actions", () => {
     const html = renderToStaticMarkup(
-      <ProjectsEventsWorkspace projects={[]} events={[]} initialView="events" />,
+      <ProjectsEventsWorkspace canMutate={true} projects={[]} events={[]} initialView="events" />,
     );
 
     expect(html).toContain("Events");
@@ -40,7 +54,7 @@ describe("Events workspace", () => {
 
   it("uses canonical project navigation for the projects route", () => {
     const html = renderToStaticMarkup(
-      <ProjectsEventsWorkspace projects={[]} events={[]} initialView="projects" workspaceRoute="projects" />,
+      <ProjectsEventsWorkspace canMutate={true} projects={[]} events={[]} initialView="projects" workspaceRoute="projects" />,
     );
 
     expect(html).toContain(">Projects</h1>");
@@ -181,7 +195,7 @@ describe("Event detail", () => {
 
   it("keeps nullable links visible until a project is selected", () => {
     const html = renderToStaticMarkup(
-      <ProjectEventDetail
+      <ProjectEventDetail canMutate={true}
         event={event as any}
         projects={[{ id: "project-1", name: "Autumn tour", project_type: "tour" }] as any}
         project_context={{
@@ -216,7 +230,7 @@ describe("Event detail", () => {
 
   it("preserves project tasks while adding release/artist/contact seam records", () => {
     const html = renderToStaticMarkup(
-      <ProjectEventDetail
+      <ProjectEventDetail canMutate={true}
         event={event as any}
         projects={[]}
         project_context={{
@@ -245,7 +259,7 @@ describe("Event detail", () => {
 
   it("shows project-only records and seam records for the same project-backed event", () => {
     const html = renderToStaticMarkup(
-      <ProjectEventDetail
+      <ProjectEventDetail canMutate={true}
         event={event as any}
         projects={[{ id: "project-1", name: "Autumn tour", project_type: "tour" }] as any}
         project_context={{

@@ -43,7 +43,8 @@ export type ProjectEventRecord = {
   [key: string]: unknown;
 };
 
-export default function ProjectsEventsWorkspace({ projects: initialProjects, events: initialEvents, initialView, workspaceRoute = "events", artists = [], releases = [], contacts = [] }: {
+export default function ProjectsEventsWorkspace({ projects: initialProjects, events: initialEvents, initialView, workspaceRoute = "events", artists = [], releases = [], contacts = [], canMutate }: {
+  canMutate: boolean;
   projects: ProjectRecord[];
   events: ProjectEventRecord[];
   initialView: "projects" | "events";
@@ -70,10 +71,10 @@ export default function ProjectsEventsWorkspace({ projects: initialProjects, eve
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {canMutate && <div className="flex flex-wrap gap-2">
           <Button variant="outline" type="button" onClick={() => setEventDrawerOpen(true)} className="inline-flex h-10 items-center gap-2 border border-border bg-background px-3 text-sm font-medium hover:bg-muted"><CalendarPlus className="size-4" />New event</Button>
           <Button type="button" onClick={() => setProjectDialogOpen(true)} className="inline-flex h-10 items-center gap-2 bg-foreground px-3 text-sm font-medium text-background"><FolderPlus className="size-4" />New project</Button>
-        </div>
+        </div>}
       </header>
 
       <nav role="tablist" aria-label="Events and projects workspace views" className="flex border-b border-border">
@@ -83,8 +84,8 @@ export default function ProjectsEventsWorkspace({ projects: initialProjects, eve
 
       {initialView === "projects" ? <ProjectPortfolioView projects={projects} events={events} /> : <EventAgendaView events={events} projects={projects} />}
 
-      <ProjectFormDialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen} artists={artists} releases={releases} contacts={contacts} onCreated={(project) => { setProjects((current) => [...current, project]); setProjectDialogOpen(false); window.location.assign(`/projects/${project.id}`); }} />
-      <EventFormDrawer
+      {canMutate && <ProjectFormDialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen} artists={artists} releases={releases} contacts={contacts} onCreated={(project) => { setProjects((current) => [...current, project]); setProjectDialogOpen(false); window.location.assign(`/projects/${project.id}`); }} />}
+      {canMutate && <EventFormDrawer
         open={eventDrawerOpen}
         onOpenChange={setEventDrawerOpen}
         projects={projects}
@@ -97,7 +98,7 @@ export default function ProjectsEventsWorkspace({ projects: initialProjects, eve
           setEventDrawerOpen(false);
           window.location.assign(`/events/${event.id}`);
         }}
-      />
+      />}
     </div>
   );
 }
