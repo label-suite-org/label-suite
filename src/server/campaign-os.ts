@@ -201,8 +201,7 @@ export async function finalizeCampaignReport(orgId: string, campaignId: string, 
     }, { isolationLevel: "repeatable read" });
   } catch (error) {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "40001") {
-      const campaign = await requireCampaign(orgId, campaignId);
-      if (campaign.final_report_snapshot || campaign.final_report_finalized_at) throw new ConflictError("Campaign report has already been finalised");
+      throw new ConflictError("Campaign changed while finalising; refresh and try again");
     }
     throw error;
   }

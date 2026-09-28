@@ -170,6 +170,7 @@ async function handleRequest(
   }
 
   const transactionOptions = requiresRepeatableRead(context.request.method)
+    || (context.request.method.toUpperCase() === "POST" && /^\/api\/campaigns\/[^/]+\/os\/?$/.test(path))
     ? { isolationLevel: "repeatable read" as const }
     : undefined;
   return withPrivateCachePolicy(await runWithDatabaseContext(
