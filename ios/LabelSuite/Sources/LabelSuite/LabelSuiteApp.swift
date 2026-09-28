@@ -628,16 +628,22 @@ private struct NativeLibraryView: View {
     if overview == nil { overview = session.cachedWorkspaceSnapshot(workspaceID: workspace.id)?.overview }
     loading = true; defer { loading = false }
     do {
-      overview = try await api.overview(for: workspace, session: nativeSession); errorMessage = nil
+      let fresh = try await api.overview(for: workspace, session: nativeSession)
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
+      overview = fresh; errorMessage = nil
       let prior = session.cachedWorkspaceSnapshot(workspaceID: workspace.id)
       session.saveWorkspaceSnapshot(NativeWorkspaceSnapshot(userID: nativeSession.userID, workspaceID: workspace.id, campaigns: prior?.campaigns ?? [], selectedCampaign: prior?.selectedCampaign, queueResponse: prior?.queueResponse, selectedLead: prior?.selectedLead, workbench: prior?.workbench, overview: overview, todayResponse: prior?.todayResponse, artistDetails: prior?.artistDetails ?? [], releasePipeline: prior?.releasePipeline, catalog: prior?.catalog, releaseDetails: prior?.releaseDetails ?? [], campaignDetails: prior?.campaignDetails ?? []))
     } catch NativeAPIError.reauthenticationRequired {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       overview = nil; try? session.sessionExpired()
     } catch NativeAPIError.workspaceAccessRemoved {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       overview = nil
-      let remaining = (try? await api.workspaces(for: nativeSession).filter { $0.id != workspace.id }) ?? []
-      try? session.accessLost(workspaceID: workspace.id, userID: nativeSession.userID, remainingWorkspaces: remaining)
-    } catch { errorMessage = overview == nil ? "Label context could not be loaded." : "Offline · showing protected data from the last refresh." }
+      await session.workspaceAccessRemoved(workspaceID: workspace.id, userID: nativeSession.userID, api: api)
+    } catch {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
+      errorMessage = overview == nil ? "Label context could not be loaded." : "Offline · showing protected data from the last refresh."
+    }
   }
 
   private func saveCreatedDetail(_ created: NativeArtistDetail) {
@@ -838,7 +844,7 @@ struct NativeArtistDetailView: View {
     if count > displayed { Text("\(count) \(count == 1 ? label : label + "s") total").font(.caption).foregroundStyle(.secondary) }
   }
 
-  private func load() async {
+  func load() async {
     guard let nativeSession = session.sessionForRequests() else { return }
     if detail == nil, let snapshot = session.cachedWorkspaceSnapshot(workspaceID: workspace.id), let cached = snapshot.artistDetails.first(where: { $0.id == artistID }) {
       detail = cached; stale = true
@@ -847,21 +853,25 @@ struct NativeArtistDetailView: View {
     loading = true; defer { loading = false }
     do {
       let fresh = try await api.artist(id: artistID, workspace: workspace, session: nativeSession)
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       detail = fresh; stale = false; errorMessage = nil
       let prior = session.cachedWorkspaceSnapshot(workspaceID: workspace.id)
       let details = prior?.artistDetailsBySaving(fresh) ?? [fresh]
       session.saveWorkspaceSnapshot(NativeWorkspaceSnapshot(userID: nativeSession.userID, workspaceID: workspace.id, campaigns: prior?.campaigns ?? [], selectedCampaign: prior?.selectedCampaign, queueResponse: prior?.queueResponse, selectedLead: prior?.selectedLead, workbench: prior?.workbench, overview: prior?.overview, todayResponse: prior?.todayResponse, artistDetails: details, releasePipeline: prior?.releasePipeline, catalog: prior?.catalog, releaseDetails: prior?.releaseDetails ?? [], campaignDetails: prior?.campaignDetails ?? []))
       cachedAt = Date()
     } catch NativeAPIError.reauthenticationRequired {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       detail = nil; try? session.sessionExpired()
     } catch NativeAPIError.workspaceAccessRemoved {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       detail = nil
-      let remaining = (try? await api.workspaces(for: nativeSession).filter { $0.id != workspace.id }) ?? []
-      try? session.accessLost(workspaceID: workspace.id, userID: nativeSession.userID, remainingWorkspaces: remaining)
+      await session.workspaceAccessRemoved(workspaceID: workspace.id, userID: nativeSession.userID, api: api)
     } catch NativeAPIError.notFound {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       detail = nil; stale = false
       errorMessage = "This artist is no longer available in the selected workspace."
     } catch {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = detail == nil ? "Artist detail could not be loaded." : "Refresh failed; showing the last successful result."
       stale = detail != nil
     }
@@ -1325,7 +1335,7 @@ func nativeDSPTruncationNotice(_ hasMore: Bool?) -> String? {
   hasMore == true ? "Showing the 20 most recent DSP pitches." : nil
 }
 
-private struct NativeArtistEditorView: View {
+struct NativeArtistEditorView: View {
   let detail: NativeArtistDetail
   let workspace: Workspace
   @ObservedObject var session: NativeSessionController
@@ -1385,7 +1395,7 @@ private struct NativeArtistEditorView: View {
     .presentationDetents([.medium, .large])
   }
 
-  private func save() async {
+  func save() async {
     guard workspace.capabilities["operations.mutate"] == true else { errorMessage = "Read-only members cannot edit artists."; return }
     guard let expectedUpdatedAt = detail.artist.updatedAt, let nativeSession = session.sessionForRequests() else {
       errorMessage = "Refresh this artist before editing; its loaded revision is unavailable."
@@ -1401,20 +1411,29 @@ private struct NativeArtistEditorView: View {
       expectedUpdatedAt: expectedUpdatedAt,
     )
     do {
-      onSaved(try await api.updateArtist(id: detail.id, input: input, workspace: workspace, session: nativeSession))
+      let fresh = try await api.updateArtist(id: detail.id, input: input, workspace: workspace, session: nativeSession)
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
+      onSaved(fresh)
     } catch NativeAPIError.reauthenticationRequired {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       try? session.sessionExpired()
     } catch NativeAPIError.workspaceAccessRemoved {
-      try? session.accessLost(workspaceID: workspace.id, userID: nativeSession.userID, remainingWorkspaces: [])
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
+      await session.workspaceAccessRemoved(workspaceID: workspace.id, userID: nativeSession.userID, api: api)
     } catch NativeAPIError.notFound {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = "This artist is no longer available. Your entered values are still here."
     } catch NativeAPIError.conflict {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = "This artist changed elsewhere. Reload the current record, then retry; your entered values are still here."
     } catch NativeAPIError.insufficientPermissions {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = "You no longer have permission to edit this artist. Your entered values are still here."
     } catch NativeAPIError.validationFailure {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = "The artist details need correction. Your entered values are still here."
     } catch {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = "Could not confirm the save. Refresh the artist before retrying; your entered values are still here."
     }
   }
@@ -1476,16 +1495,22 @@ private struct NativeArtistCreateView: View {
     let input = NativeArtistCreateInput(name: name, imageURL: imageURL.trimmedNil, bio: bio.trimmedNil, relationship: relationship.trimmedNil)
     do {
       let created = try await api.createArtist(input: input, workspace: workspace, session: nativeSession)
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       onCreated(created)
     } catch NativeAPIError.reauthenticationRequired {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       try? session.sessionExpired()
     } catch NativeAPIError.workspaceAccessRemoved {
-      try? session.accessLost(workspaceID: workspace.id, userID: nativeSession.userID, remainingWorkspaces: [])
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
+      await session.workspaceAccessRemoved(workspaceID: workspace.id, userID: nativeSession.userID, api: api)
     } catch NativeAPIError.insufficientPermissions {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = "You do not have permission to create artists. Your entered values are still here."
     } catch NativeAPIError.validationFailure {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       errorMessage = "The artist details need correction. Your entered values are still here."
     } catch {
+      guard !Task.isCancelled, session.acceptsResponse(for: nativeSession, workspaceID: workspace.id) else { return }
       creationUnconfirmed = true
       errorMessage = "Could not confirm creation. Close this form and refresh Artists to check whether it was saved before creating another record."
     }

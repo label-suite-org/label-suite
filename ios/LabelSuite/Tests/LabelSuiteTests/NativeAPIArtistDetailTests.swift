@@ -2,6 +2,8 @@ import Foundation
 import XCTest
 @testable import LabelSuite
 
+private let artistDetailFixture = Data(#"{"artist":{"id":"artist-a","name":"Artist A","updated_at":"2026-08-15T10:00:00.000Z","image_url":null,"image_state":"missing","bio":"A bio","relationship":"roster","spotify_id":"spotify-a","spotify_followers":1200,"spotify_popularity":42,"pro":"KODA","ipi":"IPI-A","instagram":"artist-a","tiktok":null},"readiness":{"complete":7,"total":9,"missing":["Image","TikTok"]},"relationships":{"releases":[],"campaigns":[],"tasks":[],"primary_contact":null,"counts":{"releases":0,"campaigns":0,"works":0,"rights":0,"tasks":0,"assets":0,"documents":0}}}"#.utf8)
+
 final class NativeAPIArtistDetailTests: XCTestCase {
   func testArtistDetailUsesCanonicalWorkspaceRouteAndDecodesReadOnlyProjection() async throws {
     let configuration = URLSessionConfiguration.ephemeral
@@ -10,7 +12,7 @@ final class NativeAPIArtistDetailTests: XCTestCase {
       XCTAssertEqual(request.url?.path, "/api/native/artists/artist-a")
       XCTAssertEqual(request.url?.query, "workspaceId=org-a")
       XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer token-a")
-      let data = Data(#"{"artist":{"id":"artist-a","name":"Artist A","image_url":null,"image_state":"missing","bio":"A bio","relationship":"roster","spotify_id":"spotify-a","spotify_followers":1200,"spotify_popularity":42,"pro":"KODA","ipi":"IPI-A","instagram":"artist-a","tiktok":null},"readiness":{"complete":7,"total":9,"missing":["Image","TikTok"]},"relationships":{"releases":[],"campaigns":[],"tasks":[],"primary_contact":null,"counts":{"releases":0,"campaigns":0,"works":0,"rights":0,"tasks":0,"assets":0,"documents":0}}}"#.utf8)
+      let data = artistDetailFixture
       return (try XCTUnwrap(HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)), data)
     }
 
@@ -84,6 +86,48 @@ final class NativeAPIArtistDetailTests: XCTestCase {
     }
     XCTAssertEqual(input.name, "Entered but not saved")
     XCTAssertEqual(input.relationship, "collaborator")
+  }
+
+  @MainActor func testArtistResponsesCannotAffectAReplacementSession() async throws {
+    for status in [200, 401] {
+      let workspace = Workspace(id: "org-a", name: "A", capabilities: ["operations.mutate": true])
+      let original = NativeSession(token: UUID().uuidString, userID: "user-a")
+      let replacement = NativeSession(token: UUID().uuidString, userID: "user-a")
+      let snapshots = FileProtectedSnapshotStore(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString))
+      defer { try? snapshots.eraseAllWorkspaceSnapshots() }
+      let store = MemoryStore()
+      let controller = NativeSessionController(secureStore: store, snapshots: MemorySnapshots(), workspaceSnapshots: snapshots, pendingRevocationStore: MemoryRevocationStore(), recoveryMarker: MemoryRevocationRecoveryMarker())
+      let configuration = URLSessionConfiguration.ephemeral
+      configuration.protocolClasses = [ArtistDetailURLProtocol.self]
+      ArtistDetailURLProtocol.install { request in
+        // Replace the account session while the real URLSession request is in flight.
+        try DispatchQueue.main.sync {
+          try MainActor.assumeIsolated {
+            try store.save(replacement)
+          }
+        }
+        return (try XCTUnwrap(HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)), artistDetailFixture)
+      }
+      let api = NativeAPI(baseURL: URL(string: "https://native.test")!, transport: URLSession(configuration: configuration))
+      try controller.signIn(original, workspaces: [workspace])
+      await controller.select(workspace, api: FakeNativeAPI(selectResult: .success(workspace)))
+      XCTAssertEqual(controller.state, .authenticated(workspace))
+      await NativeArtistDetailView(artistID: "artist-a", workspace: workspace, session: controller, api: api).load()
+      XCTAssertEqual(controller.sessionForRequests(), replacement)
+      XCTAssertEqual(controller.state, .authenticated(workspace))
+      XCTAssertNil(try snapshots.loadWorkspaceSnapshot(userID: original.userID, workspaceID: workspace.id))
+
+      try controller.signIn(original, workspaces: [workspace])
+      await controller.select(workspace, api: FakeNativeAPI(selectResult: .success(workspace)))
+      XCTAssertEqual(controller.state, .authenticated(workspace))
+      var saved = false
+      let detail = try JSONDecoder().decode(NativeArtistDetail.self, from: artistDetailFixture)
+      let editor = NativeArtistEditorView(detail: detail, workspace: workspace, session: controller, api: api) { _ in saved = true }
+      await editor.save()
+      XCTAssertFalse(saved, "A response from the replaced session must not update its parent")
+      XCTAssertEqual(controller.sessionForRequests(), replacement)
+      XCTAssertEqual(controller.state, .authenticated(workspace))
+    }
   }
 
   private func assertNativeError<T>(_ expected: NativeAPIError, operation: () async throws -> T, file: StaticString = #filePath, line: UInt = #line) async {
