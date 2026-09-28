@@ -11,7 +11,7 @@ import {
 import { HttpError, NotFoundError } from "./errors";
 import {
   runAnalyticsSourceImport,
-  withAnalyticsSourceTransaction,
+  listLatestAnalyticsSourceImports,
   type AnalyticsSourceImportDatabase,
 } from "./analytics-source-import";
 import {
@@ -46,47 +46,12 @@ export type SpotifyImportResult =
   | { kind: "duplicate"; runId: string; reportingThrough: string; latest: LatestSpotifyAudienceImport }
   | { kind: "imported"; runId: string; inserted: number; updated: number; unchanged: number; reportingThrough: string; latest: LatestSpotifyAudienceImport };
 
-export type SpotifyImportTransaction = {
-  findArtist(artistId: string): Promise<{ id: string; name: string } | null>;
-  findSuccessfulDuplicate(input: { artistId: string; sha256: string }): Promise<LatestSpotifyAudienceImport | null>;
-  createRun(input: { id: string; artistId: string; dateRange: string; reportingThrough: string }): Promise<void>;
-  recordFile(input: {
-    id: string; runId: string; artistId: string; fileName: string; sha256: string;
-    byteSize: number; rowCount: number; headers: string[]; actualDateRange: string;
-    storageBucket: string; storageKey: string;
-  }): Promise<void>;
-  upsertRows(input: { runId: string; artistId: string; rows: SpotifyAudienceRow[] }): Promise<{ inserted: number; updated: number; unchanged: number }>;
-  completeRun(input: { runId: string; inserted: number; updated: number; unchanged: number }): Promise<void>;
-};
-
-export interface SpotifyImportStore {
-  withLockedTransaction<T>(orgId: string, work: (tx: SpotifyImportTransaction) => Promise<T>): Promise<T>;
-  recordFailedRun(input: SpotifyFailedImportEvidence): Promise<void>;
-  listLatest(orgId: string): Promise<LatestSpotifyAudienceImport[]>;
-}
-
-export interface SpotifyFailedImportEvidence {
-  runId: string;
-  fileId: string;
-  orgId: string;
-  artistId: string | null;
-  fileName: string;
-  sha256: string;
-  byteSize: number;
-  rowCount: number;
-  headers: string[];
-  actualDateRange: string;
-  reportingThrough: string;
-  archivedFile: { storageBucket: string; storageKey: string } | null;
-  error: string;
-}
-
 export interface SpotifySourceArchive {
   (input: { orgId: string; artistId: string; sha256: string; bytes: Uint8Array }): Promise<{ bucket: string; key: string }>;
 }
 
 export interface SpotifyAnalyticsImportDependencies {
-  store: SpotifyImportStore;
+  database: SpotifyAnalyticsDatabaseProvider;
   archive: SpotifySourceArchive;
   assertArchiveReady?: () => void;
   now: () => Date;
@@ -180,9 +145,9 @@ function latestSelection(tx: DrizzleTransaction, orgId: string) {
     ));
 }
 
-function makeProductionTransaction(tx: DrizzleTransaction, orgId: string, observedAt: Date): SpotifyImportTransaction {
+function makeProductionTransaction(tx: DrizzleTransaction, orgId: string, observedAt: Date) {
   return {
-    async findArtist(artistId) {
+    async findArtist(artistId: string) {
       const rows = await tx.select({ id: artists.id, name: artists.name })
         .from(artists)
         .where(and(eq(artists.org_id, orgId), eq(artists.id, artistId)))
@@ -190,7 +155,7 @@ function makeProductionTransaction(tx: DrizzleTransaction, orgId: string, observ
       return rows[0] ?? null;
     },
 
-    async findSuccessfulDuplicate({ artistId, sha256 }) {
+    async findSuccessfulDuplicate({ artistId, sha256 }: { artistId: string; sha256: string }) {
       const rows = await latestSelection(tx, orgId)
         .where(and(
           eq(analytics_import_runs.org_id, orgId),
@@ -205,66 +170,11 @@ function makeProductionTransaction(tx: DrizzleTransaction, orgId: string, observ
       return rows[0] ? latestFromRow(rows[0]) : null;
     },
 
-    async createRun({ id, artistId, dateRange, reportingThrough: through }) {
-      await tx.insert(analytics_import_runs).values({
-        id,
-        org_id: orgId,
-        source: SPOTIFY_AUDIENCE_SOURCE,
-        artist_id: artistId,
-        mode: "manual_import",
-        requested_date_range: dateRange,
-        requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
-        status: "running",
-        started_at: observedAt,
-        metadata: {
-          export_type: "audience_timeline",
-          canonical_range: SPOTIFY_AUDIENCE_RANGE,
-          reporting_through: through,
-          observed_at: observedAt.toISOString(),
-        },
-      });
-    },
-
-    async recordFile(input) {
-      await tx.insert(analytics_import_files).values({
-        id: input.id,
-        org_id: orgId,
-        run_id: input.runId,
-        source: SPOTIFY_AUDIENCE_SOURCE,
-        widget_key: SPOTIFY_AUDIENCE_WIDGET,
-        widget_title: "Audience timeline",
-        artist_id: input.artistId,
-        requested_date_range: input.actualDateRange,
-        requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
-        file_name: input.fileName,
-        storage_bucket: input.storageBucket,
-        storage_key: input.storageKey,
-        storage_status: "uploaded",
-        storage_uploaded_at: observedAt,
-        sha256: input.sha256,
-        byte_size: input.byteSize,
-        row_count: input.rowCount,
-        headers: input.headers,
-        created_at: observedAt,
-      });
-    },
-
-    async upsertRows({ runId, artistId, rows }) {
+    async upsertRows({ runId, artistId, rows }: { runId: string; artistId: string; rows: SpotifyAudienceRow[] }) {
       return persistRowsSetBased(tx, { orgId, runId, artistId, rows, observedAt });
     },
 
-    async completeRun({ runId, inserted, updated, unchanged }) {
-      await tx.update(analytics_import_runs).set({
-        status: "completed",
-        completed_at: observedAt,
-        files_downloaded: 1,
-        rows_imported: inserted + updated + unchanged,
-        rows_inserted: inserted,
-        rows_updated: updated,
-        rows_unchanged: unchanged,
-        error: null,
-      }).where(and(eq(analytics_import_runs.org_id, orgId), eq(analytics_import_runs.id, runId)));
-    },
+
   };
 }
 
@@ -393,96 +303,6 @@ async function persistRowsSetBased(tx: DrizzleTransaction, input: {
   };
 }
 
-function createProductionSpotifyImportStore(
-  databaseProvider: SpotifyAnalyticsDatabaseProvider,
-  now: () => Date,
-): SpotifyImportStore {
-  return {
-    withLockedTransaction(orgId, work) {
-      const observedAt = now();
-      return withAnalyticsSourceTransaction(
-        databaseProvider,
-        orgId,
-        SPOTIFY_AUDIENCE_SOURCE,
-        "wait",
-        (tx) => work(makeProductionTransaction(tx, orgId, observedAt)),
-      );
-    },
-
-    async recordFailedRun(input) {
-      await withAnalyticsSourceTransaction(databaseProvider, input.orgId, SPOTIFY_AUDIENCE_SOURCE, "wait", async (tx) => {
-        const observedAt = now();
-        await tx.insert(analytics_import_runs).values({
-          id: input.runId,
-          org_id: input.orgId,
-          source: SPOTIFY_AUDIENCE_SOURCE,
-          artist_id: input.artistId,
-          mode: "manual_import",
-          requested_date_range: input.actualDateRange,
-          requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
-          status: "failed",
-          started_at: observedAt,
-          completed_at: observedAt,
-          files_downloaded: input.archivedFile ? 1 : 0,
-          rows_imported: 0,
-          rows_inserted: 0,
-          rows_updated: 0,
-          rows_unchanged: 0,
-          error: input.error.slice(0, 500),
-          metadata: {
-            export_type: "audience_timeline",
-            canonical_range: SPOTIFY_AUDIENCE_RANGE,
-            reporting_through: input.reportingThrough,
-            observed_at: observedAt.toISOString(),
-            file_name: input.fileName,
-            sha256: input.sha256,
-          },
-        });
-        if (input.archivedFile) {
-          await tx.insert(analytics_import_files).values({
-            id: input.fileId,
-            org_id: input.orgId,
-            run_id: input.runId,
-            source: SPOTIFY_AUDIENCE_SOURCE,
-            widget_key: SPOTIFY_AUDIENCE_WIDGET,
-            widget_title: "Audience timeline",
-            artist_id: input.artistId,
-            requested_date_range: input.actualDateRange,
-            requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
-            file_name: input.fileName,
-            storage_bucket: input.archivedFile.storageBucket,
-            storage_key: input.archivedFile.storageKey,
-            storage_status: "uploaded",
-            storage_uploaded_at: observedAt,
-            sha256: input.sha256,
-            byte_size: input.byteSize,
-            row_count: input.rowCount,
-            headers: input.headers,
-            created_at: observedAt,
-          });
-        }
-      });
-    },
-
-    async listLatest(orgId) {
-      return withAnalyticsSourceTransaction(databaseProvider, orgId, SPOTIFY_AUDIENCE_SOURCE, "wait", async (tx) => {
-        const rows = await latestSelection(tx, orgId)
-          .where(and(
-            eq(analytics_import_runs.org_id, orgId),
-            eq(analytics_import_runs.source, SPOTIFY_AUDIENCE_SOURCE),
-            eq(analytics_import_runs.status, "completed"),
-          ))
-          .orderBy(desc(analytics_import_runs.completed_at), desc(analytics_import_runs.started_at));
-        const latest = new Map<string, LatestSpotifyAudienceImport>();
-        for (const row of rows) {
-          if (row.artistId && !latest.has(row.artistId)) latest.set(row.artistId, latestFromRow(row));
-        }
-        return [...latest.values()];
-      });
-    },
-  };
-}
-
 const productionArchive: SpotifySourceArchive = async ({ orgId, artistId, sha256, bytes }) => {
   const { getStorageClient, tenantStorageKey } = await import("./storage");
   const bucket = resolveSpotifyPrivateAnalyticsBucket(process.env);
@@ -501,7 +321,7 @@ const productionRandomId = () => randomUUID();
 const productionDatabaseProvider: SpotifyAnalyticsDatabaseProvider = async () => (await import("../lib/db")).db;
 
 const productionDependencies: SpotifyAnalyticsImportDependencies = {
-  store: createProductionSpotifyImportStore(productionDatabaseProvider, productionNow),
+  database: productionDatabaseProvider,
   archive: productionArchive,
   assertArchiveReady: () => { resolveSpotifyPrivateAnalyticsBucket(process.env); },
   now: productionNow,
@@ -517,7 +337,7 @@ export function createSpotifyAnalyticsImportProductionService(input: {
   const now = input.now ?? productionNow;
   const randomId = input.randomId ?? productionRandomId;
   return createSpotifyAnalyticsImportService({
-    store: createProductionSpotifyImportStore(async () => input.database, now),
+    database: async () => input.database,
     archive: input.archive,
     now,
     randomId,
@@ -542,13 +362,14 @@ export function createSpotifyAnalyticsImportService(dependencies = productionDep
       return runAnalyticsSourceImport<
         SpotifyLifecycleInput,
         SpotifyImportContext,
-        SpotifyImportTransaction,
+        ReturnType<typeof makeProductionTransaction>,
         LatestSpotifyAudienceImport,
-        { inserted: number; updated: number; unchanged: number },
-        SpotifyImportResult,
-        SpotifyFailedImportEvidence
+        SpotifyImportResult
       >({
-        store: dependencies.store,
+        database: dependencies.database,
+        source: SPOTIFY_AUDIENCE_SOURCE,
+        lock: "wait",
+        transaction: makeProductionTransaction,
         assertArchiveReady: dependencies.assertArchiveReady,
         now: dependencies.now,
         randomId: dependencies.randomId,
@@ -568,11 +389,16 @@ export function createSpotifyAnalyticsImportService(dependencies = productionDep
           reportingThrough: duplicate.reportingThrough,
           latest: duplicate,
         }),
-        createRun: (tx, context, runId) => tx.createRun({
-          id: runId,
-          artistId: context.artist.id,
-          dateRange: `${context.parsed.dateFrom}..${context.parsed.dateThrough}`,
-          reportingThrough: context.parsed.dateThrough,
+        runEvidence: (context, observedAt) => ({
+          artist_id: context.artist.id,
+          requested_date_range: `${context.parsed.dateFrom}..${context.parsed.dateThrough}`,
+          requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
+          metadata: {
+            export_type: "audience_timeline",
+            canonical_range: SPOTIFY_AUDIENCE_RANGE,
+            reporting_through: context.parsed.dateThrough,
+            observed_at: observedAt.toISOString(),
+          },
         }),
         archive: (value, context) => dependencies.archive({
           orgId: value.orgId,
@@ -580,25 +406,23 @@ export function createSpotifyAnalyticsImportService(dependencies = productionDep
           sha256: context.parsed.sha256,
           bytes: value.bytes,
         }),
-        recordFile: (tx, context, runId, fileId, archived) => tx.recordFile({
-          id: fileId,
-          runId,
-          artistId: context.artist.id,
-          fileName: context.parsed.fileName,
+        fileEvidence: (context) => ({
+          artist_id: context.artist.id,
+          widget_key: SPOTIFY_AUDIENCE_WIDGET,
+          widget_title: "Audience timeline",
+          file_name: context.parsed.fileName,
           sha256: context.parsed.sha256,
-          byteSize: context.parsed.byteSize,
-          rowCount: context.parsed.rowCount,
+          byte_size: context.parsed.byteSize,
+          row_count: context.parsed.rowCount,
           headers: context.parsed.headers,
-          actualDateRange: `${context.parsed.dateFrom}..${context.parsed.dateThrough}`,
-          storageBucket: archived.bucket,
-          storageKey: archived.key,
+          requested_date_range: `${context.parsed.dateFrom}..${context.parsed.dateThrough}`,
+          requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
         }),
         persistRows: (tx, context, runId) => tx.upsertRows({
           runId,
           artistId: context.artist.id,
           rows: context.parsed.rows,
         }),
-        completeRun: (tx, runId, counts) => tx.completeRun({ runId, ...counts }),
         importedResult: (context, runId, counts, observedAt) => {
           const latest: LatestSpotifyAudienceImport = {
             artistId: context.artist.id,
@@ -618,30 +442,41 @@ export function createSpotifyAnalyticsImportService(dependencies = productionDep
             latest,
           };
         },
-        buildFailureEvidence: ({ input: value, context, archivedFile, phase, runId, fileId }) => ({
-          runId,
-          fileId,
-          orgId: value.orgId,
-          artistId: context?.artist.id ?? null,
-          fileName: value.parsed.fileName,
-          sha256: value.parsed.sha256,
-          byteSize: value.parsed.byteSize,
-          rowCount: value.parsed.rowCount,
-          headers: value.parsed.headers,
-          actualDateRange: `${value.parsed.dateFrom}..${value.parsed.dateThrough}`,
-          reportingThrough: value.parsed.dateThrough,
-          archivedFile: archivedFile ? {
-            storageBucket: archivedFile.bucket,
-            storageKey: archivedFile.key,
-          } : null,
+        failureEvidence: (value, context, phase, observedAt) => ({
+          run: {
+            artist_id: context?.artist.id ?? null,
+            requested_date_range: `${value.parsed.dateFrom}..${value.parsed.dateThrough}`,
+            requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
+            metadata: {
+              export_type: "audience_timeline",
+              canonical_range: SPOTIFY_AUDIENCE_RANGE,
+              reporting_through: value.parsed.dateThrough,
+              observed_at: observedAt.toISOString(),
+              file_name: value.parsed.fileName,
+              sha256: value.parsed.sha256,
+            },
+          },
+          file: {
+            artist_id: context?.artist.id ?? null,
+            widget_key: SPOTIFY_AUDIENCE_WIDGET,
+            widget_title: "Audience timeline",
+            requested_date_range: `${value.parsed.dateFrom}..${value.parsed.dateThrough}`,
+            requested_aggregation: SPOTIFY_AUDIENCE_AGGREGATION,
+            file_name: value.parsed.fileName,
+            sha256: value.parsed.sha256,
+            byte_size: value.parsed.byteSize,
+            row_count: value.parsed.rowCount,
+            headers: value.parsed.headers,
+          },
           error: `Spotify audience import failed during ${phase}`,
         }),
         shouldRecordFailure: (error) => !(error instanceof NotFoundError),
       }, lifecycleInput);
     },
 
-    listLatestSpotifyAudienceImports(orgId: string) {
-      return dependencies.store.listLatest(orgId);
+    async listLatestSpotifyAudienceImports(orgId: string): Promise<LatestSpotifyAudienceImport[]> {
+      const rows = await listLatestAnalyticsSourceImports(dependencies.database, orgId, SPOTIFY_AUDIENCE_SOURCE, SPOTIFY_AUDIENCE_WIDGET, "wait", false);
+      return rows.map(latestFromRow);
     },
   };
 }

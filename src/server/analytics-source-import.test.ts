@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runAnalyticsSourceImport } from "./analytics-source-import";
+import { runAnalyticsSourceImport } from "./analytics-source-import-legacy";
 
 type Input = { orgId: string };
 type Context = { artistId: string };
