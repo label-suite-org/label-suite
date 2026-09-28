@@ -135,7 +135,7 @@ describe("seedAnalyticsSandbox", () => {
     const client = recordingClient();
     await seedAnalyticsSandbox(client, config);
     const lock = findQuery(client.queries, "pg_advisory_xact_lock");
-    const sisenseSync = readFileSync(new URL("./sisense-sync.ts", import.meta.url), "utf8");
+    const sisenseSync = readFileSync(new URL("./sisense-ingestion-run.ts", import.meta.url), "utf8");
 
     expect(lock.values).toEqual(["label-suite:sandbox-org:sisense"]);
     expect(sisenseSync).toContain('const SOURCE = "sisense"');

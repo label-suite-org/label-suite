@@ -195,6 +195,14 @@ async function verifyRlsAndAdvisoryLock(db: Client, competingClient: Client): Pr
   await db.query("select pg_advisory_lock(hashtext($1))", [advisoryKey]);
   const locked = await competingClient.query<{ locked: boolean }>("select pg_try_advisory_xact_lock(hashtext($1)) as locked", [advisoryKey]);
   if (locked.rows[0]?.locked !== false) throw new Error("Actual analytics advisory lock contract failed");
+  const blocked = await runImporter(["--mode", "import", "--apply", "--no-upload", "--file", csvPath], {
+    DATABASE_URL: databaseUrl, SISENSE_DB_SCHEMA: schema, SISENSE_ORG_ID: tenant,
+  });
+  if (blocked.status !== 1 || !blocked.output.includes("Another Sisense sync is already running.")) {
+    throw new Error(`Importer did not respect the held advisory lock: ${blocked.output}`);
+  }
+  const runs = await db.query(`select count(*)::int as total from ${schema}.analytics_import_runs`);
+  if (runs.rows[0]?.total !== 0) throw new Error("Blocked importer created a run before owning the lock");
   await db.query("select pg_advisory_unlock(hashtext($1))", [advisoryKey]);
 }
 

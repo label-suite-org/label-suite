@@ -93,7 +93,7 @@ describe("replaceAnalyticsSandboxEvidence", () => {
 
 describe("Sisense import replacement boundary", () => {
   it("validates replacement before the first database query and publishes it inside the import transaction", () => {
-    const importer = readFileSync(new URL("./sisense-sync.ts", import.meta.url), "utf8");
+    const importer = readFileSync(new URL("./sisense-ingestion-run.ts", import.meta.url), "utf8");
     const boundary = importer.indexOf("assertAnalyticsSandboxReplacementTarget(");
     const firstQuery = importer.indexOf("successfulRunExists(pool, orgId)");
     const transaction = importer.indexOf('await client.query("begin")');
