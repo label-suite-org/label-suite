@@ -15,7 +15,8 @@ function residual(amount: string, allocated: string) {
 
 export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
   const workbench = useRef<HTMLElement>(null);
-  const focusSelection = useRef(false);
+  const queue = useRef<HTMLElement>(null);
+  const focusSelection = useRef<"detail"|"queue"|null>(null);
   const [filter,setFilter] = useState("unmatched");
   const [offset,setOffset] = useState(0);
   const [selected,setSelected] = useState("");
@@ -39,14 +40,17 @@ export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
     return ()=>controller.abort();
   },[filter,offset,selected,search,revision]);
   useEffect(()=>{
-    if(data?.detail && focusSelection.current) { workbench.current?.focus(); focusSelection.current=false; }
+    if(data && focusSelection.current) {
+      (focusSelection.current==="detail"?workbench:queue).current?.focus();
+      focusSelection.current=null;
+    }
   },[data]);
   async function submit(path:string,body:unknown,message:string) {
     setBusy(true);setError("");setNotice("");
     try {
       const response=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       const result=await response.json();if(!response.ok)throw new Error(result.error??"Could not save. Your input is unchanged.");
-      setNotice(message);setRevision(value=>value+1);return true;
+      setNotice(message);focusSelection.current=selected?"detail":"queue";setRevision(value=>value+1);return true;
     } catch(reason) {setError(reason instanceof Error?reason.message:"Could not save");return false;}
     finally {setBusy(false);}
   }
@@ -80,16 +84,16 @@ export default function FinanceReconciliation({canMutate}:{canMutate:boolean}) {
     <div className="flex flex-wrap gap-2" role="group" aria-label="Transaction filters">{[["unmatched","Unmatched"],["partially_matched","Partial"],["matched","Matched"],["all","All"]].map(([value,label])=><Button key={value} variant={filter===value?"default":"outline"} size="sm" aria-pressed={filter===value} disabled={busy} onClick={()=>{setFilter(value);setOffset(0);setSelected("");setSearch("");}}>{label}</Button>)}</div>
     {!data&&!error&&<p role="status" className="text-sm text-muted-foreground">Loading transactions…</p>}
     {data&&<div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(16rem,1fr)_minmax(0,2fr)]">
-      <section aria-label="Transactions" className={`min-w-0 ${detail?"hidden lg:block":""}`}><h2 className="sr-only">Transactions</h2>
+      <section ref={queue} tabIndex={-1} aria-label="Transactions" className={`min-w-0 ${detail?"hidden lg:block":""}`}><h2 className="sr-only">Transactions</h2>
         {!data.transactions.length&&<p className="py-6 text-sm text-muted-foreground">No transactions in this view.</p>}
-        <ul className="divide-y">{data.transactions.map(row=><li key={row.id}><button disabled={busy} aria-pressed={selected===row.id} className={`w-full min-w-0 py-4 text-left ${selected===row.id?"border-l-2 border-primary pl-3":""}`} onClick={()=>{focusSelection.current=true;setSelected(row.id);setSearch("");setNotice("");}}>
+        <ul className="divide-y">{data.transactions.map(row=><li key={row.id}><button disabled={busy} aria-pressed={selected===row.id} className={`w-full min-w-0 py-4 text-left ${selected===row.id?"border-l-2 border-primary pl-3":""}`} onClick={()=>{focusSelection.current="detail";setSelected(row.id);setSearch("");setNotice("");}}>
           <span className="block text-xs text-muted-foreground">{date(row.occurredAt)} · {row.account}</span><span className="block break-words font-medium">{row.description||"Transaction"}</span>
           <span className="block text-sm">{row.direction==="credit"?"Incoming":"Outgoing"} · {row.currency} {row.amount}</span><span className="text-xs text-muted-foreground">Remaining {row.currency} {row.remaining}</span>
         </button></li>)}</ul>
         <div className="mt-3 flex justify-between"><Button variant="outline" size="sm" disabled={offset===0||busy} onClick={()=>setOffset(value=>Math.max(0,value-50))}>Previous</Button><Button variant="outline" size="sm" disabled={!data.hasMore||busy} onClick={()=>setOffset(value=>value+50)}>Next</Button></div>
       </section>
       <section ref={workbench} tabIndex={-1} className="min-w-0 space-y-5" aria-label="Selected transaction">
-        {detail&&<Button variant="outline" className="lg:hidden" onClick={()=>{setSelected("");setSearch("");}}>Back to transactions</Button>}
+        {detail&&<Button variant="outline" className="lg:hidden" onClick={()=>{focusSelection.current="queue";setSelected("");setSearch("");}}>Back to transactions</Button>}
         {!detail?<p className="py-6 text-sm text-muted-foreground">Select a transaction to inspect its evidence and matches.</p>:<>
           <header><h2 className="break-words text-lg font-semibold">{detail.description||"Transaction details"}</h2><p className="text-sm">{detail.source_provider} · {detail.account_label} · {date(detail.occurred_at)}</p><p className="mt-2 font-medium">Remaining {detail.currency} {detail.remaining}</p></header>
           <details className="border-y py-3"><summary className="cursor-pointer text-sm font-medium">Source evidence</summary><dl className="mt-3 space-y-2 break-all text-xs"><dt>Reference</dt><dd>{detail.external_transaction_id||"—"}</dd><dt>Source hash</dt><dd>{detail.raw_source_hash}</dd></dl><pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-all text-xs">{JSON.stringify(detail.raw_evidence,null,2)}</pre></details>
