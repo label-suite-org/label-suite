@@ -178,24 +178,32 @@ export async function setCampaignTerritories(orgId: string, campaignId: string, 
 }
 
 export async function finalizeCampaignReport(orgId: string, campaignId: string, report: string, actorId: string) {
-  return db.transaction(async (tx) => {
-    const workspace = await getCampaignOsWorkspace(orgId, campaignId, tx);
-    const finalizedAt = new Date();
-    const snapshot = { finalized_at: finalizedAt.toISOString(), cost: workspace.cost, deliverable_count: workspace.deliverables.length, approved_deliverable_count: workspace.deliverables.filter((item) => item.approval_status === "approved").length, post_count: workspace.posts.length, manual_metrics: workspace.posts.reduce<Record<string, number>>((all, post) => {
-      for (const [key, value] of Object.entries(post.manual_metrics ?? {})) all[key] = (all[key] ?? 0) + Number(value);
-      return all;
-    }, {}), creator_delivery: workspace.engagements.map((engagement) => ({
-      contact_name: engagement.contact_name, status: engagement.status,
-      deliverables: workspace.deliverables.filter((item) => item.engagement_id === engagement.id).map((item) => ({ description: item.description, approval_status: item.approval_status, evidence_url: item.evidence_url })),
-    })), post_evidence: workspace.posts.map((post) => ({
-      url: post.url, platform: post.platform, published_at: post.published_at, metrics_captured_at: post.metrics_captured_at,
-      manual_metrics: post.manual_metrics, notes: post.notes,
-    })), budget_lines: workspace.budgetLines.map((line) => ({
-      name: line.name, planned_amount: line.planned_amount ?? line.amount, committed_amount: line.committed_amount, paid_amount: line.paid_amount,
-    })) };
-    const saved = await tx.update(campaigns).set({ final_report: report, final_report_snapshot: snapshot, final_report_finalized_at: finalizedAt, final_report_finalized_by: actorId, updated_at: finalizedAt })
-      .where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId), isNull(campaigns.final_report_snapshot), isNull(campaigns.final_report_finalized_at))).returning({ id: campaigns.id });
-    if (!saved.length) throw new ConflictError("Campaign report has already been finalised");
-    return { ok: true, snapshot };
-  }, { isolationLevel: "repeatable read" });
+  try {
+    return await db.transaction(async (tx) => {
+      const workspace = await getCampaignOsWorkspace(orgId, campaignId, tx);
+      const finalizedAt = new Date();
+      const snapshot = { finalized_at: finalizedAt.toISOString(), cost: workspace.cost, deliverable_count: workspace.deliverables.length, approved_deliverable_count: workspace.deliverables.filter((item) => item.approval_status === "approved").length, post_count: workspace.posts.length, manual_metrics: workspace.posts.reduce<Record<string, number>>((all, post) => {
+        for (const [key, value] of Object.entries(post.manual_metrics ?? {})) all[key] = (all[key] ?? 0) + Number(value);
+        return all;
+      }, {}), creator_delivery: workspace.engagements.map((engagement) => ({
+        contact_name: engagement.contact_name, status: engagement.status,
+        deliverables: workspace.deliverables.filter((item) => item.engagement_id === engagement.id).map((item) => ({ description: item.description, approval_status: item.approval_status, evidence_url: item.evidence_url })),
+      })), post_evidence: workspace.posts.map((post) => ({
+        url: post.url, platform: post.platform, published_at: post.published_at, metrics_captured_at: post.metrics_captured_at,
+        manual_metrics: post.manual_metrics, notes: post.notes,
+      })), budget_lines: workspace.budgetLines.map((line) => ({
+        name: line.name, planned_amount: line.planned_amount ?? line.amount, committed_amount: line.committed_amount, paid_amount: line.paid_amount,
+      })) };
+      const saved = await tx.update(campaigns).set({ final_report: report, final_report_snapshot: snapshot, final_report_finalized_at: finalizedAt, final_report_finalized_by: actorId, updated_at: finalizedAt })
+        .where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId), isNull(campaigns.final_report_snapshot), isNull(campaigns.final_report_finalized_at))).returning({ id: campaigns.id });
+      if (!saved.length) throw new ConflictError("Campaign report has already been finalised");
+      return { ok: true, snapshot };
+    }, { isolationLevel: "repeatable read" });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "40001") {
+      const campaign = await requireCampaign(orgId, campaignId);
+      if (campaign.final_report_snapshot || campaign.final_report_finalized_at) throw new ConflictError("Campaign report has already been finalised");
+    }
+    throw error;
+  }
 }

@@ -52,9 +52,10 @@ it("shows saved report figures beside live figures without offering finalisation
   await act(async () => root.render(<CampaignOsWorkspace campaignId="campaign" section="report" canMutate contacts={[]} />));
   expect(container.textContent).toContain("Saved at finalisation");
   expect(container.textContent).toContain("Planned 10 · Committed 4 · Paid 2");
-  expect(container.textContent).toContain("Live now");
+  expect(container.textContent).toContain("Current Campaign record");
   expect(container.textContent).toContain("Planned 20 · Committed 10 · Paid 5");
   expect(container.textContent).toContain("views: 100");
+  expect(container.textContent).toContain("no platform monitoring occurs");
   await act(async () => container.querySelector<HTMLButtonElement>('[data-slot="accordion-trigger"]')!.click());
   expect(container.textContent).toContain("One video");
   expect(container.textContent).toContain("https://example.test/post");
