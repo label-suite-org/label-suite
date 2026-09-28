@@ -67,6 +67,11 @@ export const updateCampaignSchema = z.object({
   ...Object.fromEntries(
     Object.entries(campaignBaseSchema).map(([key, schema]) => [key, schema.optional()]),
   ),
+  linked_release_id: idSchema.optional(),
+  linked_artist_id: idSchema.optional(),
+}).superRefine((value, ctx) => {
+  if (hasOwn(value, "linked_release_id") && !value.linked_artist_id) ctx.addIssue({ code: "custom", path: ["linked_artist_id"], message: "Artist is required when editing Campaign links" });
+  if (hasOwn(value, "linked_artist_id") && !value.linked_release_id) ctx.addIssue({ code: "custom", path: ["linked_release_id"], message: "Release is required when editing Campaign links" });
 });
 
 export const deleteCampaignSchema = z.object({
@@ -293,6 +298,10 @@ async function requireCampaignArtistAndRelease(orgId: string, artistId: string, 
 }
 
 export async function updateCampaign(orgId: string, input: UpdateCampaignInput) {
+  if (hasOwn(input, "linked_artist_id") || hasOwn(input, "linked_release_id")) {
+    if (!input.linked_artist_id || !input.linked_release_id) throw new ConflictError("Campaign Artist and Release are required when editing catalog links");
+    await requireCampaignArtistAndRelease(orgId, input.linked_artist_id, input.linked_release_id);
+  }
   const updates: Partial<typeof campaigns.$inferInsert> = { updated_at: new Date(), revision: sql`${campaigns.revision} + 1` as unknown as number };
   const goal = deriveRichTextField(input, "goal_document", "goal", false);
   const notes = deriveRichTextField(input, "notes_document", "notes", false);

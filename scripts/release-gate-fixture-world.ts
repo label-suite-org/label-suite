@@ -8,6 +8,7 @@
 
 export type ReleaseGateFixtureWorld = {
   orgId: string;
+  readOnlyUser: { name: string; email: string; password: string };
   foreignTenant: {
     org: string;
     membership: string;
@@ -105,8 +106,18 @@ export function createReleaseGateFixtureWorld(env: Record<string, string | undef
     },
     activityEmail: "e2e-activity-email",
   };
+  const operatorEmail = env.E2E_USER_EMAIL?.trim() ?? "";
+  const at = operatorEmail.indexOf("@");
+  const derivedReadOnlyEmail = at > 0
+    ? `${operatorEmail.slice(0, at)}+readonly${operatorEmail.slice(at)}`
+    : `${operatorEmail}+readonly@example.test`;
   const world: ReleaseGateFixtureWorld = {
     orgId: "true-nature",
+    readOnlyUser: {
+      name: "Release Gate Read-only Member",
+      email: env.E2E_READ_ONLY_USER_EMAIL?.trim() || derivedReadOnlyEmail,
+      password: env.E2E_READ_ONLY_USER_PASSWORD?.trim() || env.E2E_USER_PASSWORD?.trim() || "",
+    },
     foreignTenant: {
       org: "e2e-org-release-gate-foreign",
       membership: "e2e-membership-release-gate-foreign",
