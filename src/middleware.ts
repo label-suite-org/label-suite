@@ -2,6 +2,7 @@ import { auth } from "./lib/auth";
 import { runWithDatabaseContext } from "./lib/db";
 import { defineMiddleware } from "astro:middleware";
 import { handleApiError, json } from "./server/api";
+import { isPostgresSerializationFailure } from "./server/errors";
 import {
   ACTIVE_ORG_COOKIE,
   resolveActiveOrgForUser,
@@ -36,7 +37,10 @@ export const onRequest = defineMiddleware((context, next) => {
         });
         throw error;
       }
-      response = handleApiError(error);
+      response = isCampaignOsMutation(context.request.method, context.url.pathname)
+        && isPostgresSerializationFailure(error)
+        ? json({ error: "Concurrent Campaign change; refresh and try again" }, 409)
+        : handleApiError(error);
     }
     response.headers.set("X-Request-ID", requestId);
     const durationMs = elapsed(startedAt);
@@ -170,6 +174,7 @@ async function handleRequest(
   }
 
   const transactionOptions = requiresRepeatableRead(context.request.method)
+    || isCampaignOsMutation(context.request.method, path)
     ? { isolationLevel: "repeatable read" as const }
     : undefined;
   return withPrivateCachePolicy(await runWithDatabaseContext(
@@ -181,6 +186,10 @@ async function handleRequest(
 
 function requiresRepeatableRead(method: string): boolean {
   return method.toUpperCase() === "GET";
+}
+
+function isCampaignOsMutation(method: string, path: string): boolean {
+  return method.toUpperCase() === "POST" && /^\/api\/campaigns\/[^/]+\/os\/?$/.test(path);
 }
 
 function isPayeePortalPath(path: string): boolean {
