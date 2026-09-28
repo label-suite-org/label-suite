@@ -6,15 +6,18 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+type ReportSnapshot = { finalized_at: string; cost: { planned: number; committed: number; paid: number }; deliverable_count: number; approved_deliverable_count: number; post_count: number; manual_metrics: Record<string, number> };
 type Workspace = {
   territories: Array<{ id: string; country_code: string }>;
   engagements: Array<{ id: string; contact_id: string; contact_name: string; status: string; outreach_channel: string; outreach_permission_status: string; outreach_permission_basis: string | null; agreed_rate: number | null; agreed_currency: string | null; budget_line_id: string | null }>;
   deliverables: Array<{ id: string; engagement_id: string; description: string; approval_status: string; evidence_url: string | null }>;
   posts: Array<{ id: string; url: string; platform: string; published_at: string | null; manual_metrics: Record<string, number> }>;
   cost: { planned: number; committed: number; paid: number };
+  report: { narrative: string | null; snapshot: ReportSnapshot | null; finalized_at: string | null };
 };
 
-type Props = { campaignId: string; section: "creators" | "posts" | "cost" | "report"; canMutate: boolean; contacts: Array<{ id: string; name: string }>; finalReport?: string | null; finalizedAt?: string | null };
+type Props = { campaignId: string; section: "creators" | "posts" | "cost" | "report"; canMutate: boolean; contacts: Array<{ id: string; name: string }> };
 
 function metricsFromForm(form: FormData) {
   return Object.fromEntries(["views", "likes", "comments", "shares", "saves"].flatMap((name) => {
@@ -23,10 +26,10 @@ function metricsFromForm(form: FormData) {
   }));
 }
 
-export default function CampaignOsWorkspace({ campaignId, section, canMutate, contacts, finalReport, finalizedAt }: Props) {
+export default function CampaignOsWorkspace({ campaignId, section, canMutate, contacts }: Props) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [error, setError] = useState("");
-  const [report, setReport] = useState(finalReport ?? "");
+  const [report, setReport] = useState("");
   const [territories, setTerritories] = useState("");
   const load = async () => {
     const response = await fetch(`/api/campaigns/${campaignId}/os`);
@@ -53,6 +56,11 @@ export default function CampaignOsWorkspace({ campaignId, section, canMutate, co
   if (!workspace) return <p className="text-sm text-muted-foreground">Loading Campaign OS…</p>;
   const deliverablesByEngagement = new Map<string, Workspace["deliverables"]>();
   for (const item of workspace.deliverables) deliverablesByEngagement.set(item.engagement_id, [...(deliverablesByEngagement.get(item.engagement_id) ?? []), item]);
+  const liveMetrics = workspace.posts.reduce<Record<string, number>>((all, post) => {
+    for (const [key, value] of Object.entries(post.manual_metrics ?? {})) all[key] = (all[key] ?? 0) + Number(value);
+    return all;
+  }, {});
+  const snapshot = workspace.report.snapshot;
   return <div className="space-y-4">
     {section === "creators" ? <>
       <p className="text-sm text-muted-foreground">Creator engagements are campaign-local. Record permission before outreach; this workspace never sends email.</p>
@@ -62,7 +70,22 @@ export default function CampaignOsWorkspace({ campaignId, section, canMutate, co
     </> : null}
     {section === "posts" ? <><p className="text-sm text-muted-foreground">Metrics are manual captured observations. Campaign OS does not monitor or refresh social platforms.</p><div className="space-y-2">{workspace.posts.map((post) => <div key={post.id} className="rounded-lg border p-3 text-sm"><a className="underline" href={post.url} target="_blank" rel="noreferrer">{post.platform} post</a><p className="mt-1 text-muted-foreground">Captured metrics: {Object.entries(post.manual_metrics).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p></div>)}</div>{canMutate ? <form className="grid gap-2 rounded-lg border p-3" onSubmit={submitForm("create_post", (form) => ({ url: form.get("url"), platform: form.get("platform"), published_at: form.get("published_at") ? new Date(String(form.get("published_at"))).toISOString() : null, engagement_id: form.get("engagement_id") || null, manual_metrics: metricsFromForm(form), notes: form.get("notes") || null }))}><Input required name="url" type="url" placeholder="Post URL" className="rounded border px-2 py-1" /><Input required name="platform" placeholder="Platform" className="rounded border px-2 py-1" /><Input name="published_at" type="date" className="rounded border px-2 py-1" /><NativeSelect name="engagement_id" className="rounded border px-2 py-1"><option value="">No creator linked</option>{workspace.engagements.map((item) => <option key={item.id} value={item.id}>{item.contact_name}</option>)}</NativeSelect><div className="grid grid-cols-2 gap-2">{["views", "likes", "comments", "shares", "saves"].map((name) => <Input key={name} name={name} type="number" min="0" placeholder={name} className="rounded border px-2 py-1" />)}</div><Textarea name="notes" placeholder="Notes" className="rounded border px-2 py-1" /><Button type="submit" className="rounded bg-primary px-3 py-2 text-primary-foreground">Record post</Button></form> : null}</> : null}
     {section === "cost" ? <><div className="grid grid-cols-3 gap-3 text-center"><div className="rounded border p-3"><p className="text-xs text-muted-foreground">Planned</p><strong>{workspace.cost.planned}</strong></div><div className="rounded border p-3"><p className="text-xs text-muted-foreground">Committed</p><strong>{workspace.cost.committed}</strong></div><div className="rounded border p-3"><p className="text-xs text-muted-foreground">Paid</p><strong>{workspace.cost.paid}</strong></div></div><p className="text-sm text-muted-foreground">Amounts come from linked Budget Lines. Campaign OS cannot mark a Creator Engagement paid.</p></> : null}
-    {section === "report" ? <><label className="block text-sm font-medium">Territories (two-letter ISO codes, separated by commas)</label>{canMutate ? <div className="flex gap-2"><Input value={territories} onChange={(event) => setTerritories(event.target.value)} className="flex-1 rounded border px-2 py-1" /><Button type="button" onClick={() => submit("set_territories", { country_codes: territories.split(",").map((value) => value.trim()).filter(Boolean) }).catch((reason) => setError(reason.message))} className="rounded border px-3">Save</Button></div> : <p>{territories || "No territories recorded"}</p>}<p className="text-sm text-muted-foreground">Finalising saves a dated snapshot of costs, deliverables, and captured metrics. It does not freeze the live record.</p>{finalReport ? <div className="rounded-lg border p-3 text-sm"><p className="font-medium">Finalised report{finalizedAt ? ` · ${new Date(finalizedAt).toLocaleDateString()}` : ""}</p><p className="mt-1 whitespace-pre-wrap text-muted-foreground">{finalReport}</p></div> : null}{canMutate ? <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); submit("finalize_report", { report }).catch((reason) => setError(reason.message)); }}><Textarea required value={report} onChange={(event) => setReport(event.target.value)} placeholder="Final report" className="min-h-32 rounded border p-2" /><Button type="submit" className="rounded bg-primary px-3 py-2 text-primary-foreground">Finalise report</Button></form> : null}</> : null}
+    {section === "report" ? <>
+      <label className="block text-sm font-medium">Territories (two-letter ISO codes, separated by commas)</label>
+      {canMutate ? <div className="flex gap-2"><Input value={territories} onChange={(event) => setTerritories(event.target.value)} className="flex-1" /><Button type="button" onClick={() => submit("set_territories", { country_codes: territories.split(",").map((value) => value.trim()).filter(Boolean) }).catch((reason) => setError(reason.message))}>Save</Button></div> : <p>{territories || "No territories recorded"}</p>}
+      <p className="text-sm text-muted-foreground">Finalising saves a dated snapshot. The live Campaign can still change.</p>
+      {workspace.report.finalized_at || snapshot ? <Card size="sm">
+        <CardHeader><CardTitle>Finalised report · {new Date(workspace.report.finalized_at ?? snapshot!.finalized_at).toLocaleDateString()}</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="whitespace-pre-wrap">{workspace.report.narrative}</p>
+          {snapshot ? <div className="grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
+            <div><p className="font-medium">Saved at finalisation</p><p className="text-muted-foreground">Planned {snapshot.cost.planned} · Committed {snapshot.cost.committed} · Paid {snapshot.cost.paid}</p><p className="text-muted-foreground">Deliverables {snapshot.deliverable_count} · Approved {snapshot.approved_deliverable_count} · Posts {snapshot.post_count}</p><p className="text-muted-foreground">Captured metrics: {Object.entries(snapshot.manual_metrics).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p></div>
+            <div><p className="font-medium">Live now</p><p className="text-muted-foreground">Planned {workspace.cost.planned} · Committed {workspace.cost.committed} · Paid {workspace.cost.paid}</p><p className="text-muted-foreground">Deliverables {workspace.deliverables.length} · Approved {workspace.deliverables.filter((item) => item.approval_status === "approved").length} · Posts {workspace.posts.length}</p><p className="text-muted-foreground">Captured metrics: {Object.entries(liveMetrics).map(([key, value]) => `${key}: ${value}`).join(", ") || "none"}</p></div>
+          </div> : <p className="text-muted-foreground">No saved figures are available for this report.</p>}
+        </CardContent>
+      </Card> : null}
+      {canMutate && !workspace.report.finalized_at && !snapshot ? <form className="grid gap-2" onSubmit={(event) => { event.preventDefault(); submit("finalize_report", { report }).catch((reason) => setError(reason.message)); }}><Textarea required value={report} onChange={(event) => setReport(event.target.value)} placeholder="Final report" className="min-h-32" /><Button type="submit">Finalise report</Button></form> : null}
+    </> : null}
     {error ? <p role="alert" className="text-sm text-red-600">{error}</p> : null}
   </div>;
 }

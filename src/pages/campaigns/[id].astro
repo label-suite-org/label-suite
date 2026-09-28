@@ -202,7 +202,7 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
 
       {(["creators", "posts", "cost", "report"] as const).includes(activeTab as "creators" | "posts" | "cost" | "report") && <section class="rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 class="sr-only">{campaignTabs.find((tab) => tab.key === activeTab)?.label}</h2>
-        <CampaignOsWorkspace client:load campaignId={id} section={activeTab as "creators" | "posts" | "cost" | "report"} canMutate={canMutate} contacts={contactRowsForCampaignOs} finalReport={campaign.final_report} finalizedAt={campaign.final_report_finalized_at?.toISOString() ?? null} />
+        <CampaignOsWorkspace client:load campaignId={id} section={activeTab as "creators" | "posts" | "cost" | "report"} canMutate={canMutate} contacts={contactRowsForCampaignOs} />
       </section>}
 
       {activeTab === "content" && <>

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import {
   budget_line_items,
@@ -10,7 +10,7 @@ import {
   contacts,
 } from "../db/schema";
 import { db } from "../lib/db";
-import { NotFoundError } from "./errors";
+import { ConflictError, NotFoundError } from "./errors";
 import { idSchema, nullableNumber, nullableText } from "./validation";
 
 const isoCountryCode = z.string().regex(/^[A-Z]{2}$/, "Use a two-letter ISO country code");
@@ -69,8 +69,9 @@ export const setCampaignTerritoriesSchema = z.object({ country_codes: z.array(is
 export const finalizeCampaignReportSchema = z.object({ report: z.string().trim().min(1).max(20_000) });
 
 async function requireCampaign(orgId: string, campaignId: string) {
-  const rows = await db.select({ id: campaigns.id }).from(campaigns).where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId))).limit(1);
+  const rows = await db.select({ id: campaigns.id, final_report: campaigns.final_report, final_report_snapshot: campaigns.final_report_snapshot, final_report_finalized_at: campaigns.final_report_finalized_at }).from(campaigns).where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId))).limit(1);
   if (!rows.length) throw new NotFoundError("Campaign not found");
+  return rows[0];
 }
 
 async function requireEngagement(orgId: string, campaignId: string, engagementId: string) {
@@ -93,7 +94,7 @@ async function requireBudgetLine(orgId: string, campaignId: string, budgetLineId
 }
 
 export async function getCampaignOsWorkspace(orgId: string, campaignId: string) {
-  await requireCampaign(orgId, campaignId);
+  const campaign = await requireCampaign(orgId, campaignId);
   const [territories, engagements, posts, budgetLines] = await Promise.all([
     db.select({ id: campaign_territories.id, country_code: campaign_territories.country_code }).from(campaign_territories)
       .where(and(eq(campaign_territories.org_id, orgId), eq(campaign_territories.campaign_id, campaignId))).orderBy(asc(campaign_territories.country_code)),
@@ -119,7 +120,7 @@ export async function getCampaignOsWorkspace(orgId: string, campaignId: string) 
     committed: total.committed + Number(line.committed_amount ?? 0),
     paid: total.paid + Number(line.paid_amount ?? 0),
   }), { planned: 0, committed: 0, paid: 0 });
-  return { territories, engagements, deliverables, posts, budgetLines, cost };
+  return { territories, engagements, deliverables, posts, budgetLines, cost, report: { narrative: campaign.final_report, snapshot: campaign.final_report_snapshot, finalized_at: campaign.final_report_finalized_at } };
 }
 
 export async function createCampaignEngagement(orgId: string, campaignId: string, input: z.infer<typeof createCampaignEngagementSchema>) {
@@ -178,11 +179,13 @@ export async function setCampaignTerritories(orgId: string, campaignId: string, 
 
 export async function finalizeCampaignReport(orgId: string, campaignId: string, report: string, actorId: string) {
   const workspace = await getCampaignOsWorkspace(orgId, campaignId);
-  const snapshot = { finalized_at: new Date().toISOString(), cost: workspace.cost, deliverable_count: workspace.deliverables.length, approved_deliverable_count: workspace.deliverables.filter((item) => item.approval_status === "approved").length, post_count: workspace.posts.length, manual_metrics: workspace.posts.reduce<Record<string, number>>((all, post) => {
+  const finalizedAt = new Date();
+  const snapshot = { finalized_at: finalizedAt.toISOString(), cost: workspace.cost, deliverable_count: workspace.deliverables.length, approved_deliverable_count: workspace.deliverables.filter((item) => item.approval_status === "approved").length, post_count: workspace.posts.length, manual_metrics: workspace.posts.reduce<Record<string, number>>((all, post) => {
     for (const [key, value] of Object.entries(post.manual_metrics ?? {})) all[key] = (all[key] ?? 0) + Number(value);
     return all;
   }, {}) };
-  await db.update(campaigns).set({ final_report: report, final_report_snapshot: snapshot, final_report_finalized_at: new Date(), final_report_finalized_by: actorId, updated_at: new Date() })
-    .where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId)));
+  const saved = await db.update(campaigns).set({ final_report: report, final_report_snapshot: snapshot, final_report_finalized_at: finalizedAt, final_report_finalized_by: actorId, updated_at: finalizedAt })
+    .where(and(eq(campaigns.id, campaignId), eq(campaigns.org_id, orgId), isNull(campaigns.final_report_snapshot), isNull(campaigns.final_report_finalized_at))).returning({ id: campaigns.id });
+  if (!saved.length) throw new ConflictError("Campaign report has already been finalised");
   return { ok: true, snapshot };
 }
