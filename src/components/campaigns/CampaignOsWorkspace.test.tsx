@@ -32,10 +32,21 @@ it.each([
     else if (field instanceof HTMLInputElement && field.type === "url") field.value = "https://example.test/post";
     else if (!field.value) field.value = "Test value";
   }
+  if (action === "create_engagement") {
+    form.querySelector<HTMLSelectElement>('[name="permission"]')!.value = "permitted";
+    form.querySelector<HTMLInputElement>('[name="basis"]')!.value = "Direct opt-in";
+  }
   await act(async () => form.querySelector<HTMLButtonElement>("button")!.click());
   const saves = fetch.mock.calls.filter(([, options]) => options?.method === "POST");
   expect(saves).toHaveLength(1);
   expect(JSON.parse(saves[0][1].body).action).toBe(action);
+  if (action === "create_engagement") {
+    expect(JSON.parse(saves[0][1].body).input).toMatchObject({
+      outreach_permission_status: "permitted",
+      outreach_permission_basis: "Direct opt-in",
+      outreach_permission_recorded_at: expect.any(String),
+    });
+  }
   expect(container.querySelector('[role="alert"]')).toBeNull();
   if (action !== "finalize_report") expect(form.querySelector<HTMLInputElement>("input[required], textarea[required]")?.value ?? "").toBe("");
 });

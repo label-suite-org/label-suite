@@ -10,12 +10,17 @@ import {
   contacts,
 } from "../db/schema";
 import { db } from "../lib/db";
-import { ConflictError, isPostgresSerializationFailure, NotFoundError } from "./errors";
+import { ConflictError, HttpError, isPostgresSerializationFailure, NotFoundError } from "./errors";
 import { idSchema, nullableNumber, nullableText } from "./validation";
 
 const isoCountryCode = z.string().regex(/^[A-Z]{2}$/, "Use a two-letter ISO country code");
 const dateTime = z.string().datetime().nullable().optional();
 const url = z.url({ protocol: /^https?$/ }).max(2_000);
+const contactStatuses = new Set(["permission_confirmed", "contacted", "negotiating", "agreed", "delivering", "complete"]);
+
+function hasRecordedPermission(value: { outreach_permission_status: string; outreach_permission_basis?: string | null; outreach_permission_recorded_at?: string | Date | null; outreach_permission_revoked_at?: string | Date | null }) {
+  return value.outreach_permission_status === "permitted" && !!value.outreach_permission_basis && !!value.outreach_permission_recorded_at && !value.outreach_permission_revoked_at;
+}
 
 const campaignEngagementFields = {
   contact_id: idSchema,
@@ -40,11 +45,24 @@ export const createCampaignEngagementSchema = z.object({ ...campaignEngagementFi
   if (value.outreach_permission_status === "permitted" && !value.outreach_permission_basis) {
     ctx.addIssue({ code: "custom", path: ["outreach_permission_basis"], message: "Permission basis is required when outreach is permitted" });
   }
-});
-export const updateCampaignEngagementSchema = z.object(campaignEngagementFields).partial().extend({ id: idSchema }).superRefine((value, ctx) => {
-  if (value.outreach_permission_status === "permitted" && !value.outreach_permission_basis) {
-    ctx.addIssue({ code: "custom", path: ["outreach_permission_basis"], message: "Permission basis is required when outreach is permitted" });
+  if (value.outreach_permission_status === "permitted" && !value.outreach_permission_recorded_at) {
+    ctx.addIssue({ code: "custom", path: ["outreach_permission_recorded_at"], message: "Permission recorded time is required when outreach is permitted" });
   }
+  if (value.outreach_permission_status === "permitted" && value.outreach_permission_revoked_at) {
+    ctx.addIssue({ code: "custom", path: ["outreach_permission_revoked_at"], message: "Revoked permission cannot be used for outreach" });
+  }
+  if (value.outreach_permission_status === "revoked" && !value.outreach_permission_revoked_at) {
+    ctx.addIssue({ code: "custom", path: ["outreach_permission_revoked_at"], message: "Revocation time is required" });
+  }
+  if (contactStatuses.has(value.status) && !hasRecordedPermission(value)) {
+    ctx.addIssue({ code: "custom", path: ["status"], message: "Recorded outreach permission is required before contact" });
+  }
+});
+export const updateCampaignEngagementSchema = z.object(campaignEngagementFields).partial().extend({
+  id: idSchema,
+  status: campaignEngagementFields.status.unwrap().optional(),
+  outreach_channel: campaignEngagementFields.outreach_channel.unwrap().optional(),
+  outreach_permission_status: campaignEngagementFields.outreach_permission_status.unwrap().optional(),
 });
 export const createCampaignDeliverableSchema = z.object({
   id: idSchema.optional(),
@@ -75,9 +93,10 @@ async function requireCampaign(orgId: string, campaignId: string, database: Pick
 }
 
 async function requireEngagement(orgId: string, campaignId: string, engagementId: string) {
-  const rows = await db.select({ id: campaign_creator_engagements.id }).from(campaign_creator_engagements)
+  const rows = await db.select({ id: campaign_creator_engagements.id, contact_id: campaign_creator_engagements.contact_id, status: campaign_creator_engagements.status, outreach_channel: campaign_creator_engagements.outreach_channel, outreach_permission_status: campaign_creator_engagements.outreach_permission_status, outreach_permission_basis: campaign_creator_engagements.outreach_permission_basis, outreach_permission_recorded_at: campaign_creator_engagements.outreach_permission_recorded_at, outreach_permission_revoked_at: campaign_creator_engagements.outreach_permission_revoked_at }).from(campaign_creator_engagements)
     .where(and(eq(campaign_creator_engagements.id, engagementId), eq(campaign_creator_engagements.campaign_id, campaignId), eq(campaign_creator_engagements.org_id, orgId))).limit(1);
   if (!rows.length) throw new NotFoundError("Creator Engagement not found");
+  return rows[0];
 }
 
 async function requireContact(orgId: string, contactId: string) {
@@ -137,7 +156,21 @@ export async function createCampaignEngagement(orgId: string, campaignId: string
 }
 
 export async function updateCampaignEngagement(orgId: string, campaignId: string, input: z.infer<typeof updateCampaignEngagementSchema>) {
-  await requireEngagement(orgId, campaignId, input.id);
+  const current = await requireEngagement(orgId, campaignId, input.id);
+  const permission = {
+    outreach_permission_status: input.outreach_permission_status ?? current.outreach_permission_status,
+    outreach_permission_basis: input.outreach_permission_basis === undefined ? current.outreach_permission_basis : input.outreach_permission_basis,
+    outreach_permission_recorded_at: input.outreach_permission_recorded_at === undefined ? current.outreach_permission_recorded_at : input.outreach_permission_recorded_at,
+    outreach_permission_revoked_at: input.outreach_permission_revoked_at === undefined ? current.outreach_permission_revoked_at : input.outreach_permission_revoked_at,
+  };
+  const permissionChanged = input.outreach_permission_status !== undefined || input.outreach_permission_basis !== undefined || input.outreach_permission_recorded_at !== undefined || input.outreach_permission_revoked_at !== undefined;
+  const scopeChanged = (input.contact_id !== undefined && input.contact_id !== current.contact_id) || (input.outreach_channel !== undefined && input.outreach_channel !== current.outreach_channel);
+  if (scopeChanged && ((input.outreach_permission_status === undefined && current.outreach_permission_status !== "unknown") || (input.outreach_permission_status === "permitted" && (!input.outreach_permission_basis || !input.outreach_permission_recorded_at)))) throw new HttpError("Changing Contact or channel requires an explicit permission status and fresh evidence when permitted", 409);
+  if (input.outreach_permission_status === "permitted" && current.outreach_permission_status !== "permitted" && (!input.outreach_permission_basis || !input.outreach_permission_recorded_at)) throw new HttpError("Newly permitted outreach requires a fresh basis and recorded time", 409);
+  if (permissionChanged && permission.outreach_permission_status === "permitted" && !hasRecordedPermission(permission)) throw new HttpError("Permitted outreach requires a basis, recorded time, and no revocation", 409);
+  if (input.outreach_permission_status === "revoked" && current.outreach_permission_status !== "revoked" && !input.outreach_permission_revoked_at) throw new HttpError("Revocation time is required", 409);
+  if (scopeChanged && contactStatuses.has(input.status ?? current.status) && !hasRecordedPermission(permission)) throw new HttpError("Recorded outreach permission is required before changing a contacted engagement's Contact or channel", 409);
+  if (input.status && input.status !== current.status && contactStatuses.has(input.status) && !hasRecordedPermission(permission)) throw new HttpError("Recorded outreach permission is required before contact", 409);
   if (input.contact_id) await requireContact(orgId, input.contact_id);
   const budgetLineId = await requireBudgetLine(orgId, campaignId, input.budget_line_id);
   const updates: Record<string, unknown> = { ...input, updated_at: new Date() };
