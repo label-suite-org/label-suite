@@ -1,4 +1,6 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ilike, or, sql, getTableColumns } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { users } from "../db/auth-schema";
 import { z } from "zod";
 import {
   budget_line_items, budget_projects, royalty_imports, royalty_import_currency_totals,
@@ -215,4 +217,58 @@ export async function reverseFinanceMatch(orgId: string, raw: z.input<typeof rev
     await tx.update(data_quality_issues).set({ status: allocated === 0n ? "open" : "triaged", updated_at: new Date() }).where(and(eq(data_quality_issues.org_id, orgId), eq(data_quality_issues.label_suite_object_id, match.transaction_id), eq(data_quality_issues.source, "finance_reconciliation")));
     return reversed;
   });
+}
+
+export const financeViewSchema = z.object({
+  status: z.enum(["unmatched", "partially_matched", "matched", "all"]).default("unmatched"),
+  offset: z.coerce.number().int().min(0).max(1000000).default(0),
+  transaction: z.string().trim().min(1).optional(),
+  search: z.string().trim().max(200).default(""),
+});
+
+export async function getFinanceReconciliationView(orgId: string, input: z.infer<typeof financeViewSchema>) {
+  const remaining = sql<string>`(${finance_transactions.amount} - coalesce(sum(${finance_transaction_matches.allocated_amount}) filter (where ${finance_transaction_matches.status} = 'active'),0))::text`;
+  const rows = await db.select({id:finance_transactions.id,account:finance_transactions.account_label,
+    description:finance_transactions.description,occurredAt:finance_transactions.occurred_at,
+    amount:finance_transactions.amount,currency:finance_transactions.currency,direction:finance_transactions.direction,
+    status:finance_transactions.status,remaining})
+    .from(finance_transactions).leftJoin(finance_transaction_matches,and(eq(finance_transaction_matches.org_id,orgId),eq(finance_transaction_matches.transaction_id,finance_transactions.id)))
+    .where(and(eq(finance_transactions.org_id,orgId),input.status === "all" ? undefined : eq(finance_transactions.status,input.status)))
+    .groupBy(finance_transactions.id).orderBy(desc(finance_transactions.occurred_at),desc(finance_transactions.id)).limit(51).offset(input.offset);
+  const result = {transactions:rows.slice(0,50),hasMore:rows.length>50};
+  if (!input.transaction) return {...result,detail:null,candidates:[]};
+  const [transaction] = await db.select().from(finance_transactions).where(and(eq(finance_transactions.org_id,orgId),eq(finance_transactions.id,input.transaction)));
+  if (!transaction) throw new NotFoundError("Finance transaction not found in active workspace");
+  const actor = alias(users,"finance_match_actor"), reverser = alias(users,"finance_match_reverser");
+  const matches = await db.select({...getTableColumns(finance_transaction_matches),actorName:actor.name,reversedByName:reverser.name})
+    .from(finance_transaction_matches).leftJoin(actor,eq(actor.id,finance_transaction_matches.actor_user_id)).leftJoin(reverser,eq(reverser.id,finance_transaction_matches.reversed_by))
+    .where(and(eq(finance_transaction_matches.org_id,orgId),eq(finance_transaction_matches.transaction_id,transaction.id))).orderBy(desc(finance_transaction_matches.created_at),desc(finance_transaction_matches.id));
+  const allocated = matches.filter(match=>match.status === "active").reduce((sum,match)=>sum+decimalUnits(match.allocated_amount),0n);
+  const units = decimalUnits(transaction.amount)-allocated;
+  const detail = {...transaction,matches,remaining:`${units / 100_000_000n}.${(units % 100_000_000n).toString().padStart(8,"0")}`};
+  const candidates: Array<{id:string;type:"royalty_receipt"|"payout_batch"|"budget_spend";label:string;currency:string}> = [];
+  const search = `%${input.search}%`;
+  if (transaction.direction === "credit") {
+    const imports = await db.select({id:royalty_imports.id,source:royalty_imports.source,file:royalty_imports.file_name,period:royalty_imports.period_start})
+      .from(royalty_imports).where(and(eq(royalty_imports.org_id,orgId),eq(royalty_imports.status,"parsed"),
+        or(eq(royalty_imports.currency,transaction.currency),sql`exists(select 1 from ${royalty_import_currency_totals} where ${royalty_import_currency_totals.org_id}=${orgId} and ${royalty_import_currency_totals.import_id}=${royalty_imports.id} and ${royalty_import_currency_totals.currency}=${transaction.currency})`),
+        or(ilike(royalty_imports.source,search),ilike(royalty_imports.file_name,search),ilike(royalty_imports.id,search))))
+      .orderBy(desc(royalty_imports.created_at),royalty_imports.id).limit(25);
+    for (const row of imports) candidates.push({id:row.id,type:"royalty_receipt",label:[row.source,row.file,row.period].filter(Boolean).join(" · "),currency:transaction.currency});
+  } else {
+    const batches = await db.select({id:royalty_ledger_transactions.id,reference:royalty_ledger_transactions.evidence_reference,date:royalty_ledger_transactions.effective_date})
+      .from(royalty_ledger_transactions).where(and(eq(royalty_ledger_transactions.org_id,orgId),eq(royalty_ledger_transactions.posting_status,"posted"),
+        sql`${royalty_ledger_transactions.reversal_of_transaction_id} is null`,
+        sql`exists(select 1 from ${royalty_ledger_entries} where ${royalty_ledger_entries.org_id}=${orgId} and ${royalty_ledger_entries.transaction_id}=${royalty_ledger_transactions.id} and ${royalty_ledger_entries.entry_type}='payout' and ${royalty_ledger_entries.currency}=${transaction.currency})`,
+        sql`not exists(select 1 from ${royalty_ledger_entries} where ${royalty_ledger_entries.org_id}=${orgId} and ${royalty_ledger_entries.transaction_id}=${royalty_ledger_transactions.id} and ${royalty_ledger_entries.entry_type}<>'payout')`,
+        or(ilike(royalty_ledger_transactions.evidence_reference,search),ilike(royalty_ledger_transactions.id,search))))
+      .orderBy(desc(royalty_ledger_transactions.created_at),royalty_ledger_transactions.id).limit(25);
+    for (const row of batches) candidates.push({id:row.id,type:"payout_batch",label:`${row.reference ?? row.id} · ${row.date}`,currency:transaction.currency});
+    const lines = await db.select({id:budget_line_items.id,name:budget_line_items.name,project:budget_projects.name})
+      .from(budget_line_items).innerJoin(budget_projects,and(eq(budget_projects.id,budget_line_items.project_id),eq(budget_projects.org_id,orgId)))
+      .where(and(eq(budget_line_items.org_id,orgId),eq(budget_projects.currency,transaction.currency),or(ilike(budget_line_items.name,search),ilike(budget_projects.name,search))))
+      .orderBy(budget_line_items.name,budget_line_items.id).limit(25);
+    for (const row of lines) candidates.push({id:row.id,type:"budget_spend",label:`${row.name} · ${row.project}`,currency:transaction.currency});
+  }
+  return {...result,detail,candidates};
 }

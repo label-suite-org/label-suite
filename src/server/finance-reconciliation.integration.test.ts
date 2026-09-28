@@ -45,6 +45,11 @@ describe.skipIf(process.env.CI !== "true")("finance reconciliation on disposable
     expect(saved.value).toMatchObject({actor_user_id:org,rationale:match.rationale,status:'active'});
     expect(saved.value.created_at).toBeInstanceOf(Date);
     expect((await finance.listFinanceExceptions(org)).find(row=>row.label_suite_object_id===first.id)?.status).toBe('triaged');
+    const partialView = await finance.getFinanceReconciliationView(org,finance.financeViewSchema.parse({status:'partially_matched',transaction:first.id}));
+    expect(partialView.detail?.remaining).toBe('40.00000000');
+    expect(partialView.detail?.matches[0].actorName).toBe('Synthetic operator');
+    expect(partialView.candidates.map(row=>row.id)).toEqual([org]);
+    await expect(finance.getFinanceReconciliationView(org+'foreign',finance.financeViewSchema.parse({transaction:first.id}))).rejects.toMatchObject({status:404});
     expect((await sql`select status from label_suite.finance_transactions where id=${first.id}`)[0].status).toBe('partially_matched');
     await expect(finance.reverseFinanceMatch(org+'foreign',{id:saved.value.id,reversal_reason:'No authority'},org)).rejects.toMatchObject({status:404});
     await expect(finance.reverseFinanceMatch(org,{id:saved.value.id,reversal_reason:'Wrong transaction'},org,'different-transaction')).rejects.toMatchObject({status:404});
@@ -56,5 +61,16 @@ describe.skipIf(process.env.CI !== "true")("finance reconciliation on disposable
     expect((await finance.listFinanceExceptions(org)).some(row=>row.label_suite_object_id===first.id)).toBe(false);
     expect((await sql`select status from label_suite.finance_transactions where id=${first.id}`)[0].status).toBe('matched');
     expect(full.allocated_amount).toBe('100.00000000');
+    const matchedView = await finance.getFinanceReconciliationView(org,finance.financeViewSchema.parse({status:'matched',transaction:first.id}));
+    expect(matchedView.detail?.remaining).toBe('0.00000000');
+    expect(matchedView.detail?.matches.find(row=>row.status==='reversed')).toMatchObject({reversedByName:'Synthetic operator',reversal_reason:'Synthetic correction'});
+    await sql`insert into label_suite.royalty_imports (id,org_id,source,currency) values (${org},${org},'Synthetic royalties','USD')`;
+    await sql`update label_suite.royalty_imports set status='parsing' where id=${org}`;
+    await sql`update label_suite.royalty_imports set status='parsed' where id=${org}`;
+    const receipt = await finance.importFinanceTransaction(org,{...input,idempotency_key:'receipt',direction:'credit'},org);
+    const receiptView = await finance.getFinanceReconciliationView(org,finance.financeViewSchema.parse({transaction:receipt.id}));
+    expect(receiptView.candidates).toEqual([{id:org,type:'royalty_receipt',label:'Synthetic royalties',currency:'USD'}]);
+    await expect(finance.matchFinanceTransaction(org,receipt.id,match,org)).rejects.toMatchObject({status:409});
+    expect((await finance.matchFinanceTransaction(org,receipt.id,{...match,match_type:'royalty_receipt',allocated_amount:'100'},org)).status).toBe('active');
   });
 });

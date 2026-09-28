@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { handleApiError, json, parseJson } from "../../../server/api";
 import {
+  financeViewSchema, getFinanceReconciliationView,
   importFinanceTransaction,
   importFinanceTransactionSchema,
   listFinanceExceptions,
@@ -10,9 +11,11 @@ import { requireCapability, requireOrgId } from "../../../server/tenant";
 
 export const prerender = false;
 
-export const GET: APIRoute = async ({ locals }) => {
+export const GET: APIRoute = async ({ locals, url }) => {
   try {
-    return json({ exceptions: await listFinanceExceptions(requireOrgId(locals)) });
+    const orgId = requireOrgId(locals);
+    const input = financeViewSchema.parse(Object.fromEntries(url.searchParams));
+    return json({ ...await getFinanceReconciliationView(orgId,input), exceptions: await listFinanceExceptions(orgId) });
   } catch (error) {
     return handleApiError(error);
   }

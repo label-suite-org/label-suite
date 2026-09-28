@@ -1,5 +1,6 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
+import FinanceReconciliation from "../components/finance/FinanceReconciliation";
 import BudgetDepartment from "../components/budget/BudgetDepartment";
 import { listBudgetProjects, listBudgetGrantGuidance } from "../server/budget-dashboard";
 import { listBudgetItems } from "../server/budget-items";
@@ -8,6 +9,7 @@ import { listReleaseOptions } from "../server/releases";
 import { serializeClientCapabilities } from "../server/tenant";
 import { formatCoverageMoney } from "../components/funding/money";
 
+const reconciliation = Astro.url.searchParams.get("section") === "reconciliation";
 const orgId = Astro.locals.orgId!;
 const capabilities = serializeClientCapabilities(Astro.locals.membershipRole ?? "member");
 const projects = await listBudgetProjects(orgId);
@@ -21,6 +23,12 @@ const legacyItems = await listBudgetItems(orgId);
 
 <AppLayout>
   <div class="space-y-6">
+    <nav aria-label="Money views" class="flex gap-4 border-b pb-3 text-sm">
+      <a href="/budget" aria-current={!reconciliation ? "page" : undefined}>Budgets</a>
+      <a href="/budget?section=reconciliation" aria-current={reconciliation ? "page" : undefined}>Reconciliation</a>
+    </nav>
+    {reconciliation ? <FinanceReconciliation client:load canMutate={capabilities["operations.mutate"]} /> : <>
+
     <BudgetDepartment
       client:load
       workspaceId={orgId}
@@ -53,5 +61,6 @@ const legacyItems = await listBudgetItems(orgId);
         </div>
       </details>
     )}
+    </>}
   </div>
 </AppLayout>
