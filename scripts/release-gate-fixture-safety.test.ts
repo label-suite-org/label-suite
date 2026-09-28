@@ -103,7 +103,7 @@ describe("release-gate fixture target safety", () => {
     const ensureUser = seed.slice(seed.indexOf("async function ensureFixtureUser"), seed.indexOf("async function ensureTrueNatureOrg"));
     const main = seed.slice(seed.indexOf("async function main()"));
 
-    expect(seed).toContain('readOnlyFixtureEmail(FIXTURE_USER.email)');
+    expect(seed).toContain("const READ_ONLY_FIXTURE_USER = releaseGateFixtureWorld.readOnlyUser;");
     expect(ensureUser).toContain("const existing = await findUserByEmail(user.email);");
     expect(ensureUser).toContain("const created = await findUserByEmail(user.email);");
     expect(ensureUser).toContain("if (existing) return existing.id;");
