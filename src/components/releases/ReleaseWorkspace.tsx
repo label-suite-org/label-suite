@@ -561,7 +561,7 @@ export function ReleaseWorkspace({
       </nav>
 
       {activeSection === "overview" && (
-        <section aria-label="Release tracklist" className="space-y-5">
+        <section id="release-overview" aria-label="Release tracklist" className="scroll-mt-16 space-y-5">
           {readiness && !readiness.readiness.isReady && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/60 px-4 py-3">
               <p className="text-sm text-foreground"><span className="font-medium">Needs attention</span> · {readiness.readiness.missing[0] || "Required checks need review"}</p>
@@ -590,7 +590,7 @@ export function ReleaseWorkspace({
         </section>
       )}
 
-      {activeSection === "details" && <ReleaseOperationsBrief brief={operationsBrief} onAction={handleBriefAction} />}
+      {activeSection === "details" && <div id="release-details" className="scroll-mt-16"><ReleaseOperationsBrief brief={operationsBrief} onAction={handleBriefAction} /></div>}
 
       {activeSection === "details" && (
         <ReleaseAuthorityPanel release={release} tracks={tracks} works={works} />
@@ -625,7 +625,7 @@ export function ReleaseWorkspace({
           <ReleaseTimeline releaseId={release.id} canManage={canManage} timeline={timeline} />
         </div>}
 
-        {activeSection === "tracks" && <Panel
+        {activeSection === "tracks" && <div id="release-tracks" className="scroll-mt-16"><Panel
           title="Tracklist"
           action={<a href={`/releases/${release.id}/tracks`} className="text-xs font-medium text-muted-foreground hover:text-foreground">Manage tracks</a>}
         >
@@ -644,12 +644,12 @@ export function ReleaseWorkspace({
               onReviewSelect={handleReviewSelect}
             />
           </div>
-        </Panel>}
+        </Panel></div>}
 
-        {activeSection === "campaigns" && <ReleaseCampaignsPanel campaigns={campaigns} />}
+        {activeSection === "campaigns" && <div id="release-campaigns" className="scroll-mt-16"><ReleaseCampaignsPanel campaigns={campaigns} /></div>}
 
-        {activeSection === "budget" && <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Panel title="Budget">
+        {activeSection === "budget" && <div id="release-budget" className="grid scroll-mt-16 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Panel title="Budget" action={<a href="/budget" className="text-xs font-medium text-muted-foreground hover:text-foreground">Open budgets</a>}>
             <BudgetBucketSummary items={budgetItems} />
           </Panel>
           <div id="dsp-pitches" className="scroll-mt-4">
@@ -659,7 +659,7 @@ export function ReleaseWorkspace({
           </div>
         </div>}
 
-        {activeSection === "assets" && <div className="space-y-5"><ReleaseDeliveryPanel releaseId={release.id} canManage={canManage} onOpen={()=>selectSection("assets")} onInspect={tracks=>tracks?selectSection("tracks"):selectSection("overview","upc")} /><ReleaseAssetsPanel documents={documents} mediaAssets={mediaAssets} /></div>}
+        {activeSection === "assets" && <div id="release-assets" className="scroll-mt-16 space-y-5"><ReleaseDeliveryPanel releaseId={release.id} canManage={canManage} onOpen={()=>selectSection("assets")} onInspect={tracks=>tracks?selectSection("tracks"):selectSection("overview","upc")} /><ReleaseAssetsPanel documents={documents} mediaAssets={mediaAssets} /></div>}
 
         {activeSection === "analytics" && <div id="performance-data" className="scroll-mt-4">
           <Panel title="Performance data" action={<span className="text-xs text-muted-foreground">{cockpit?.dataWindow.from ? `${formatDate(cockpit.dataWindow.from)} to ${cockpit.dataWindow.to ? formatDate(cockpit.dataWindow.to) : "now"}` : "No scoped window"}</span>}>
@@ -1544,6 +1544,7 @@ function ReleaseDataPanel({ cockpit, hasScopedAnalytics }: { cockpit: ReleaseCoc
             <p className="mt-1 text-sm text-muted-foreground">
               This release has no matched nonzero analytics rows. Import Sisense rows linked by release, track, or ISRC before showing top track, city, source, or trend claims.
             </p>
+            <a href="/analytics?section=data-health" className="mt-3 inline-block text-sm font-medium text-foreground underline underline-offset-4 hover:text-foreground/70">Open Data Health</a>
           </div>
         </div>
       </div>
@@ -1710,7 +1711,6 @@ function sectionFromHash(hash: string): ReleaseSection {
 
 function sectionHash(section: ReleaseSection): string {
   if (section === "timeline") return "release-timeline";
-  if (section === "budget") return "dsp-pitches";
   if (section === "analytics") return "performance-data";
   return `release-${section}`;
 }

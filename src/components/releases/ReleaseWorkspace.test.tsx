@@ -174,4 +174,28 @@ describe("ReleaseWorkspace", () => {
       act(() => root.unmount()); host.remove(); vi.unstubAllGlobals();
     }
   });
+
+  it("opens deep-linked sections at their content and offers a path from empty data", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    window.history.replaceState(null, "", "/releases/release-4?section=budget#release-budget");
+    const host = document.createElement("div"); document.body.append(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<ReleaseWorkspace
+        release={{ id: "release-4", title: "Fixture" }}
+        tracks={[]} budgetItems={[]} pitches={[]} works={[]} artists={[]} cockpit={null} samplyReview={null} canManage={true} timeline={null} parentReleases={[]} campaigns={[]} documents={[]} mediaAssets={[]}
+      />));
+      expect(host.querySelector("#release-budget")?.textContent).toContain("No budget items yet");
+      expect(host.querySelector('a[href="/budget"]')?.textContent).toBe("Open budgets");
+
+      await act(async () => {
+        window.history.replaceState(null, "", "/releases/release-4?section=analytics#performance-data");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      expect(host.querySelector("#performance-data")?.textContent).toContain("No trustworthy release-level stream data yet");
+      expect(host.querySelector('a[href="/analytics?section=data-health"]')?.textContent).toBe("Open Data Health");
+    } finally {
+      act(() => root.unmount()); host.remove(); vi.unstubAllGlobals();
+    }
+  });
 });

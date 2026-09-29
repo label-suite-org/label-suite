@@ -80,7 +80,7 @@ export function BudgetBucketSummary({ items }: Props) {
                   <span className="text-xs text-muted-foreground">({bucket.items.length} items)</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-lg font-bold">${Number(bucket.total).toLocaleString()}</span>
+                  <span className="text-lg font-bold">{Number(bucket.total).toLocaleString()} DKK</span>
                   <span className="text-xs text-muted-foreground ml-2">{pct}% of total</span>
                 </div>
               </div>
@@ -97,7 +97,7 @@ export function BudgetBucketSummary({ items }: Props) {
                   <div key={item.id} className="flex items-center justify-between py-1 text-sm">
                     <span className="text-muted-foreground">{item.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">${Number(item.amount).toLocaleString()}</span>
+                      <span className="font-medium">{Number(item.amount).toLocaleString()} DKK</span>
                       <span className={`text-xs px-2 py-0.5 rounded ${
                         (STATUS_COLORS as Record<string, string>)[item.status ?? ""] || "bg-muted text-muted-foreground"
                       }`}>

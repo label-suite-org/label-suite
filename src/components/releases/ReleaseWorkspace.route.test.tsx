@@ -10,6 +10,11 @@ describe("ReleaseWorkspace routing helpers", () => {
     expect(releaseFocusId("cover")).toBe("release-cover-input");
   });
 
+  it("keeps both current and existing budget links openable", () => {
+    expect(routeFromLocation("", "#release-budget").section).toBe("budget");
+    expect(routeFromLocation("", "#dsp-pitches").section).toBe("budget");
+  });
+
   it("keeps grounded blocker routes exact for track and work-scope evidence", () => {
     expect(briefActionNavigationTarget("track-readiness", "/releases/release-1/tracks?track=track-1&focus=isrc")).toBe(
       "/releases/release-1/tracks?track=track-1&focus=isrc",
