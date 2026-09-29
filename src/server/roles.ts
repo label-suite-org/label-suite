@@ -49,8 +49,8 @@ export async function createRole(orgId: string, input: CreateRoleInput, native?:
         .where(and(eq(works.id, input.work_id), eq(works.org_id, orgId)));
       if (!work) throw new NotFoundError("Work not found");
       if (work.revision !== native.expectedWorkRevision) throw new ConflictError("Work changed elsewhere. Refresh before adding a role.");
-      validateNativeRole(input);
     } else await assertWorkInOrg(tx, orgId, input.work_id);
+    validateRole(input);
     if (input.contact_id) await assertPersonContactInOrg(tx, orgId, input.contact_id);
 
     const id = input.id ?? crypto.randomUUID();
@@ -92,7 +92,7 @@ export async function updateRole(orgId: string, input: UpdateRoleInput, native?:
 
     if (native && existing.work_id !== native.workId) throw new NotFoundError("Role not found in this Work");
     if (native && existing.revision !== native.expectedRevision) throw new ConflictError("Role changed elsewhere. Refresh before saving.");
-    if (native) validateNativeRole({ ...existing, ...input });
+    validateRole({ ...existing, ...input });
     const updates: Partial<typeof roles.$inferInsert> = {};
     if (hasOwn(input, "contact_id")) updates.contact_id = input.contact_id as string | null;
     if (hasOwn(input, "role")) updates.role = input.role as string | null;
@@ -167,7 +167,7 @@ function chooseValue<T extends string>(
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
 
-function validateNativeRole(role: Partial<Pick<typeof roles.$inferSelect, "role" | "contact_id" | "ownership_type" | "scope" | "percent_share" | "clearance_status">>) {
+function validateRole(role: Partial<Pick<typeof roles.$inferSelect, "role" | "contact_id" | "ownership_type" | "scope" | "percent_share" | "clearance_status">>) {
   if (!role.role?.trim() || !OWNERSHIP.includes(role.ownership_type ?? "") || !CLEARANCE.includes(role.clearance_status ?? "")) throw new HttpError("Role, ownership and clearance status are required", 400);
   if (role.scope != null && !SCOPES.includes(role.scope)) throw new HttpError("Invalid role scope", 400);
   if (role.percent_share != null && (!Number.isFinite(role.percent_share) || role.percent_share < 0 || role.percent_share > 100)) throw new HttpError("Share must be between 0 and 100", 400);

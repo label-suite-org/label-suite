@@ -55,11 +55,11 @@ describe("role mutations persist readiness for affected work/release pairs", () 
   });
 
   it("recomputes readiness after creating a linked role", async () => {
-    mocks.selectedRows.push([{ id: "work-1" }]);
+    mocks.selectedRows.push([{ id: "work-1" }], [{ id: "person-1" }], [], [], []);
 
     await expect(createRole("org-1", {
       work_id: "work-1",
-      contact_id: null,
+      contact_id: "person-1",
       role: "Songwriter",
       ownership_type: "Rights",
       scope: "Publishing",
@@ -74,7 +74,7 @@ describe("role mutations persist readiness for affected work/release pairs", () 
   it("rejects duplicate role IDs before readiness or Work timestamp changes", async () => {
     mocks.selectedRows.push([{ id: "work-1" }]);
     mocks.inserted.mockResolvedValueOnce([]);
-    await expect(createRole("org-1", { id: "duplicate", work_id: "work-1", role: "Credit" }))
+    await expect(createRole("org-1", { id: "duplicate", work_id: "work-1", role: "Credit", ownership_type: "Credit", clearance_status: "Unknown" }))
       .rejects.toMatchObject({ status: 409 });
     expect(readiness.persistAfterRoleChange).not.toHaveBeenCalled();
     expect(mocks.tx.update).not.toHaveBeenCalled();
@@ -136,6 +136,7 @@ describe("role mutations persist readiness for affected work/release pairs", () 
     mocks.selectedRows.push([{
       id: "role-1",
       work_id: "work-2",
+      contact_id: "person-1",
       ownership_type: "Rights",
       scope: "Publishing",
       percent_share: 100,
@@ -147,6 +148,24 @@ describe("role mutations persist readiness for affected work/release pairs", () 
 
     expect(readiness.persistAfterRoleChange).toHaveBeenCalledTimes(1);
     expect(readiness.persistAfterRoleChange).toHaveBeenCalledWith("work-2", expect.any(Object), "org-1");
+  });
+
+  it.each([
+    { contact_id: null },
+    { scope: null },
+    { scope: "Bogus" },
+    { percent_share: null },
+    { clearance_status: "Misspelled" },
+    { ownership_type: "Misspelled" },
+  ])("rejects incomplete or invalid web rights on create and update: %j", async (invalid) => {
+    const valid = { work_id: "work-1", role: "Songwriter", contact_id: "person-1", ownership_type: "Rights", scope: "Publishing", percent_share: 100, clearance_status: "Signed" };
+    mocks.selectedRows.push([{ id: "work-1" }]);
+    await expect(createRole("org-1", { ...valid, ...invalid })).rejects.toMatchObject({ status: 400 });
+    mocks.selectedRows.push([{ id: "role-1", ...valid }]);
+    await expect(updateRole("org-1", { id: "role-1", ...invalid })).rejects.toMatchObject({ status: 400 });
+    expect(mocks.tx.insert).not.toHaveBeenCalled();
+    expect(mocks.tx.update).not.toHaveBeenCalled();
+    expect(readiness.persistAfterRoleChange).not.toHaveBeenCalled();
   });
 
   it("recomputes readiness after deleting a linked role", async () => {
