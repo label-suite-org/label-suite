@@ -97,8 +97,8 @@ export function RoleForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-neutral-700 mb-1">Contact</label>
-        <NativeSelect value={contactId} onChange={(e) => setContactId(e.target.value)} className={inputCls}>
+        <label className="block text-sm font-medium text-neutral-700 mb-1">Contact{ownership === "Rights" ? " *" : ""}</label>
+        <NativeSelect required={ownership === "Rights"} value={contactId} onChange={(e) => setContactId(e.target.value)} className={inputCls}>
           <option value="">— Unassigned —</option>
           {contactOptions.currentOnly ? (
             <optgroup label="Current selection">
@@ -142,8 +142,9 @@ export function RoleForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">Share %</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-1">Share %{ownership === "Rights" ? " *" : ""}</label>
           <Input
+            required={ownership === "Rights"}
             type="number"
             min={0}
             max={100}
