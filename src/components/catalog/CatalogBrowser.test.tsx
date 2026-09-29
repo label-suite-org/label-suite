@@ -21,11 +21,21 @@ it("opens only the selected track's artist/release branch and preserves exact ed
     await act(async () => root.render(<CatalogBrowser {...props} />));
     const nav = host.querySelector('nav[aria-label="Artists, releases and tracks"]')!;
     expect(nav.textContent).toContain("Second artist");
+    expect(nav.textContent).not.toContain("First artist");
     expect(nav.textContent).toContain("Track b");
     expect(nav.textContent).not.toContain("Track a");
     expect(host.querySelector("h1")?.textContent).toBe("Track b");
     expect(host.querySelector('a[href="/releases/release-b/tracks?track=track-b"]')?.textContent).toBe("View record");
+    const browserToggle = [...host.querySelectorAll("button")].find(item => item.textContent?.includes("Hide browser"))!;
+    await act(async () => browserToggle.click());
+    expect(browserToggle.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => browserToggle.click());
+    await act(async () => (nav.querySelector('button[aria-controls="catalog-artist-list"]') as HTMLButtonElement).click());
+    expect(nav.textContent).toContain("First artist");
+    const tabs = [...host.querySelectorAll('[role="tab"]')] as HTMLElement[];
+    await act(async () => tabs.find(item => item.textContent === "More")!.click());
     expect(host.querySelector('a[href="/catalog?view=numbering"]')).not.toBeNull();
+    await act(async () => tabs.find(item => item.textContent === "Files")!.click());
     expect(host.textContent).toContain("No audio linked yet.");
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });
@@ -36,12 +46,16 @@ it("searches tracks outside the open branch without losing the selected record",
   const root = createRoot(host);
   try {
     await act(async () => root.render(<CatalogBrowser {...props} />));
+    const browserToggle = [...host.querySelectorAll("button")].find(item => item.textContent?.includes("Hide browser"))!;
+    await act(async () => browserToggle.click());
+    expect(browserToggle.getAttribute("aria-expanded")).toBe("false");
     const input = host.querySelector("input")!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Track a");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
     const nav = host.querySelector('nav[aria-label="Artists, releases and tracks"]')!;
+    expect(browserToggle.getAttribute("aria-expanded")).toBe("true");
     expect(nav.querySelector('a[href="/catalog?track=track-a"]')).not.toBeNull();
     expect(nav.textContent).not.toContain("Track b");
     expect(host.querySelector("h1")?.textContent).toBe("Track b");
