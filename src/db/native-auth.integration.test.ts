@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import postgres, { type Sql } from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -71,6 +71,54 @@ describeNativeAuth("native authentication against request-scoped membership data
       request: new Request("https://example.test/api/native/session", { headers: { Authorization: `Bearer ${revokeToken}` } }),
     } as never));
     expect(revokedRoute.status).toBe(401);
+  });
+
+  it("redeems browser sign-in once with the correct proof and a live source session", async () => {
+    const { issueBrowserCode, exchangeBrowserCode } = await import("../server/native-browser-sign-in");
+    const verifier = randomBytes(32).toString("base64url");
+    const challenge = createHash("sha256").update(verifier).digest("base64url");
+    const identifiers: string[] = [];
+    const issue = async (sessionId: string) => {
+      const code = await issueBrowserCode(sessionId, challenge);
+      identifiers.push(`native-sign-in:${createHash("sha256").update(code).digest("base64url")}`);
+      return code;
+    };
+    try {
+      const code = await issue(liveSession);
+      await expect(exchangeBrowserCode(code, "x".repeat(43))).rejects.toMatchObject({ status: 401 });
+      const attempts = await Promise.allSettled([exchangeBrowserCode(code, verifier), exchangeBrowserCode(code, verifier)]);
+      expect(attempts.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const accepted = attempts.find((r) => r.status === "fulfilled");
+      if (accepted?.status !== "fulfilled") throw new Error("No native session issued");
+      expect(accepted.value.user.id).toBe(userA);
+      expect(accepted.value.token).not.toBe(liveToken);
+      expect((await getNativeSession(accepted.value.token))?.user.id).toBe(userA);
+      await expect(exchangeBrowserCode(code, verifier)).rejects.toMatchObject({ status: 401 });
+      const revokingSession = `native-auth-browser-revoking-${suffix}`;
+      await admin!`insert into "label_suite"."session" ("id", "expiresAt", "token", "userId") values (${revokingSession}, now() + interval '1 hour', ${randomUUID()}, ${userA})`;
+      const revokingCode = await issue(revokingSession);
+      let redemption: Promise<unknown> | undefined;
+      await admin!.begin(async (tx) => {
+        await tx`delete from "label_suite"."session" where "id" = ${revokingSession}`;
+        let settled = false;
+        redemption = exchangeBrowserCode(revokingCode, verifier).then(
+          (value) => { settled = true; return value; },
+          (error: unknown) => { settled = true; return error; },
+        );
+        // Redemption must wait for the revocation transaction, not use its stale snapshot.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(settled).toBe(false);
+      });
+      await expect(redemption).resolves.toMatchObject({ status: 401 });
+      const expiredSource = await issue(expiredSession);
+      await expect(exchangeBrowserCode(expiredSource, verifier)).rejects.toMatchObject({ status: 401 });
+      const expiredCode = await issue(liveSession);
+      await admin!`update "label_suite"."verification" set "expiresAt" = now() - interval '1 second' where "identifier" = ${identifiers[identifiers.length - 1]}`;
+      await expect(exchangeBrowserCode(expiredCode, verifier)).rejects.toMatchObject({ status: 401 });
+    } finally {
+      for (const identifier of identifiers) await admin!`delete from "label_suite"."verification" where "identifier" = ${identifier}`;
+      await admin!`delete from "label_suite"."session" where "userId" = ${userA} and "id" not in (${liveSession}, ${expiredSession}, ${revokeSession})`;
+    }
   });
 
   it("projects only the requesting user's workspaces and derives role capabilities", async () => {

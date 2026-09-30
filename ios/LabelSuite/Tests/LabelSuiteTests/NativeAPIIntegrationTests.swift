@@ -831,3 +831,22 @@ final class NativeAPIIntegrationTests: XCTestCase {
     }
   }
 }
+
+final class NativeBrowserSignInTests: XCTestCase {
+  func testBrowserProofAndCallbackBinding() throws {
+    let attempt = try NativeBrowserSignIn()
+    let other = try NativeBrowserSignIn()
+    XCTAssertEqual(attempt.verifier.count, 43)
+    XCTAssertEqual(attempt.challenge.count, 43)
+    XCTAssertNotEqual(attempt.verifier, attempt.challenge)
+    XCTAssertNotEqual(attempt.state, other.state)
+    let url = attempt.url(base: URL(string: "https://suite.example")!)
+    XCTAssertFalse(url.absoluteString.contains(attempt.verifier))
+    let code = String(repeating: "a", count: 43)
+    let valid = "online.truenature.labelsuite://sign-in?code=\(code)&state=\(attempt.state)"
+    XCTAssertEqual(try attempt.code(from: URL(string: valid)!), code)
+    XCTAssertThrowsError(try other.code(from: URL(string: valid)!))
+    XCTAssertThrowsError(try attempt.code(from: URL(string: valid + "&state=wrong")!))
+    XCTAssertThrowsError(try attempt.code(from: URL(string: valid.replacingOccurrences(of: "online.truenature.labelsuite:", with: "https:"))!))
+  }
+}
