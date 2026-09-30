@@ -395,7 +395,7 @@ export function ReleaseWorkspace({
   const hasCoverArt = Boolean(release.cover_art_url) && !artworkPreviewFailed;
 
   const hasScopedAnalytics = Boolean(
-    cockpit &&
+    cockpit?.dataQuality === "current" &&
       (
         cockpit.periods.some((period) => period.streamTotal > 0) ||
         cockpit.leaderboard.some((track) => track.combinedStreams > 0) ||
@@ -1650,8 +1650,8 @@ function WaveformLayer({ peaks, className }: { peaks: number[]; className: strin
   );
 }
 
-function ReleaseDataPanel({ cockpit, hasScopedAnalytics }: { cockpit: ReleaseCockpit | null; hasScopedAnalytics: boolean }) {
-  if (!cockpit || !hasScopedAnalytics) {
+export function ReleaseDataPanel({ cockpit, hasScopedAnalytics }: { cockpit: ReleaseCockpit | null; hasScopedAnalytics: boolean }) {
+  if (!cockpit || cockpit.dataQuality !== "current" || !hasScopedAnalytics) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
         <div className="flex items-start gap-3">
@@ -1659,8 +1659,15 @@ function ReleaseDataPanel({ cockpit, hasScopedAnalytics }: { cockpit: ReleaseCoc
           <div>
             <p className="font-medium text-foreground">No trustworthy release-level stream data yet.</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              This release has no matched nonzero analytics rows. Import Sisense rows linked by release, track, or ISRC before showing top track, city, source, or trend claims.
+              {cockpit && cockpit.dataQuality !== "current"
+                ? cockpit.dataQuality === "stale" ? "Source data is stale. Current release totals are unavailable."
+                : cockpit.dataQuality === "partial" ? "Source coverage is incomplete. Release totals are unavailable."
+                : cockpit.dataQuality === "empty" ? "The current import contains no source data. Release totals are unavailable."
+                : cockpit.dataQuality === "failed" ? "Recent source imports have failed. Release totals are unavailable."
+                : "Source freshness is unknown. Release totals are unavailable."
+                : "This release has no matched nonzero analytics rows yet."}
             </p>
+            {cockpit?.dataWindow.to && <p className="mt-2 text-sm text-muted-foreground">Reporting period: {cockpit.dataWindow.from} – {cockpit.dataWindow.to}</p>}
           </div>
         </div>
       </div>
@@ -1671,6 +1678,7 @@ function ReleaseDataPanel({ cockpit, hasScopedAnalytics }: { cockpit: ReleaseCoc
   const topTrack = cockpit.leaderboard[0] ?? null;
   return (
     <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">Reporting period: {period.from} – {period.to}</p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Period streams" value={formatNumber(period.streamTotal)} detail={period.label} icon={<BarChart3 className="h-4 w-4" />} />
         <Metric label="Top track" value={topTrack?.trackTitle ?? "No track data"} detail={topTrack ? `${formatNumber(topTrack.combinedStreams)} streams` : "not enough data"} icon={<Music2 className="h-4 w-4" />} />

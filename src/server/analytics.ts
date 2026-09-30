@@ -4,7 +4,7 @@ import { db } from "../lib/db";
 import { LEGACY_UNSCOPED_ANALYTICS_ENABLED } from "../lib/analytics-legacy-policy";
 import { mapCanonicalDailySourceRows } from "../lib/analytics-canonical-sources";
 import { mapCanonicalArtistPlaylistRows, mapCanonicalArtistShazamRows } from "../lib/analytics-artist-aux";
-import { listAnalyticsDataQuality, type AnalyticsDataQualityReport } from "./analytics-data-quality";
+import { isAnalyticsIngestionStale, listAnalyticsDataQuality, type AnalyticsDataQualityReport } from "./analytics-data-quality";
 import {
   buildAnalyticsCommandCenter,
   buildArtist360,
@@ -3330,5 +3330,18 @@ export async function listReleaseCockpit(
     })),
   };
 
-  return buildReleaseCockpit(input);
+  const cockpit = buildReleaseCockpit(input);
+  const quality = await loadTodayAnalyticsDataQuality(orgId).catch(error => {
+    console.error("Release analytics quality unavailable", { errorType: error instanceof Error ? error.name : "Unknown" });
+    return unavailableAnalyticsDataQualityReport();
+  });
+  const reportingThrough = cockpit.dataWindow.to ? new Date(cockpit.dataWindow.to) : null;
+  cockpit.dataQuality = quality.health.coverage === "empty" ? "empty"
+    : quality.health.coverage === "invalid" ? "unknown"
+    : !quality.evidence.complete || quality.evidence.partial || quality.health.coverage !== "complete" ? "partial"
+    : quality.health.degradedReasons.includes("repeated_failures") ? "failed"
+    : !reportingThrough || quality.health.freshnessBasis === "unknown" ? "unknown"
+    : quality.health.stale || isAnalyticsIngestionStale({ lastSuccessfulRunAt: quality.health.lastSuccessfulRunAt, reportingThrough, now: new Date() }) ? "stale"
+    : "current";
+  return cockpit;
 }
