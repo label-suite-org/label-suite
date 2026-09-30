@@ -464,7 +464,7 @@ const TABLE_SPECS: TableSpec[] = [
 ];
 
 // These fields follow the existing import mappings; no source value authorizes a write.
-const RECORD_CHECKS: Record<string, Array<{ column: string; fields: string[]; link?: string; date?: boolean; numeric?: boolean; fallback?: string }>> = {
+const RECORD_CHECKS: Record<string, Array<{ column: string; fields: string[]; link?: string; date?: boolean; numeric?: boolean }>> = {
   "Artists": [
     { column: "contact_id", fields: ["Contact", "Primary Contact", "Manager"], link: "contacts" },
     { column: "relationship", fields: ["Relationship", "Artist Relationship"] },
@@ -474,20 +474,20 @@ const RECORD_CHECKS: Record<string, Array<{ column: string; fields: string[]; li
   "Releases (And Artist Events)": [
     { column: "artist_id", fields: ["Artist", "Artists", "Linked Artist"], link: "artists" },
     { column: "release_date", fields: ["Release Date", "Date"], date: true },
-    { column: "status", fields: ["Status"], fallback: "draft" },
+    { column: "status", fields: ["Status"] },
   ],
   "Release Tracks": [
     { column: "release_id", fields: ["Release", "Releases", "Release Event"], link: "releases" },
     { column: "work_id", fields: ["WORKS", "Work Title", "Recording", "Master", "Work", "Recordings (Masters)"], link: "works" },
   ],
   "Rights Lines (Roles)": [
-    { column: "role", fields: ["Role", "Credit", "Role Type"], fallback: "Rights" },
+    { column: "role", fields: ["Role", "Credit", "Role Type"] },
     { column: "contact_id", fields: ["Contact", "Person", "Contributor", "Payee"], link: "contacts" },
     { column: "work_id", fields: ["WORKS", "Recording", "Master", "Work", "Recordings (Masters)", "Track", "Release Track"], link: "works" },
-    { column: "ownership_type", fields: ["Ownership Type", "Ownership", "Type"], fallback: "Rights" },
+    { column: "ownership_type", fields: ["Ownership Type", "Ownership", "Type"] },
     { column: "scope", fields: ["Scope", "Rights Scope", "Clearance Scope"] },
     { column: "percent_share", fields: ["Percent Share", "% Share", "Share", "Split %", "Share %"], numeric: true },
-    { column: "clearance_status", fields: ["Clearance Status", "Status", "Rights Status"], fallback: "Unknown" },
+    { column: "clearance_status", fields: ["Clearance Status", "Status", "Rights Status"] },
   ],
 };
 
@@ -536,7 +536,7 @@ async function runRecordChecks(results: TableResult[]): Promise<{ checks: Parity
       const typedMatches = matches.filter(row => row.record_kind === kind);
       for (const row of typedMatches) matchedDirectory.add(`${row.record_kind}:${row.id}`);
       for (const field of DIRECTORY_CHECKS[kind]) {
-        const name = findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
+        const name = findFieldName(new Set(Object.keys(record.fields).filter(key => fieldValues(record.fields[key]).length > 0)), field.fields) ?? findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
         const values = fieldValues(name ? record.fields[name] : null);
         checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: kind, field: field.column, sourceRecordId: record.id,
           sourceField: name, sourceRawValue: values.length ? values.join(" ") : null,
@@ -599,9 +599,9 @@ async function runRecordChecks(results: TableResult[]): Promise<{ checks: Parity
       const canonicalRecordIds = [...ids].sort();
       for (const id of canonicalRecordIds) matchedCanonical.add(id);
       for (const field of fields) {
-        const name = findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
+        const name = findFieldName(new Set(Object.keys(record.fields).filter(key => fieldValues(record.fields[key]).length > 0)), field.fields) ?? findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
         const values = name ? fieldValues(record.fields[name]) : [];
-        let sourceValue = values.length ? values.join(" ").trim() : field.fallback ?? null;
+        let sourceValue = values.length ? values.join(" ").trim() : null;
         let comparable = Boolean(name);
         if (field.numeric && sourceValue !== null) {
           const numeric = Number(sourceValue.replace(/[%,$]/g, "").trim());

@@ -321,6 +321,8 @@ describe("record-level parity evidence", () => {
   it("retains matched coverage and reports different, unmapped, ambiguous and unavailable identities without guessing", () => {
     const base = { table: "Rights Lines (Roles)", canonicalTable: "roles", field: "ownership_type", sourceRecordId: "rec-role", sourceValue: "Rights", canonicalRecordIds: ["role-1"], canonicalValues: ["Rights"] };
     expect(compareRecordEvidence(base).status).toBe("matched");
+    expect(compareRecordEvidence({ ...base, sourceValue: null, canonicalValues: ["Rights"] }).status).toBe("different");
+    expect(compareRecordEvidence({ ...base, sourceValue: null }, false).status).toBe("unavailable");
     expect(compareRecordEvidence({ ...base, canonicalValues: ["Credit"] }).status).toBe("different");
     expect(compareRecordEvidence({ ...base, canonicalRecordIds: [], canonicalValues: [] }).status).toBe("unmapped");
     expect(compareRecordEvidence({ ...base, canonicalRecordIds: ["role-1", "role-2"], canonicalValues: ["Rights", "Rights"] }).status).toBe("ambiguous");
