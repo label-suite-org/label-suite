@@ -314,6 +314,9 @@ describe("record-level parity evidence", () => {
     expect(report.mismatches[0].sourceRecordIds).toEqual([]);
     expect(report.mismatches[0].canonicalRecordIds).toEqual(["native-contact"]);
     expect(report.mismatches[0].proposedDisposition).toBe("Human review required");
+    const split = buildM0Audit(parity({ keyChecks: ["contacts", "organizations"].map(canonicalTable => ({ table: "Contacts", canonicalTable, label: "name", airtableField: "Name", airtableKeyCount: 1, postgresKeyCount: 0, missingInPostgres: ["Same name"], extraInPostgres: [] })), sourceIdChecks: ["contacts", "organizations"].map(postgres => ({ airtable: "Contacts", postgres, preservedIds: 0, importedRecords: 1, airtableRecords: 1 })) }));
+    expect(new Set(split.mismatches.map(row => row.id)).size).toBe(split.mismatches.length);
+    expect(split.mismatches.filter(row => row.kind === "key_missing").map(row => row.canonicalTable).sort()).toEqual(["contacts", "organizations"]);
   });
   it("retains matched coverage and reports different, unmapped, ambiguous and unavailable identities without guessing", () => {
     const base = { table: "Rights Lines (Roles)", canonicalTable: "roles", field: "ownership_type", sourceRecordId: "rec-role", sourceValue: "Rights", canonicalRecordIds: ["role-1"], canonicalValues: ["Rights"] };

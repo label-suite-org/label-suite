@@ -63,6 +63,7 @@ interface TableResult {
 
 interface KeyCheckResult {
   table: string;
+  canonicalTable?: string;
   label: string;
   airtableField: string | null;
   airtableKeyCount: number;
@@ -464,7 +465,12 @@ const TABLE_SPECS: TableSpec[] = [
 
 // These fields follow the existing import mappings; no source value authorizes a write.
 const RECORD_CHECKS: Record<string, Array<{ column: string; fields: string[]; link?: string; date?: boolean; numeric?: boolean; fallback?: string }>> = {
-  "Artists": [{ column: "contact_id", fields: ["Contact", "Primary Contact", "Manager"], link: "contacts" }],
+  "Artists": [
+    { column: "contact_id", fields: ["Contact", "Primary Contact", "Manager"], link: "contacts" },
+    { column: "relationship", fields: ["Relationship", "Artist Relationship"] },
+    { column: "pro", fields: ["PRO", "Pro"] },
+    { column: "ipi", fields: ["IPI", "IPI Number"] },
+  ],
   "Releases (And Artist Events)": [
     { column: "artist_id", fields: ["Artist", "Artists", "Linked Artist"], link: "artists" },
     { column: "release_date", fields: ["Release Date", "Date"], date: true },
@@ -638,12 +644,17 @@ async function main() {
       result.canonicalRecordIds = canonical?.recordIds ?? [];
     }
 
+    const recordEvidence = options.countsOnly ? { checks: [], directoryCounts: [] } : await runRecordChecks(tableResults);
+    const identityTables = [...tableResults.filter(result => result.spec.airtable !== "Contacts"), ...recordEvidence.directoryCounts.map(result => ({
+      ...result, spec: { ...result.spec, sourceIdTargets: [result.spec.postgres!], checks: [{ label: "name", airtableFields: ["Name", "Full Name", "Contact Name"], postgresSql: `select id::text as record_id, name as value from ${scopedTable(result.spec.postgres!)} where name is not null` },
+        ...(result.spec.postgres === "contacts" ? [{ label: "email", airtableFields: ["Email", "E-mail"], postgresSql: `select id::text as record_id, email as value from ${scopedTable("contacts")} where email is not null` }] : [])] },
+    }))];
     const keyChecks = options.countsOnly
       ? []
-      : await runKeyChecks(tableResults);
+      : await runKeyChecks(identityTables);
     const sourceIdChecks = options.countsOnly
       ? []
-      : await runSourceIdChecks(tableResults);
+      : await runSourceIdChecks(identityTables);
     const rightsSemantics = options.countsOnly
       ? null
       : collectRightsSemantics(tableResults);
@@ -653,8 +664,6 @@ async function main() {
     const readinessChecks = options.countsOnly
       ? []
       : await runSqlChecks(READINESS_CHECKS);
-
-    const recordEvidence = options.countsOnly ? { checks: [], directoryCounts: [] } : await runRecordChecks(tableResults);
 
     const report = {
       generatedAt: new Date().toISOString(),
@@ -866,6 +875,7 @@ async function runKeyChecks(tableResults: TableResult[]): Promise<KeyCheckResult
       if (!airtableField) {
         results.push({
           table: result.spec.airtable,
+          canonicalTable: result.spec.postgres,
           label: check.label,
           airtableField: null,
           airtableKeyCount: 0,
@@ -889,6 +899,7 @@ async function runKeyChecks(tableResults: TableResult[]): Promise<KeyCheckResult
 
       results.push({
         table: result.spec.airtable,
+        canonicalTable: result.spec.postgres,
         label: check.label,
         airtableField,
         airtableKeyCount: new Set(airtableRows.map((row) => row.normalizedValue)).size,

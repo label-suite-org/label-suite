@@ -45,6 +45,7 @@ export interface ParityTableResult {
 
 export interface ParityKeyCheck {
   table: string;
+  canonicalTable?: string;
   label: string;
   airtableField: string | null;
   airtableKeyCount: number;
@@ -305,7 +306,7 @@ function addCountMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
 
 function addKeyMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
   for (const check of input.keyChecks) {
-    const canonicalTable = canonicalTableFor(check.table, input.tableResults);
+    const canonicalTable = check.canonicalTable ?? canonicalTableFor(check.table, input.tableResults);
     const missingRecords = check.missingInPostgresRecords ?? check.missingInPostgres.map((value) => ({
       identity: redactValue(value), recordIds: [], value,
     }));
@@ -313,7 +314,7 @@ function addKeyMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
       const value = record.value;
       const safe = redactValue(value);
       mismatches.push(mismatchBase({
-        id: `key:${slug(check.table)}:${slug(check.label)}:missing:${slug(record.identity)}`,
+        id: `key:${slug(check.table)}:${slug(check.label)}:missing:${slug(record.identity)}${check.table === "Contacts" && canonicalTable === "organizations" ? ":organizations" : ""}`,
         domain: domainForTable(check.table),
         kind: "key_missing",
         sourceTable: check.table,
@@ -333,7 +334,7 @@ function addKeyMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
       const value = record.value;
       const safe = redactValue(value);
       mismatches.push(mismatchBase({
-        id: `key:${slug(check.table)}:${slug(check.label)}:extra:${slug(record.identity)}`,
+        id: `key:${slug(check.table)}:${slug(check.label)}:extra:${slug(record.identity)}${check.table === "Contacts" && canonicalTable === "organizations" ? ":organizations" : ""}`,
         domain: domainForTable(check.table),
         kind: "key_extra",
         sourceTable: check.table,
@@ -353,7 +354,7 @@ function addSourceIdMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
   for (const check of input.sourceIdChecks) {
     if (check.preservedIds === check.importedRecords) continue;
     mismatches.push(mismatchBase({
-      id: `source-id:${slug(check.airtable)}`,
+      id: `source-id:${slug(check.airtable)}${check.airtable === "Contacts" && check.postgres === "organizations" ? ":organizations" : ""}`,
       domain: domainForTable(check.airtable),
       kind: "source_id",
       sourceTable: check.airtable,
