@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 private extension View {
   @ViewBuilder
@@ -2138,12 +2139,33 @@ private struct NativeSignInView: View {
   let configuration: LabelSuiteConfiguration
   @State private var email = ""
   @State private var password = ""
+  @State private var signingIn = false
+  @State private var signInError: String?
+  @Environment(\.webAuthenticationSession) private var webAuthenticationSession
   var body: some View {
     Form {
       TextField("Email", text: $email)
       SecureField("Password", text: $password)
-      Button("Sign in") { Task { await session.signIn(email: email, password: password, api: configuration.api) } }
-    }.navigationTitle("Sign in")
+      Button("Sign in") { signingIn = true; Task { await session.signIn(email: email, password: password, api: configuration.api); signingIn = false } }
+      Button("Use a passkey", systemImage: "person.badge.key") {
+        signingIn = true; signInError = nil
+        Task {
+          defer { signingIn = false }
+          do {
+            let attempt = try NativeBrowserSignIn()
+            let callback = try await webAuthenticationSession.authenticate(using: attempt.url(base: configuration.api.externalURLBase), callbackURLScheme: "online.truenature.labelsuite", preferredBrowserSession: .ephemeral)
+            let code = try attempt.code(from: callback)
+            let (nativeSession, workspaces) = try await configuration.api.exchangeBrowserSignIn(code: code, verifier: attempt.verifier)
+            do { try session.signIn(nativeSession, workspaces: workspaces) }
+            catch { try? await configuration.api.revoke(nativeSession); throw error }
+            if workspaces.count == 1 { await session.select(workspaces[0], api: configuration.api) }
+          } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            // Cancellation leaves password sign-in available and does not create a native session.
+          } catch { signInError = "Passkey sign-in was not completed. Try again or use your password." }
+        }
+      }
+      if let signInError { Text(signInError).foregroundStyle(.red).accessibilityLabel(signInError) }
+    }.disabled(signingIn).navigationTitle("Sign in")
   }
 }
 

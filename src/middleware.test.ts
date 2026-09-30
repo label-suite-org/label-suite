@@ -78,6 +78,19 @@ describe("Spotify import middleware boundary", () => {
     process.env.PUBLIC_SITE_URL = "https://labels.example";
   });
 
+  it.each(["/native-sign-in", "/api/native/browser-sign-in"])("leaves %s authentication to the sign-in boundary", async (path) => {
+    const { onRequest } = await import("./middleware");
+    const context = contextFor(new Request(`https://labels.example${path}`, {
+      method: path.startsWith("/api/") ? "POST" : "GET",
+    }));
+    const next = vi.fn().mockResolvedValue(new Response("sign-in"));
+    expect((await onRequest(context as never, next) as Response).status).toBe(200);
+    expect(next).toHaveBeenCalledOnce();
+    expect(context.redirect).not.toHaveBeenCalled();
+    expect(authBoundary.resolveActiveOrgForUser).not.toHaveBeenCalled();
+    expect(nativeBoundary.getNativeSession).not.toHaveBeenCalled();
+  });
+
   it.each(["/", "/login"])("redirects authenticated %s before rendering", async (path) => {
     authBoundary.getSession.mockResolvedValue({ user: { id: "existing-user" }, session: { id: "existing-session" } });
     const { onRequest } = await import("./middleware");

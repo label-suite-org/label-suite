@@ -27,6 +27,7 @@ const JUSTIFIED_EXCEPTIONS = new Map([
   ["api/local-tools/v1/campaign-enrichment/items/[id]/proposals.ts", "scoped local-tool bearer propose"],
   ["api/native/session.ts", "scoped native bearer session selection"],
   ["api/native/sign-in.ts", "native bearer sign-in boundary"],
+  ["api/native/browser-sign-in.ts", "same-origin authenticated browser authorization and single-use S256 proof exchange for a separate native session"],
   ["api/native/sign-out.ts", "scoped native bearer session revocation"],
   ["api/native/artists.ts", "scoped native bearer Artist creation with operations.mutate"],
   ["api/native/artists/[id].ts", "scoped native bearer Artist update with operations.mutate"],

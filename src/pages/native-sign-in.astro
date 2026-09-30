@@ -1,0 +1,16 @@
+---
+import { validBrowserNonce } from "../server/native-browser-sign-in";
+import AuthLayout from "../layouts/AuthLayout.astro";
+import { NativePasskeySignIn } from "../components/auth/NativePasskeySignIn";
+export const prerender = false;
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("Referrer-Policy", "no-referrer");
+Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
+const challenge = Astro.url.searchParams.get("challenge") ?? "";
+const state = Astro.url.searchParams.get("state") ?? "";
+const valid = validBrowserNonce(challenge) && validBrowserNonce(state);
+if (!valid) Astro.response.status = 400;
+---
+<AuthLayout title="Sign in to Label Suite">
+  {valid ? <NativePasskeySignIn client:load challenge={challenge} state={state} /> : <p>Open passkey sign-in from the Label Suite app to continue.</p>}
+</AuthLayout>
