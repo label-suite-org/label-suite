@@ -28,6 +28,11 @@ export function assertM0AuditTargetHealth(
 
 export type M0Disposition = (typeof M0_DISPOSITIONS)[number];
 
+export function scopedParityTable(schema: string, table: string, orgId: string): string {
+  const ident = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  return `(select * from ${ident(schema)}.${ident(table)} where org_id = '${orgId.replace(/'/g, "''")}')`;
+}
+
 export interface ParityTableResult {
   spec: { airtable: string; postgres?: string; status: string };
   airtableCount: number | null;
@@ -117,6 +122,8 @@ export interface ParityRecordCheck {
   sourceRecordId: string;
   canonicalRecordIds: string[];
   sourceValue: string | null;
+  sourceField?: string | null;
+  sourceRawValue?: string | null;
   canonicalValues: Array<string | null>;
   status: "matched" | "different" | "unmapped" | "ambiguous" | "unavailable";
 }
@@ -144,6 +151,7 @@ export interface ParityReport {
   auditCommands?: string[];
   groupExceptions?: Record<string, string[]>;
   recordChecks?: ParityRecordCheck[];
+  orgId?: string;
 }
 
 export interface M0Mismatch {
@@ -189,6 +197,7 @@ export interface M0AuditReport {
     readMode: "Airtable GET + Postgres SELECT";
     sourceRevision: string;
     targetRevision: string;
+    orgId?: string;
   };
   safety: {
     noMutation: true;
@@ -406,6 +415,9 @@ function sectionFor(issue: M0Section["issue"], mismatches: M0Mismatch[]): M0Sect
 }
 
 export function buildM0Audit(input: ParityReport): M0AuditReport {
+  if (input.tableResults.some(result => result.truncated || result.error)) {
+    throw new Error("M0 audit requires complete source evidence; truncated or failed tables cannot certify coverage.");
+  }
   const mismatches: M0Mismatch[] = [];
   addCountMismatches(input, mismatches);
   addKeyMismatches(input, mismatches);
@@ -415,6 +427,7 @@ export function buildM0Audit(input: ParityReport): M0AuditReport {
   const recordChecks = (input.recordChecks ?? []).map(check => ({
     ...check,
     sourceValue: check.sourceValue === null ? null : redactValue(check.sourceValue),
+    sourceRawValue: check.sourceRawValue == null ? check.sourceRawValue : redactValue(check.sourceRawValue),
     canonicalValues: check.canonicalValues.map(value => value === null ? null : redactValue(value)),
   })).sort((a, b) =>
     `${a.table}/${a.sourceRecordId}/${a.field}`.localeCompare(`${b.table}/${b.sourceRecordId}/${b.field}`));
@@ -451,6 +464,7 @@ export function buildM0Audit(input: ParityReport): M0AuditReport {
       readMode: "Airtable GET + Postgres SELECT",
       sourceRevision: input.sourceRevision ?? `airtable:${input.baseId}@${input.generatedAt}`,
       targetRevision: input.targetRevision ?? "not-supplied",
+      orgId: input.orgId ?? "not-supplied",
     },
     safety: {
       noMutation: true,

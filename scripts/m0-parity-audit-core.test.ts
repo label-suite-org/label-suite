@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   M0_DISPOSITIONS,
   compareRecordEvidence,
+  scopedParityTable,
   buildKeyRecordEvidence,
   assertM0AuditTargetHealth,
   buildM0Audit,
@@ -290,6 +291,15 @@ describe("M0 parity audit", () => {
 
 
 describe("record-level parity evidence", () => {
+  it("scopes every canonical table and rejects partial source coverage", () => {
+    expect(scopedParityTable("label_suite", "contacts", "owner's-org")).toBe('(select * from "label_suite"."contacts" where org_id = \'owner\'\'s-org\')');
+    const report = parity();
+    report.tableResults[0].truncated = true;
+    expect(() => buildM0Audit(report)).toThrow("complete source evidence");
+    report.tableResults[0].truncated = false;
+    report.tableResults[0].error = "source unavailable";
+    expect(() => buildM0Audit(report)).toThrow("complete source evidence");
+  });
   it("retains matched coverage and reports different, unmapped, ambiguous and unavailable identities without guessing", () => {
     const base = { table: "Rights Lines (Roles)", canonicalTable: "roles", field: "ownership_type", sourceRecordId: "rec-role", sourceValue: "Rights", canonicalRecordIds: ["role-1"], canonicalValues: ["Rights"] };
     expect(compareRecordEvidence(base).status).toBe("matched");

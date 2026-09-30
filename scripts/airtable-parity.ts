@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { writeFile } from "node:fs/promises";
 import { Pool } from "pg";
-import { compareRecordEvidence, type ParityRecordCheck, buildKeyRecordEvidence, type ParityKeyRecord, type ParityKeyRow, type ParitySourceIdCheck } from "./m0-parity-audit-core";
+import { scopedParityTable, compareRecordEvidence, type ParityRecordCheck, buildKeyRecordEvidence, type ParityKeyRecord, type ParityKeyRow, type ParitySourceIdCheck } from "./m0-parity-audit-core";
 import { normalizeParityKey } from "./airtable-parity-key";
 
 if (process.argv.includes("--grants-v2")) {
@@ -140,12 +140,12 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "email",
         airtableFields: ["Email", "E-mail"],
-        postgresSql: `select id::text as record_id, email as value from ${qname("contacts")} where email is not null`,
+        postgresSql: `select id::text as record_id, email as value from ${scopedTable("contacts")} where email is not null`,
       },
       {
         label: "name",
         airtableFields: ["Name", "Full Name", "Contact Name"],
-        postgresSql: `select id::text as record_id, name as value from ${qname("contacts")} where name is not null`,
+        postgresSql: `select id::text as record_id, name as value from ${scopedTable("contacts")} where name is not null`,
       },
     ],
   },
@@ -158,7 +158,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Artist", "Artist Name"],
-        postgresSql: `select id::text as record_id, name as value from ${qname("artists")} where name is not null`,
+        postgresSql: `select id::text as record_id, name as value from ${scopedTable("artists")} where name is not null`,
       },
     ],
   },
@@ -171,7 +171,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "title",
         airtableFields: ["Title", "Name", "Release", "Release Title"],
-        postgresSql: `select id::text as record_id, title as value from ${qname("releases")} where title is not null`,
+        postgresSql: `select id::text as record_id, title as value from ${scopedTable("releases")} where title is not null`,
       },
     ],
   },
@@ -184,12 +184,12 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "title",
         airtableFields: ["Title", "Name", "Track", "Track Title", "Track Name"],
-        postgresSql: `select id::text as record_id, title as value from ${qname("tracks")} where title is not null`,
+        postgresSql: `select id::text as record_id, title as value from ${scopedTable("tracks")} where title is not null`,
       },
       {
         label: "isrc",
         airtableFields: ["ISRC", "ISRC Code"],
-        postgresSql: `select id::text as record_id, isrc as value from ${qname("tracks")} where isrc is not null`,
+        postgresSql: `select id::text as record_id, isrc as value from ${scopedTable("tracks")} where isrc is not null`,
       },
     ],
   },
@@ -202,12 +202,12 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "title",
         airtableFields: ["Title", "Name", "Recording", "Recording Title"],
-        postgresSql: `select id::text as record_id, title as value from ${qname("works")} where title is not null`,
+        postgresSql: `select id::text as record_id, title as value from ${scopedTable("works")} where title is not null`,
       },
       {
         label: "isrc",
         airtableFields: ["ISRC", "ISRC Code"],
-        postgresSql: `select id::text as record_id, isrc as value from ${qname("works")} where isrc is not null`,
+        postgresSql: `select id::text as record_id, isrc as value from ${scopedTable("works")} where isrc is not null`,
       },
     ],
   },
@@ -238,7 +238,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Item", "Line Item"],
-        postgresSql: `select id::text as record_id, name as value from ${qname("budget_line_items")} where name is not null`,
+        postgresSql: `select id::text as record_id, name as value from ${scopedTable("budget_line_items")} where name is not null`,
       },
     ],
   },
@@ -251,7 +251,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Category"],
-        postgresSql: `select id::text as record_id, name as value from ${qname("budget_categories")} where name is not null`,
+        postgresSql: `select id::text as record_id, name as value from ${scopedTable("budget_categories")} where name is not null`,
       },
     ],
   },
@@ -293,7 +293,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "title",
         airtableFields: ["Name", "Title", "Bug"],
-        postgresSql: `select id::text as record_id, title as value from ${qname("bugs")} where title is not null`,
+        postgresSql: `select id::text as record_id, title as value from ${scopedTable("bugs")} where title is not null`,
       },
     ],
   },
@@ -306,7 +306,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "title",
         airtableFields: ["Name", "Title", "Call"],
-        postgresSql: `select id::text as record_id, title as value from ${qname("calls")} where title is not null`,
+        postgresSql: `select id::text as record_id, title as value from ${scopedTable("calls")} where title is not null`,
       },
     ],
   },
@@ -339,7 +339,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Task", "Task Name"],
-        postgresSql: `select id::text as record_id, task_name as value from ${qname("ops_tasks")} where task_name is not null`,
+        postgresSql: `select id::text as record_id, task_name as value from ${scopedTable("ops_tasks")} where task_name is not null`,
       },
     ],
   },
@@ -352,7 +352,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Campaign", "Campaign Name"],
-        postgresSql: `select id::text as record_id, campaign_name as value from ${qname("campaigns")} where campaign_name is not null`,
+        postgresSql: `select id::text as record_id, campaign_name as value from ${scopedTable("campaigns")} where campaign_name is not null`,
       },
     ],
   },
@@ -365,7 +365,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Record Name", "Statement"],
-        postgresSql: `select id::text as record_id, record_name as value from ${qname("royalties_revenue")} where record_name is not null`,
+        postgresSql: `select id::text as record_id, record_name as value from ${scopedTable("royalties_revenue")} where record_name is not null`,
       },
     ],
   },
@@ -378,7 +378,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Asset", "Asset Name"],
-        postgresSql: `select id::text as record_id, asset_name as value from ${qname("media_assets")} where asset_name is not null`,
+        postgresSql: `select id::text as record_id, asset_name as value from ${scopedTable("media_assets")} where asset_name is not null`,
       },
     ],
   },
@@ -392,7 +392,7 @@ const TABLE_SPECS: TableSpec[] = [
     postgres: "royalty_earnings",
     sourceIdSql: `
       select source_row_id::text as source_record_id, id::text as canonical_record_id
-      from ${qname("royalty_earnings")}
+      from ${scopedTable("royalty_earnings")}
       where org_id = $1 and source = 'airtable_sheet'
     `,
     status: "mapped",
@@ -408,7 +408,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Document", "Document Name"],
-        postgresSql: `select id::text as record_id, name as value from ${qname("documents")} where name is not null`,
+        postgresSql: `select id::text as record_id, name as value from ${scopedTable("documents")} where name is not null`,
       },
     ],
   },
@@ -421,7 +421,7 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Side Artist", "Artist"],
-        postgresSql: `select id::text as record_id, name as value from ${qname("side_artists")} where name is not null`,
+        postgresSql: `select id::text as record_id, name as value from ${scopedTable("side_artists")} where name is not null`,
       },
     ],
   },
@@ -439,12 +439,12 @@ const TABLE_SPECS: TableSpec[] = [
       {
         label: "name",
         airtableFields: ["Name", "Station", "Station Name"],
-        postgresSql: `select id::text as record_id, name as value from ${qname("radio_stations")} where name is not null`,
+        postgresSql: `select id::text as record_id, name as value from ${scopedTable("radio_stations")} where name is not null`,
       },
       {
         label: "call sign",
         airtableFields: ["Call Sign", "Callsign", "Call Letters"],
-        postgresSql: `select id::text as record_id, call_sign as value from ${qname("radio_stations")} where call_sign is not null`,
+        postgresSql: `select id::text as record_id, call_sign as value from ${scopedTable("radio_stations")} where call_sign is not null`,
       },
     ],
   },
@@ -499,39 +499,43 @@ const DIRECTORY_CHECKS = {
 
 async function runRecordChecks(results: TableResult[]): Promise<ParityRecordCheck[]> {
   const checks: ParityRecordCheck[] = [];
-  const mappingRows = await readOnlyQuery(`select airtable_table_name, airtable_record_id, postgres_table_name, postgres_record_id from ${qname("airtable_record_mappings")} where org_id = $1 and airtable_base_id = $2`, [ORG_ID, baseId]);
+  const mappingRows = await readOnlyQuery(`select airtable_table_name, airtable_record_id, postgres_table_name, postgres_record_id from ${scopedTable("airtable_record_mappings")} where org_id = $1 and airtable_base_id = $2`, [ORG_ID, baseId]);
   const directory = results.find(result => result.spec.airtable === "Contacts" && !result.error);
   if (directory) {
-    const rows = [];
+    const rows: Array<Record<string, unknown> & { id: string; record_kind: string }> = [];
     for (const [table, fields] of Object.entries(DIRECTORY_CHECKS)) {
-      const result = await readOnlyQuery(`select id, ${fields.map(field => field.column).join(", ")} from ${qname(table)} where org_id = $1`, [ORG_ID]);
+      const result = await readOnlyQuery(`select id, ${fields.map(field => field.column).join(", ")} from ${scopedTable(table)} where org_id = $1`, [ORG_ID]);
       rows.push(...result.rows.map(row => ({ ...row, record_kind: table })));
     }
     const available = new Set(directory.metadata?.fields.map(field => field.name) ?? []);
-    const organizationLinks = await readOnlyQuery(`select link.contact_id, link.organization_id from ${qname("contact_organizations")} link join ${qname("contacts")} contact on contact.id = link.contact_id and contact.org_id = link.org_id join ${qname("organizations")} organization on organization.id = link.organization_id and organization.org_id = link.org_id where link.org_id = $1`, [ORG_ID]);
+    const organizationLinks = await readOnlyQuery(`select link.contact_id, link.organization_id from ${scopedTable("contact_organizations")} link join ${scopedTable("contacts")} contact on contact.id = link.contact_id and contact.org_id = link.org_id join ${scopedTable("organizations")} organization on organization.id = link.organization_id and organization.org_id = link.org_id where link.org_id = $1`, [ORG_ID]);
     const typeField = findFieldName(available, ["Type"]) ?? findFieldNameFromRecords(directory.records, ["Type"]);
     for (const record of directory.records) {
       const kind = fieldValues(typeField ? record.fields[typeField] : null).join(" ").trim().toLowerCase() === "organization" ? "organizations" : "contacts";
       // ponytail: scan the small directory; index source mappings if audit volume grows.
-      const matches = rows.filter(row => row.id === record.id || mappingRows.rows.some(mapping =>
+      const matches = rows.filter(row => mappingRows.rows.some(mapping =>
         mapping.airtable_table_name === "Contacts" && mapping.airtable_record_id === record.id && mapping.postgres_table_name === row.record_kind && mapping.postgres_record_id === row.id));
       matches.sort((a, b) => `${a.record_kind}:${a.id}`.localeCompare(`${b.record_kind}:${b.id}`));
       checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: kind, field: "record_kind", sourceRecordId: record.id,
+        sourceField: typeField, sourceRawValue: fieldValues(typeField ? record.fields[typeField] : null).join(" ") || null,
         canonicalRecordIds: matches.map(row => `${row.record_kind}:${row.id}`), sourceValue: kind, canonicalValues: matches.map(row => row.record_kind) }, Boolean(typeField)));
       const typedMatches = matches.filter(row => row.record_kind === kind);
       for (const field of DIRECTORY_CHECKS[kind]) {
-        const name = findFieldName(available, field.fields) ?? findFieldNameFromRecords(directory.records, field.fields);
+        const name = findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
         const values = fieldValues(name ? record.fields[name] : null);
         checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: kind, field: field.column, sourceRecordId: record.id,
+          sourceField: name, sourceRawValue: values.length ? values.join(" ") : null,
           canonicalRecordIds: typedMatches.map(row => row.id), sourceValue: values.length ? values.join(" ").trim() : null,
           canonicalValues: typedMatches.map(row => row[field.column] == null ? null : String(row[field.column]).trim()) }, Boolean(name)));
       }
       if (kind === "contacts") {
-        const name = findFieldName(available, ["Related Organization", "Related Company", "From field: Related Company"]);
+        const aliases = ["Related Organization", "Related Company", "From field: Related Company"];
+        const name = findFieldName(new Set(Object.keys(record.fields)), aliases) ?? findFieldName(available, aliases);
         const sourceIds = fieldValues(name ? record.fields[name] : null);
-        const resolved = sourceIds.map(id => rows.filter(row => row.record_kind === "organizations" && (row.id === id || mappingRows.rows.some(mapping => mapping.airtable_table_name === "Contacts" && mapping.airtable_record_id === id && mapping.postgres_table_name === "organizations" && mapping.postgres_record_id === row.id))));
+        const resolved = sourceIds.map(id => rows.filter(row => row.record_kind === "organizations" && (mappingRows.rows.some(mapping => mapping.airtable_table_name === "Contacts" && mapping.airtable_record_id === id && mapping.postgres_table_name === "organizations" && mapping.postgres_record_id === row.id))));
         const comparable = Boolean(name) && resolved.every(matches => matches.length === 1);
         checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: "contacts", field: "linked_organizations", sourceRecordId: record.id,
+          sourceField: name, sourceRawValue: JSON.stringify(sourceIds),
           canonicalRecordIds: typedMatches.map(row => row.id), sourceValue: JSON.stringify(comparable ? [...new Set(resolved.map(matches => matches[0].id))].sort() : sourceIds.sort()),
           canonicalValues: typedMatches.map(row => JSON.stringify([...new Set(organizationLinks.rows.filter(link => link.contact_id === row.id).map(link => String(link.organization_id)))].sort())) }, comparable));
       }
@@ -539,9 +543,9 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
   }
   const links = new Map<string, Map<string, Set<string>>>();
   for (const table of new Set(Object.values(RECORD_CHECKS).flatMap(fields => fields.flatMap(field => field.link ? [field.link] : [])))) {
-    const ids = await readOnlyQuery(`select id from ${qname(table)} where org_id = $1`, [ORG_ID]);
+    const ids = await readOnlyQuery(`select id from ${scopedTable(table)} where org_id = $1`, [ORG_ID]);
     const live = new Set(ids.rows.map(row => String(row.id)));
-    const map = new Map<string, Set<string>>(ids.rows.map(row => [String(row.id), new Set([String(row.id)])]));
+    const map = new Map<string, Set<string>>();
     for (const row of mappingRows.rows) {
       if (row.postgres_table_name !== table || !live.has(String(row.postgres_record_id))) continue;
       const source = String(row.airtable_record_id);
@@ -550,7 +554,7 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
     links.set(table, map);
   }
   // Rights may link through a release track, as in the existing importer.
-  const trackWorks = await readOnlyQuery(`select mapping.airtable_record_id, track.work_id from ${qname("airtable_record_mappings")} mapping join ${qname("tracks")} track on track.org_id = mapping.org_id and track.id = mapping.postgres_record_id join ${qname("works")} work on work.org_id = track.org_id and work.id = track.work_id where mapping.org_id = $1 and mapping.airtable_base_id = $2 and mapping.airtable_table_name = 'Release Tracks' and mapping.postgres_table_name = 'tracks'`, [ORG_ID, baseId]);
+  const trackWorks = await readOnlyQuery(`select mapping.airtable_record_id, track.work_id from ${scopedTable("airtable_record_mappings")} mapping join ${scopedTable("tracks")} track on track.org_id = mapping.org_id and track.id = mapping.postgres_record_id join ${scopedTable("works")} work on work.org_id = track.org_id and work.id = track.work_id where mapping.org_id = $1 and mapping.airtable_base_id = $2 and mapping.airtable_table_name = 'Release Tracks' and mapping.postgres_table_name = 'tracks'`, [ORG_ID, baseId]);
   const works = links.get("works")!;
   for (const row of trackWorks.rows) {
     const source = String(row.airtable_record_id);
@@ -560,18 +564,17 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
     const fields = RECORD_CHECKS[result.spec.airtable];
     const table = result.spec.postgres;
     if (!fields || !table || result.error) continue;
-    const canonical = await readOnlyQuery(`select id, ${fields.map(field => field.column).join(", ")} from ${qname(table)} where org_id = $1`, [ORG_ID]);
+    const canonical = await readOnlyQuery(`select id, ${fields.map(field => field.column).join(", ")} from ${scopedTable(table)} where org_id = $1`, [ORG_ID]);
     const byId = new Map(canonical.rows.map(row => [String(row.id), row]));
     const available = new Set(result.metadata?.fields.map(field => field.name) ?? []);
     for (const record of result.records) {
       const ids = new Set<string>();
-      if (byId.has(record.id)) ids.add(record.id);
       for (const row of mappingRows.rows) {
         if (row.airtable_table_name === result.spec.airtable && row.postgres_table_name === table && row.airtable_record_id === record.id && byId.has(String(row.postgres_record_id))) ids.add(String(row.postgres_record_id));
       }
       const canonicalRecordIds = [...ids].sort();
       for (const field of fields) {
-        const name = findFieldName(available, field.fields) ?? findFieldNameFromRecords(result.records, field.fields);
+        const name = findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
         const values = name ? fieldValues(record.fields[name]) : [];
         let sourceValue = values.length ? values.join(" ").trim() : field.fallback ?? null;
         let comparable = Boolean(name);
@@ -590,7 +593,7 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
           const value = byId.get(id)![field.column];
           return value == null ? null : value instanceof Date ? value.toISOString().slice(0, 10) : String(value).trim();
         });
-        checks.push(compareRecordEvidence({ table: result.spec.airtable, canonicalTable: table, field: field.column, sourceRecordId: record.id, canonicalRecordIds, sourceValue, canonicalValues }, comparable));
+        checks.push(compareRecordEvidence({ table: result.spec.airtable, canonicalTable: table, field: field.column, sourceRecordId: record.id, sourceField: name, sourceRawValue: values.length ? values.join(" ") : null, canonicalRecordIds, sourceValue, canonicalValues }, comparable));
       }
     }
   }
@@ -631,6 +634,7 @@ async function main() {
       generatedAt: new Date().toISOString(),
       baseId,
       schema: SCHEMA,
+      orgId: ORG_ID,
       metadataAvailable: metadataByName.size > 0,
       tableResults: tableResults.map(({ records, ...rest }) => ({
         ...rest,
@@ -723,9 +727,13 @@ function wantedFieldsFor(spec: TableSpec, metadata: AirtableTableMetadata): stri
     wanted.add(primaryField.name);
   }
 
-  for (const check of [...(spec.checks ?? []), ...(RECORD_CHECKS[spec.airtable] ?? []).map(field => ({ airtableFields: field.fields }))]) {
+  for (const check of spec.checks ?? []) {
     const field = findFieldName(available, check.airtableFields);
     if (field) wanted.add(field);
+  }
+
+  for (const field of (RECORD_CHECKS[spec.airtable] ?? []).flatMap(check => check.fields)) {
+    if (available.has(field)) wanted.add(field);
   }
 
   if (spec.airtable === "Contacts") {
@@ -734,26 +742,6 @@ function wantedFieldsFor(spec: TableSpec, metadata: AirtableTableMetadata): stri
     }
   }
 
-  if (spec.airtable === "Rights Lines (Roles)") {
-    for (const field of [
-      "Scope",
-      "Rights Scope",
-      "Clearance Scope",
-      "Clearance Status",
-      "Status",
-      "Rights Status",
-      "Ownership Type",
-      "Ownership",
-      "Type",
-      "Percent Share",
-      "% Share",
-      "Share",
-      "Split %",
-      "Share %",
-    ]) {
-      if (available.has(field)) wanted.add(field);
-    }
-  }
 
   return [...wanted];
 }
@@ -827,7 +815,7 @@ async function readPostgresTables(specs: TableSpec[]): Promise<Map<string, { cou
   const tables = [...new Set(specs.map((spec) => spec.postgres).filter(Boolean))] as string[];
 
   for (const table of tables) {
-    const result = await readOnlyQuery(`select id::text as record_id from ${qname(table)} order by id::text`);
+    const result = await readOnlyQuery(`select id::text as record_id from ${scopedTable(table)} order by id::text`);
     const recordIds = result.rows.map((row) => String(row.record_id));
     tablesByName.set(table, { count: recordIds.length, recordIds });
   }
@@ -908,7 +896,7 @@ async function runSourceIdChecks(
 
     if (sourceIds.size > 0) {
       const direct = await readOnlyQuery(
-        `select id::text as source_record_id from ${qname(result.spec.postgres)} where org_id = $1 and id::text = any($2::text[])`,
+        `select id::text as source_record_id from ${scopedTable(result.spec.postgres)} where org_id = $1 and id::text = any($2::text[])`,
         [ORG_ID, [...sourceIds]],
       );
       for (const row of direct.rows) {
@@ -925,8 +913,8 @@ async function runSourceIdChecks(
           select mapping.airtable_record_id as source_record_id,
                  mapping.postgres_record_id as canonical_record_id,
                  target.id is not null as target_exists
-          from ${qname("airtable_record_mappings")} mapping
-          left join ${qname(target)} target
+          from ${scopedTable("airtable_record_mappings")} mapping
+          left join ${scopedTable(target)} target
             on target.org_id = mapping.org_id
            and target.id = mapping.postgres_record_id
           where mapping.org_id = $1
@@ -1017,47 +1005,47 @@ const INTEGRITY_CHECKS = [
     label: "Releases with missing artist reference",
     sql: `
       select r.id
-      from ${qname("releases")} r
-      left join ${qname("artists")} a on a.id = r.artist_id
+      from ${scopedTable("releases")} r
+      left join ${scopedTable("artists")} a on a.id = r.artist_id
       where r.artist_id is not null and a.id is null
     `,
   },
   {
     label: "Tracks missing release",
-    sql: `select id from ${qname("tracks")} where release_id is null`,
+    sql: `select id from ${scopedTable("tracks")} where release_id is null`,
   },
   {
     label: "Tracks with invalid release reference",
     sql: `
       select t.id
-      from ${qname("tracks")} t
-      left join ${qname("releases")} r on r.id = t.release_id
+      from ${scopedTable("tracks")} t
+      left join ${scopedTable("releases")} r on r.id = t.release_id
       where t.release_id is not null and r.id is null
     `,
   },
   {
     label: "Tracks missing work",
-    sql: `select id from ${qname("tracks")} where work_id is null`,
+    sql: `select id from ${scopedTable("tracks")} where work_id is null`,
   },
   {
     label: "Tracks with invalid work reference",
     sql: `
       select t.id
-      from ${qname("tracks")} t
-      left join ${qname("works")} w on w.id = t.work_id
+      from ${scopedTable("tracks")} t
+      left join ${scopedTable("works")} w on w.id = t.work_id
       where t.work_id is not null and w.id is null
     `,
   },
   {
     label: "Roles missing work",
-    sql: `select id from ${qname("roles")} where work_id is null`,
+    sql: `select id from ${scopedTable("roles")} where work_id is null`,
   },
   {
     label: "Roles with invalid work reference",
     sql: `
       select r.id
-      from ${qname("roles")} r
-      left join ${qname("works")} w on w.id = r.work_id
+      from ${scopedTable("roles")} r
+      left join ${scopedTable("works")} w on w.id = r.work_id
       where r.work_id is not null and w.id is null
     `,
   },
@@ -1065,8 +1053,8 @@ const INTEGRITY_CHECKS = [
     label: "Roles with invalid contact reference",
     sql: `
       select r.id
-      from ${qname("roles")} r
-      left join ${qname("contacts")} c on c.id = r.contact_id
+      from ${scopedTable("roles")} r
+      left join ${scopedTable("contacts")} c on c.id = r.contact_id
       where r.contact_id is not null and c.id is null
     `,
   },
@@ -1074,9 +1062,9 @@ const INTEGRITY_CHECKS = [
     label: "Budget items with invalid release/category reference",
     sql: `
       select b.id
-      from ${qname("budget_line_items")} b
-      left join ${qname("releases")} r on r.id = b.release_id
-      left join ${qname("budget_categories")} c on c.id = b.category_id
+      from ${scopedTable("budget_line_items")} b
+      left join ${scopedTable("releases")} r on r.id = b.release_id
+      left join ${scopedTable("budget_categories")} c on c.id = b.category_id
       where (b.release_id is not null and r.id is null)
          or (b.category_id is not null and c.id is null)
     `,
@@ -1085,9 +1073,9 @@ const INTEGRITY_CHECKS = [
     label: "Campaign stations with invalid campaign/station reference",
     sql: `
       select cs.id
-      from ${qname("campaign_stations")} cs
-      left join ${qname("campaigns")} c on c.id = cs.campaign_id
-      left join ${qname("radio_stations")} rs on rs.id = cs.station_id
+      from ${scopedTable("campaign_stations")} cs
+      left join ${scopedTable("campaigns")} c on c.id = cs.campaign_id
+      left join ${scopedTable("radio_stations")} rs on rs.id = cs.station_id
       where (cs.campaign_id is not null and c.id is null)
          or (cs.station_id is not null and rs.id is null)
     `,
@@ -1096,10 +1084,10 @@ const INTEGRITY_CHECKS = [
     label: "Documents with invalid linked records",
     sql: `
       select d.id
-      from ${qname("documents")} d
-      left join ${qname("releases")} r on r.id = d.release_id
-      left join ${qname("artists")} a on a.id = d.artist_id
-      left join ${qname("contacts")} c on c.id = d.contact_id
+      from ${scopedTable("documents")} d
+      left join ${scopedTable("releases")} r on r.id = d.release_id
+      left join ${scopedTable("artists")} a on a.id = d.artist_id
+      left join ${scopedTable("contacts")} c on c.id = d.contact_id
       where (d.release_id is not null and r.id is null)
          or (d.artist_id is not null and a.id is null)
          or (d.contact_id is not null and c.id is null)
@@ -1109,9 +1097,9 @@ const INTEGRITY_CHECKS = [
     label: "Media assets with invalid linked records",
     sql: `
       select m.id
-      from ${qname("media_assets")} m
-      left join ${qname("releases")} r on r.id = m.linked_release_id
-      left join ${qname("artists")} a on a.id = m.linked_artist_id
+      from ${scopedTable("media_assets")} m
+      left join ${scopedTable("releases")} r on r.id = m.linked_release_id
+      left join ${scopedTable("artists")} a on a.id = m.linked_artist_id
       where (m.linked_release_id is not null and r.id is null)
          or (m.linked_artist_id is not null and a.id is null)
     `,
@@ -1120,9 +1108,9 @@ const INTEGRITY_CHECKS = [
     label: "Ops tasks with invalid linked records",
     sql: `
       select o.id
-      from ${qname("ops_tasks")} o
-      left join ${qname("releases")} r on r.id = o.linked_release_id
-      left join ${qname("artists")} a on a.id = o.linked_artist_id
+      from ${scopedTable("ops_tasks")} o
+      left join ${scopedTable("releases")} r on r.id = o.linked_release_id
+      left join ${scopedTable("artists")} a on a.id = o.linked_artist_id
       where (o.linked_release_id is not null and r.id is null)
          or (o.linked_artist_id is not null and a.id is null)
     `,
@@ -1132,25 +1120,25 @@ const INTEGRITY_CHECKS = [
 const READINESS_CHECKS = [
   {
     label: "Tracks marked ready while missing ISRC",
-    sql: `select id from ${qname("tracks")} where track_ready = true and isrc is null`,
+    sql: `select id from ${scopedTable("tracks")} where track_ready = true and isrc is null`,
   },
   {
     label: "Tracks marked ready while missing audio",
-    sql: `select id from ${qname("tracks")} where track_ready = true and audio_url is null`,
+    sql: `select id from ${scopedTable("tracks")} where track_ready = true and audio_url is null`,
   },
   {
     label: "Tracks marked ready while missing work",
-    sql: `select id from ${qname("tracks")} where track_ready = true and work_id is null`,
+    sql: `select id from ${scopedTable("tracks")} where track_ready = true and work_id is null`,
   },
   {
     label: "Tracks marked ready while clearance is incomplete",
-    sql: `select id from ${qname("tracks")} where track_ready = true and coalesce(clearance_progress, 0) < 1`,
+    sql: `select id from ${scopedTable("tracks")} where track_ready = true and coalesce(clearance_progress, 0) < 1`,
   },
   {
     label: "Tracks that look ready but cache says not ready",
     sql: `
       select id
-      from ${qname("tracks")}
+      from ${scopedTable("tracks")}
       where track_ready = false
         and isrc is not null
         and audio_url is not null
@@ -1160,22 +1148,22 @@ const READINESS_CHECKS = [
   },
   {
     label: "Releases marked ready while missing UPC/EAN",
-    sql: `select id from ${qname("releases")} where release_ready = true and upc_ean is null`,
+    sql: `select id from ${scopedTable("releases")} where release_ready = true and upc_ean is null`,
   },
   {
     label: "Releases marked ready while missing cover art",
-    sql: `select id from ${qname("releases")} where release_ready = true and cover_art_url is null`,
+    sql: `select id from ${scopedTable("releases")} where release_ready = true and cover_art_url is null`,
   },
   {
     label: "Releases marked ready while missing release date",
-    sql: `select id from ${qname("releases")} where release_ready = true and release_date is null`,
+    sql: `select id from ${scopedTable("releases")} where release_ready = true and release_date is null`,
   },
   {
     label: "Releases marked ready with no tracks",
     sql: `
       select r.id
-      from ${qname("releases")} r
-      left join ${qname("tracks")} t on t.release_id = r.id
+      from ${scopedTable("releases")} r
+      left join ${scopedTable("tracks")} t on t.release_id = r.id
       where r.release_ready = true
       group by r.id
       having count(t.id) = 0
@@ -1185,8 +1173,8 @@ const READINESS_CHECKS = [
     label: "Releases marked ready with at least one non-ready track",
     sql: `
       select distinct r.id
-      from ${qname("releases")} r
-      join ${qname("tracks")} t on t.release_id = r.id
+      from ${scopedTable("releases")} r
+      join ${scopedTable("tracks")} t on t.release_id = r.id
       where r.release_ready = true and coalesce(t.track_ready, false) = false
     `,
   },
@@ -1423,8 +1411,8 @@ function numberOption(name: string): number | undefined {
   return n;
 }
 
-function qname(table: string): string {
-  return `${quoteIdent(SCHEMA)}.${quoteIdent(table)}`;
+function scopedTable(table: string): string {
+  return scopedParityTable(SCHEMA, table, ORG_ID);
 }
 
 function readOnlyQuery(sql: string, values?: unknown[]) {
@@ -1432,10 +1420,6 @@ function readOnlyQuery(sql: string, values?: unknown[]) {
     fail(`Refusing non-read-only SQL in parity report: ${sql.slice(0, 80)}`);
   }
   return pool.query(sql, values);
-}
-
-function quoteIdent(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
 }
 
 function sleep(ms: number): Promise<void> {
