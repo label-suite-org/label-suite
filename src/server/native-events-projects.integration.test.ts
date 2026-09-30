@@ -42,8 +42,8 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
     expect(event).toMatchObject({ record_type: "event", all_day: false, is_confirmed: true, revision: expect.any(String), relationships: { project_id: project.id, tasks: [] } });
     const updatedProject = await service.updateNativeProject(orgA, { id: project.id, description: "Updated goal", notes: "Production notes", location_name: "Studio", expected_revision: project.revision }, userA);
     expect(updatedProject).toMatchObject({ record_type: "project", goal: "Updated goal", relationships: { events: [{ id: event.id }] } });
-    const updatedEvent = await service.updateNativeEvent(orgA, { id: event.id, ...service.nativeUpdateEventSchema.parse({ notes: "Updated agenda", venue_name: "Main room", starts_at: "2027-01-01T11:00:00+01:00", expected_revision: event.revision }) }, userA);
-    expect(updatedEvent).toMatchObject({ record_type: "event", agenda: "Updated agenda", relationships: { project_id: project.id } });
+    const updatedEvent = await service.updateNativeEvent(orgA, { id: event.id, ...service.nativeUpdateEventSchema.parse({ notes: "Updated agenda", venue_name: "Main room", starts_at: null, ends_at: null, all_day: true, expected_revision: event.revision }) }, userA);
+    expect(updatedEvent).toMatchObject({ record_type: "event", all_day: true, starts_at: null, ends_at: null, agenda: "Updated agenda", relationships: { project_id: project.id } });
     const [projectAudit] = await sql!`select "before", "after" from label_suite.audit_events where org_id=${orgA} and object_id=${project.id} and event_type='project.updated'`;
     expect(projectAudit.before).toMatchObject({ notes: null, location_name: null });
     expect(projectAudit.after).toMatchObject({ notes: "Production notes", location_name: "Studio" });

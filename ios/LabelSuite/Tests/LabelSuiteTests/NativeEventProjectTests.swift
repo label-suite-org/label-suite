@@ -62,6 +62,8 @@ final class NativeEventProjectTests: XCTestCase {
     XCTAssertEqual(values["is_confirmed"] as? Bool, true)
     let patch = try JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeEventUpdateInput(expectedRevision: "r1", allDay: false, eventType: "show"))) as! [String: Any]
     XCTAssertEqual(patch as NSDictionary, ["expected_revision": "r1", "all_day": false, "event_type": "show"])
+    let allDay = try JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeEventUpdateInput(expectedRevision: "r2", startsAt: .some(nil), endsAt: .some(nil), allDay: true))) as! [String: Any]
+    XCTAssertEqual(allDay as NSDictionary, ["expected_revision": "r2", "starts_at": NSNull(), "ends_at": NSNull(), "all_day": true])
   }
 
   func testCompositeIdentityPreventsEventProjectCollision() {

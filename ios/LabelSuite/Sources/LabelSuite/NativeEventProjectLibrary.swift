@@ -822,10 +822,16 @@ struct NativeEventDetailView: View {
   private func budget(_ values: [NativeBudgetRecord], partial: Bool?) -> some View {
     Section("Project budget · shared with this event") {
       if values.isEmpty { Text("No linked project budget items.").foregroundStyle(.secondary) }
-      ForEach(values) {
-        Text(
-          "\($0.name) · \($0.amount.map { String(format: "%.2f", $0) } ?? "—") \($0.currency ?? "")"
-        )
+      ForEach(values) { item in
+        let label = "\(item.name) · \(item.amount.map { String(format: "%.2f", $0) } ?? "—") \(item.currency ?? "")"
+        if case let .authenticated(active) = session.state, active.id == workspace.id, active.capabilities["budgets.read"] == true {
+          NavigationLink(label) {
+            NativeBudgetView(workspace: active, session: session, api: api, lineID: item.id)
+          }
+        } else {
+          Text(label)
+          Text("Budget access is unavailable.").font(.caption).foregroundStyle(.secondary)
+        }
       }
       if partial == true {
         Text("Showing a partial list.").font(.caption).foregroundStyle(.secondary)
@@ -932,9 +938,15 @@ struct NativeProjectDetailView: View {
             Text("No budget items.").foregroundStyle(.secondary)
           }
           ForEach(detail.relationships.budget) { item in
-            Text(
-              "\(item.name) · \(item.amount.map { String(format: "%.2f", $0) } ?? "—") \(item.currency ?? "")"
-            )
+            let label = "\(item.name) · \(item.amount.map { String(format: "%.2f", $0) } ?? "—") \(item.currency ?? "")"
+            if case let .authenticated(active) = session.state, active.id == workspace.id, active.capabilities["budgets.read"] == true {
+              NavigationLink(label) {
+                NativeBudgetView(workspace: active, session: session, api: api, lineID: item.id)
+              }
+            } else {
+              Text(label)
+              Text("Budget access is unavailable.").font(.caption).foregroundStyle(.secondary)
+            }
           }
           if detail.relationshipWindows?.budget?.partial == true {
             Text("Showing a partial list.").font(.caption)
@@ -1217,7 +1229,9 @@ private struct NativeEventProjectCreateView: View {
         NativeGrantDateField(title: "End date", value: $endDate)
         TextField(root == .events ? "Agenda" : "Goal", text: $notes, axis: .vertical)
         if root == .events {
-          Toggle("All-day event", isOn: $allDay)
+          Toggle("All-day event", isOn: $allDay).onChange(of: allDay) { _, value in
+            if value { startsAt = ""; endsAt = "" }
+          }
           if !allDay {
             NativeEventTimeField(title: "Starts at", value: $startsAt)
             NativeEventTimeField(title: "Ends at", value: $endsAt)
@@ -1273,7 +1287,7 @@ private struct NativeEventProjectCreateView: View {
     do {
       if root == .events {
         _ = try await api.createEvent(
-          input: .init(title: name, eventType: type, startDate: date, status: status.nativeTrimmed, projectID: projectID, agenda: notes.nativeTrimmed, artistID: artistID, releaseID: releaseID, contactID: contactID, ownerContactID: ownerContactID, endDate: endDate.nativeTrimmed, startsAt: startsAt.nativeTrimmed, endsAt: endsAt.nativeTrimmed, timezone: timezone.nativeTrimmed, venueName: venueName.nativeTrimmed, allDay: allDay, isConfirmed: isConfirmed), workspace: workspace,
+          input: .init(title: name, eventType: type, startDate: date, status: status.nativeTrimmed, projectID: projectID, agenda: notes.nativeTrimmed, artistID: artistID, releaseID: releaseID, contactID: contactID, ownerContactID: ownerContactID, endDate: endDate.nativeTrimmed, startsAt: allDay ? nil : startsAt.nativeTrimmed, endsAt: allDay ? nil : endsAt.nativeTrimmed, timezone: timezone.nativeTrimmed, venueName: venueName.nativeTrimmed, allDay: allDay, isConfirmed: isConfirmed), workspace: workspace,
           session: s)
       } else {
         _ = try await api.createProject(
@@ -1424,7 +1438,9 @@ private struct NativeEventProjectEditorView: View {
         NativeGrantDateField(title: "End date", value: $endDate)
         TextField(event == nil ? "Goal" : "Agenda", text: $notes, axis: .vertical)
         if event != nil {
-          Toggle("All-day event", isOn: $allDay)
+          Toggle("All-day event", isOn: $allDay).onChange(of: allDay) { _, value in
+            if value { startsAt = ""; endsAt = "" }
+          }
           if !allDay {
             NativeEventTimeField(title: "Starts at", value: $startsAt)
             NativeEventTimeField(title: "Ends at", value: $endsAt)
