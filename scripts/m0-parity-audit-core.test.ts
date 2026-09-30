@@ -240,6 +240,8 @@ describe("M0 parity audit", () => {
     expect(report.sections.map((section) => section.issue)).toEqual([25, 84, 85, 86]);
     const markdown = renderM0Markdown(report);
     expect(markdown).toContain("# Immutable M0 Parity Audit");
+    expect(markdown).toContain("Organization scope: `fixture-org`");
+    expect(markdown).toContain("| Comparison field | Evidence |");
     expect(markdown).toContain("No Airtable or Postgres mutation");
     expect(markdown).toContain("| #84 | Artist relationship cleanup/control consistency |");
   });

@@ -550,6 +550,7 @@ export function renderM0Markdown(report: M0AuditReport): string {
     "",
     `Generated: ${report.generatedAt}`,
     `Report version: \`${report.reportVersion}\``,
+    `Organization scope: \`${cell(report.source.orgId)}\``,
     `Airtable base: \`${report.source.airtableBaseId}\``,
     `Source revision: \`${report.source.sourceRevision}\``,
     `Postgres schema: \`${report.source.postgresSchema}\``,
@@ -597,9 +598,9 @@ export function renderM0Markdown(report: M0AuditReport): string {
     "",
     "## Mismatch ledger",
     "",
-    "| ID | Domain | Kind | Source record IDs | Canonical record IDs | Source value | Canonical value | Proposed disposition | Owner | Next action |",
-    "|---|---|---|---|---|---|---|---|---|---|",
-    ...report.mismatches.map((mismatch) => `| ${cell(mismatch.id)} | ${cell(mismatch.domain)} | ${cell(mismatch.kind)} | ${cell(mismatch.sourceRecordIds.join(", "))} | ${cell(mismatch.canonicalRecordIds.join(", "))} | ${cell(mismatch.sourceValue)} | ${cell(mismatch.canonicalValue)} | ${cell(mismatch.proposedDisposition)} | ${cell(mismatch.owner)} | ${cell(mismatch.nextAction)} |`),
+    "| ID | Domain | Kind | Comparison field | Evidence | Source record IDs | Canonical record IDs | Source value | Canonical value | Proposed disposition | Owner | Next action |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|",
+    ...report.mismatches.map((mismatch) => `| ${cell(mismatch.id)} | ${cell(mismatch.domain)} | ${cell(mismatch.kind)} | ${cell(mismatch.comparisonField)} | ${cell(mismatch.evidence)} | ${cell(mismatch.sourceRecordIds.join(", "))} | ${cell(mismatch.canonicalRecordIds.join(", "))} | ${cell(mismatch.sourceValue)} | ${cell(mismatch.canonicalValue)} | ${cell(mismatch.proposedDisposition)} | ${cell(mismatch.owner)} | ${cell(mismatch.nextAction)} |`),
     "",
   ];
   return lines.join("\n");
