@@ -13,8 +13,6 @@ const BUTTON_LABELS: Record<ArtistFocusField, string> = {
   pro: "PRO",
   ipi: "IPI",
   spotify_id: "Spotify ID",
-  spotify_followers: "Spotify followers",
-  spotify_popularity: "Spotify popularity",
   instagram: "Instagram",
   tiktok: "TikTok",
 };

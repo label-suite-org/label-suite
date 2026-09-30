@@ -58,7 +58,7 @@ describe("out-of-scope read-only affordances", () => {
     const artists = renderToStaticMarkup(<ArtistRoster artists={[]} canMutate={false} />);
     const media = renderToStaticMarkup(<MediaAssetManager initialAssets={[]} artists={[]} releases={[]} canMutate={false} />);
     const tasks = renderToStaticMarkup(<OpsTaskManager initialTasks={[]} artists={[]} releases={[]} campaigns={[]} contacts={[]} projects={[]} events={[]} canMutate={false} />);
-    expect(artists).toContain("Read-only for fundraiser");
+    expect(artists).toContain("Read-only for your role");
     expect(artists).not.toContain("New Artist");
     expect(media).toContain("Read-only for fundraiser");
     expect(media).not.toContain("Add asset");

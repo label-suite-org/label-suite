@@ -6,7 +6,7 @@ import { normalizeReviewedRichText, type ReviewedRichTextState } from "../../lib
 import { CampaignRichTextEditor } from "../campaigns/CampaignRichTextEditor";
 
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 export interface ContactOption {
   id: string;
@@ -32,7 +32,7 @@ export interface Artist {
   contact_id?: string | null;
 }
 
-export type ArtistFocusField = "bio" | "pro" | "ipi" | "spotify_id" | "spotify_followers" | "spotify_popularity" | "instagram" | "tiktok";
+export type ArtistFocusField = "bio" | "pro" | "ipi" | "spotify_id" | "instagram" | "tiktok";
 
 export function ArtistForm({
   initial,
@@ -61,8 +61,6 @@ export function ArtistForm({
   const [bioFallback, setBioFallback] = useState(initialBio.usedFallback);
   const [pro, setPro] = useState(initial?.pro || "");
   const [spotifyId, setSpotifyId] = useState(initial?.spotify_id || "");
-  const [followers, setFollowers] = useState(initial?.spotify_followers?.toString() || "");
-  const [popularity, setPopularity] = useState(initial?.spotify_popularity?.toString() || "");
   const [ipi, setIpi] = useState(initial?.ipi || "");
   const [instagram, setInstagram] = useState(initial?.instagram || "");
   const [tiktok, setTiktok] = useState(initial?.tiktok || "");
@@ -82,8 +80,6 @@ export function ArtistForm({
         image_url: imageUrl || null,
         pro,
         spotify_id: spotifyId,
-        spotify_followers: followers || null,
-        spotify_popularity: popularity || null,
         ipi,
         instagram,
         tiktok,
@@ -139,14 +135,14 @@ export function ArtistForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4 text-left">
       <div>
-        <label htmlFor={`${formId}-name`} className="block text-sm font-medium text-neutral-700 mb-1">Name *</label>
+        <label htmlFor={`${formId}-name`} className="block text-sm font-medium text-foreground mb-1">Name *</label>
         <Input id={`${formId}-name`} value={name} onChange={(e) => setName(e.target.value)} required
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+          className="w-full" />
       </div>
       <div>
-        <label htmlFor={`${formId}-image`} className="block text-sm font-medium text-neutral-700 mb-1">Artist image (optional)</label>
+        <label htmlFor={`${formId}-image`} className="block text-sm font-medium text-foreground mb-1">Artist image (optional)</label>
         <Input id={`${formId}-image`} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://... or artists/.../photo.jpg"
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+          className="w-full" />
       </div>
       <details open={isEdit || Boolean(focusField)} className="border-y border-border py-3">
         <summary className="cursor-pointer py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Profile details (optional)</summary>
@@ -154,8 +150,8 @@ export function ArtistForm({
         <div className="mt-4 space-y-4">
       <div>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-medium text-neutral-700">Bio</span>
-          <span className="text-xs font-medium capitalize text-neutral-500" data-testid="artist-bio-state">{bioState}</span>
+          <span className="text-sm font-medium text-foreground">Bio</span>
+          <span className="text-xs font-medium capitalize text-muted-foreground" data-testid="artist-bio-state">{bioState}</span>
         </div>
         <CampaignRichTextEditor
           id="artist-bio"
@@ -199,72 +195,45 @@ export function ArtistForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor={`${formId}-pro`} className="block text-sm font-medium text-neutral-700 mb-1">PRO</label>
+          <label htmlFor={`${formId}-pro`} className="block text-sm font-medium text-foreground mb-1">PRO</label>
           <Input id={`${formId}-pro`} value={pro} onChange={(e) => setPro(e.target.value)} placeholder="ASCAP, KODA..." autoFocus={focusField === "pro"}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+            className="w-full" />
         </div>
         <div>
-          <label htmlFor={`${formId}-spotify-id`} className="block text-sm font-medium text-neutral-700 mb-1">Spotify ID</label>
+          <label htmlFor={`${formId}-spotify-id`} className="block text-sm font-medium text-foreground mb-1">Spotify ID</label>
           <Input id={`${formId}-spotify-id`} value={spotifyId} onChange={(e) => setSpotifyId(e.target.value)} autoFocus={focusField === "spotify_id"}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+            className="w-full" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor={`${formId}-spotify-followers`} className="block text-sm font-medium text-neutral-700 mb-1">Spotify Followers</label>
-          <Input id={`${formId}-spotify-followers`} type="number" value={followers} onChange={(e) => setFollowers(e.target.value)} autoFocus={focusField === "spotify_followers"}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
-        </div>
-        <div>
-          <label htmlFor={`${formId}-spotify-popularity`} className="block text-sm font-medium text-neutral-700 mb-1">Spotify Popularity</label>
-          <Input id={`${formId}-spotify-popularity`} type="number" min="0" max="100" value={popularity} onChange={(e) => setPopularity(e.target.value)} autoFocus={focusField === "spotify_popularity"}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label htmlFor={`${formId}-ipi`} className="block text-sm font-medium text-neutral-700 mb-1">IPI</label>
+          <label htmlFor={`${formId}-ipi`} className="block text-sm font-medium text-foreground mb-1">IPI</label>
           <Input id={`${formId}-ipi`} value={ipi} onChange={(e) => setIpi(e.target.value)} autoFocus={focusField === "ipi"}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+            className="w-full" />
         </div>
         <div>
-          <label htmlFor={`${formId}-instagram`} className="block text-sm font-medium text-neutral-700 mb-1">Instagram</label>
+          <label htmlFor={`${formId}-instagram`} className="block text-sm font-medium text-foreground mb-1">Instagram</label>
           <Input id={`${formId}-instagram`} value={instagram} onChange={(e) => setInstagram(e.target.value)} autoFocus={focusField === "instagram"}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+            className="w-full" />
         </div>
       </div>
       <div>
-        <label htmlFor={`${formId}-tiktok`} className="block text-sm font-medium text-neutral-700 mb-1">TikTok</label>
+        <label htmlFor={`${formId}-tiktok`} className="block text-sm font-medium text-foreground mb-1">TikTok</label>
         <Input id={`${formId}-tiktok`} value={tiktok} onChange={(e) => setTiktok(e.target.value)} autoFocus={focusField === "tiktok"}
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+          className="w-full" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label htmlFor={`${formId}-relationship`} className="block text-sm font-medium text-neutral-700 mb-1">Roster relationship</label>
-          <NativeSelect
-            id={`${formId}-relationship`}
-            value={relationship}
-            onChange={(event) => setRelationship(event.target.value)}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
-          >
-            <option value="">— Unclassified —</option>
-            <option value="roster">Roster</option>
-            <option value="collaborator">Collaborator</option>
-          </NativeSelect>
+          <label htmlFor={`${formId}-relationship`} className="block text-sm font-medium text-foreground mb-1">Roster relationship</label>
+          <Select id={`${formId}-relationship`} aria-label="Roster relationship" placeholder="Unclassified" value={relationship} onValueChange={value => setRelationship(value ?? "")} className="w-full" options={[
+            { value: "", label: "Unclassified" }, { value: "roster", label: "Roster" }, { value: "collaborator", label: "Collaborator" },
+          ]} />
         </div>
         <div>
-          <label htmlFor={`${formId}-contact`} className="block text-sm font-medium text-neutral-700 mb-1">Primary contact</label>
-          <NativeSelect
-            id={`${formId}-contact`}
-            value={contactId}
-            onChange={(event) => setContactId(event.target.value)}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
-          >
-            <option value="">— None —</option>
-            {safeContactOptions.map((contact) => (
-              <option key={contact.id} value={contact.id}>{contact.name}</option>
-            ))}
-          </NativeSelect>
+          <label htmlFor={`${formId}-contact`} className="block text-sm font-medium text-foreground mb-1">Primary contact</label>
+          <Select id={`${formId}-contact`} aria-label="Primary contact" placeholder="None" value={contactId} onValueChange={value => setContactId(value ?? "")} className="w-full" options={[
+            { value: "", label: "None" }, ...safeContactOptions.map(contact => ({ value: contact.id, label: contact.name })),
+          ]} />
         </div>
       </div>
         </div>
@@ -272,8 +241,8 @@ export function ArtistForm({
       {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2 justify-end">
         <Button variant="ghost" type="button" onClick={onClose} className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900">Cancel</Button>
-        <Button variant="ghost" type="submit" disabled={loading}
-          className="px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50">
+        <Button type="submit" disabled={loading}
+          >
           {loading ? "Saving..." : isEdit ? "Save Changes" : "Create Artist"}
         </Button>
       </div>

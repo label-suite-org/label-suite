@@ -129,6 +129,37 @@ blocked by 12 timeouts in the unchanged Sisense browser-contract suite; one also
 reproduced separately. Do not merge until the required checks are green. This is
 a local review and draft delivery, not visual acceptance or production deployment.
 
+## Artist correction and component workshop — 30 September 2026
+
+The primary sidebar is now 200px wide, with secondary destinations in
+collapsible groups and child destinations shown for the active parent. Artist
+Overview shows four recent/upcoming releases with access to the entire catalog.
+Images is the last tab; its upload form uses shared inputs, buttons and Select.
+Team explains the primary contact and collaborators derived from credits.
+Artist rights are grouped by work in disclosures that retain shares, clearance
+and links to the work editor, rather than showing the full ledger at once.
+Spotify follower/popularity values remain read-only observations and no longer
+appear as editable fields or profile readiness requirements. Manual web/native
+mutation schemas reject supplied metrics; stored values and import paths remain.
+
+Storybook now previews the actual sidebar, artist workspace and Select with
+fictional records. Official MCP documentation, preview and test tools were
+verified locally. App and Storybook tooling have separate type-check scopes;
+see `docs/storybook.md` for commands. Ten story checks, 72 focused checks,
+Storybook build and its TypeScript check pass. A subsequent complete local CI
+run passed 3,535 tests plus all 36 Sisense contract checks, schema/type/build
+stages; 215 tests were skipped. This supersedes the earlier local CI blocker
+above for that run, without claiming a fix to intermittent Sisense behavior.
+Final presentation changes were checked through the focused/story/build checks.
+
+A private catalog snapshot was verified in the integrated preview, including
+artist-to-release navigation from both tabs, actual linked rights/credits and
+provider observations. Snapshot exports, assets and screenshots stay outside
+Git. Desktop and 390px phone review cover Overview, image layout and accessible
+tab/dropdown navigation. Missing private artwork connections, provider sync,
+remaining routes and complete error/permission variants still need review.
+Owner acceptance, remote CI, merge and deployment remain separate gates.
+
 ## First delivery boundary
 
 This delivery establishes common tokens and repairs the track editor. It does

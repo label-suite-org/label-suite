@@ -72,6 +72,7 @@ describe("artist relationship UI", () => {
     const html = renderToStaticMarkup(
       <ArtistForm
         onClose={() => undefined}
+        initial={{ id: "artist-1", name: "Artist One", relationship: "collaborator", contact_id: "contact-1" }}
         contactOptions={[
           { id: "contact-1", name: "Malthe Lund Madsen" },
           { id: "contact-2", name: "Lorenzo" },

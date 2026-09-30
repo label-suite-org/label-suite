@@ -234,6 +234,8 @@ describe("AppSidebar", () => {
     expect(container.querySelector('[data-sidebar="menu-sub-button"][href="/works"]')).toBeTruthy();
     expect(container.querySelector('[href="/works"][aria-current="page"]')).toBeInstanceOf(HTMLAnchorElement);
     expect(container.querySelector('[href="/analytics"][aria-expanded="false"]')).toBeTruthy();
+    expect(container.querySelector('[href="/forecast"]')).toBeNull();
+    expect(container.querySelector('[href="/radio-plugging"]')).toBeNull();
 
     await act(async () => {
       window.location.pathname = "/radio-plugging";
@@ -244,7 +246,20 @@ describe("AppSidebar", () => {
     expect(container.querySelector('[href="/campaigns"][aria-expanded="true"]')).toBeTruthy();
     expect(container.querySelector('[href="/releases"][aria-expanded="false"]')).toBeTruthy();
     expect(container.querySelector('[href="/radio-plugging"][aria-current="page"]')).toBeTruthy();
+    expect(container.querySelector('[href="/works"]')).toBeNull();
 
+    await cleanupSidebar(container, root);
+  });
+
+  it("reveals secondary destinations when their group is opened", async () => {
+    const { container, root } = await renderSidebar("/artists/artist-1");
+    expect(container.querySelector('[href="/artists"][data-active]')).toBeTruthy();
+    expect(container.querySelector('[href="/contacts"]')).toBeNull();
+    await act(async () => {
+      const directory = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Directory"));
+      directory?.click();
+    });
+    expect(container.querySelector('[href="/contacts"]')).toBeTruthy();
     await cleanupSidebar(container, root);
   });
 

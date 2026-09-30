@@ -257,7 +257,7 @@ export function ArtistRoster({
 
   return (
     <div className="space-y-5">
-      {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
+      {!canMutate && <p className="text-sm text-muted-foreground">Read-only for your role</p>}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <RosterStat label="Roster" value={artists.length.toString()} detail="artists in workspace" />
         <RosterStat label="Roster artists" value={stats.roster.toString()} detail="signed to the label" />

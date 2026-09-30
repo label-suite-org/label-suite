@@ -41,10 +41,12 @@ import {
   Sun,
   PlugZap,
   CircleHelp,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { APP_NAV_ITEMS, APP_NAV_SECTIONS, isActiveNavRoute, isCurrentNavPage, navItemHref, type AppNavItem } from "@/lib/navigation";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const navIcons: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -81,6 +83,7 @@ export function AppSidebar({
   onToggleTheme: () => void;
 }) {
   const [currentUrl, setCurrentUrl] = useState("");
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const syncCurrentPath = () => {
@@ -147,8 +150,14 @@ export function AppSidebar({
           if (!sectionItems.length) return null;
 
           return (
-            <SidebarGroup key={section.id} className="group-data-[collapsible=icon]:p-1">
-              <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+            <Collapsible key={section.id} open={section.id === "primary" || (expandedGroups[section.id] ?? sectionItems.some(item => isActiveNavRoute(currentUrl, item.url)))} onOpenChange={open => setExpandedGroups(groups => ({ ...groups, [section.id]: open }))}>
+            <SidebarGroup className="group-data-[collapsible=icon]:p-1">
+              {section.id === "primary" ? <SidebarGroupLabel>{section.label}</SidebarGroupLabel> : (
+                <CollapsibleTrigger className="group flex h-8 w-full items-center justify-between px-2 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden">
+                  {section.label}<ChevronDown aria-hidden className="size-3 transition-transform duration-300 motion-reduce:transition-none group-data-[panel-open]:rotate-180" />
+                </CollapsibleTrigger>
+              )}
+              <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden transition-[height] duration-300 ease-out data-ending-style:h-0 data-starting-style:h-0 motion-reduce:transition-none">
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
                   {topLevelItems.map((item) => {
@@ -156,7 +165,7 @@ export function AppSidebar({
                     const itemHref = navItemHref(item, currentUrl);
                     const isCurrentPage = isCurrentNavPage(currentUrl, itemHref);
                     const hasActiveChild = children.some((child) => isActiveNavRoute(currentUrl, navItemHref(child, currentUrl)));
-                    const isActive = isCurrentPage || hasActiveChild;
+                    const isActive = isActiveNavRoute(currentUrl, itemHref) || hasActiveChild;
                     const Icon = navIcons[item.id] ?? LayoutDashboard;
 
                     return (
@@ -173,7 +182,7 @@ export function AppSidebar({
                           tooltip={item.title}
                           isActive={isActive}
                           data-sidebar-hover="button"
-                          className="relative h-9 gap-3 px-2.5 text-[13px] transition-[background-color,color,box-shadow] duration-200 ease-out before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-sidebar-primary before:opacity-0 data-active:before:opacity-100 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!"
+                          className="h-8 gap-2.5 px-2 text-[13px] transition-colors group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!"
                         >
                           <Icon className="size-4" />
                           <span data-sidebar-hover="label" className="group-data-[collapsible=icon]:hidden">
@@ -181,7 +190,7 @@ export function AppSidebar({
                           </span>
                         </SidebarMenuButton>
 
-                        {children.length > 0 ? (
+                        {children.length > 0 && isActive ? (
                           <SidebarMenuSub>
                             {children.map((child) => {
                               const childHref = navItemHref(child, currentUrl);
@@ -213,7 +222,9 @@ export function AppSidebar({
                   })}
                 </SidebarMenu>
               </SidebarGroupContent>
+              </CollapsibleContent>
             </SidebarGroup>
+            </Collapsible>
           );
         })}
       </SidebarContent>

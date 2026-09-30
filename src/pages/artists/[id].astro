@@ -32,10 +32,10 @@ const destinationParam = Astro.url.searchParams.get("destination");
 const initialTab = tabParam && ["overview", "visuals", "releases", "team", "rights", "campaigns", "analytics"].includes(tabParam)
   ? tabParam as "overview" | "visuals" | "releases" | "team" | "rights" | "campaigns" | "analytics"
   : undefined;
-const initialFocusField = canMutate && focusParam && ["bio", "pro", "ipi", "spotify_id", "spotify_followers", "spotify_popularity", "instagram", "tiktok"].includes(focusParam)
+const initialFocusField = canMutate && focusParam && ["bio", "pro", "ipi", "spotify_id", "instagram", "tiktok"].includes(focusParam)
   ? focusParam as ArtistFocusField
   : undefined;
-const initialReadinessDestination = destinationParam && ["overview:bio", "overview:pro", "overview:ipi", "overview:spotify_id", "overview:spotify_followers", "overview:spotify_popularity", "overview:instagram", "overview:tiktok", "tab:visuals", "tab:documents", "tab:rights"].includes(destinationParam)
+const initialReadinessDestination = destinationParam && ["overview:bio", "overview:pro", "overview:ipi", "overview:spotify_id", "overview:instagram", "overview:tiktok", "tab:visuals", "tab:documents", "tab:rights"].includes(destinationParam)
   ? destinationParam as ReadinessDestination
   : undefined;
 const analytics = artist

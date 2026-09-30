@@ -51,6 +51,16 @@ Use Tabs for views, Accordion for optional evidence, Sheet for contextual mobile
 work, Dialog for a focused confirmation/form, Table for comparable records and
 Badge for quiet state. Preserve keyboard behavior, labels and focus indicators.
 
+Keep the primary sidebar compact. Secondary work stays in collapsible groups;
+show child destinations when their parent is active. Artist Overview shows a
+short release selection with a route to the full catalog. Images follows the
+core catalog and collaboration tabs. Spotify followers and popularity are
+provider-owned, read-only observations, never profile inputs or readiness tasks.
+
+Review shared components and meaningful states in Storybook using the same
+tokens and fictional records. Follow `docs/storybook.md`, then check the actual
+route: an isolated story does not establish integrated workflow correctness.
+
 ## Evidence and truth
 
 Start visual proposals from screenshots of shipped interfaces and the accepted

@@ -16,7 +16,7 @@ export const APP_NAV_SECTIONS = [
   { id: "primary", label: "Workspace" },
   { id: "operations", label: "Operations" },
   { id: "directory", label: "Directory" },
-  { id: "contextual", label: "Contextual" },
+  { id: "contextual", label: "Resources" },
 ] as const satisfies readonly { id: AppNavSection; label: string }[];
 
 export const APP_NAV_ITEMS = [
@@ -28,10 +28,10 @@ export const APP_NAV_ITEMS = [
   { id: "releases", title: "Releases", url: "/releases", section: "primary", mobilePrimary: true, keywords: ["catalog", "albums", "singles"] },
   { id: "analytics", title: "Analytics", url: "/analytics", section: "primary", mobilePrimary: false, keywords: ["stats", "insights", "streams"] },
   { id: "campaigns", title: "Campaigns", url: "/campaigns", section: "primary", mobilePrimary: true, keywords: ["marketing", "promo"] },
-  { id: "ops-tasks", title: "Tasks", url: "/ops-tasks", section: "operations", mobilePrimary: true, keywords: ["tasks", "todo", "operations"] },
+  { id: "ops-tasks", title: "Tasks", url: "/ops-tasks", section: "primary", mobilePrimary: true, keywords: ["tasks", "todo", "operations"] },
   { id: "data-quality", title: "Data quality", url: "/data-quality", section: "operations", mobilePrimary: false, keywords: ["integrations", "mismatches", "reconciliation"] },
   { id: "integrations", title: "Integrations", url: "/integrations", section: "operations", mobilePrimary: false, keywords: ["providers", "connections", "sync", "data quality"] },
-  { id: "royalties", title: "Royalties", url: "/royalties", section: "operations", mobilePrimary: false, keywords: ["money", "revenue", "statements", "payouts"] },
+  { id: "royalties", title: "Royalties", url: "/royalties", section: "primary", mobilePrimary: false, keywords: ["money", "revenue", "statements", "payouts"] },
   { id: "grants", title: "Grants", url: "/grants", section: "operations", mobilePrimary: false, keywords: ["funding", "applications", "funder"] },
   { id: "contacts", title: "Contacts", url: "/contacts", section: "directory", mobilePrimary: false, keywords: ["people", "organizations"] },
   { id: "forecast", title: "Forecast", url: "/analytics?section=forecast", section: "contextual", mobilePrimary: false, parentId: "analytics", keywords: ["analytics", "projection", "planning"] },

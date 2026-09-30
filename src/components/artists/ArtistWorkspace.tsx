@@ -19,7 +19,7 @@ import type { Artist, ArtistFocusField, ContactOption } from "./ArtistForm";
 import { normalizeReviewedRichText } from "../../lib/reviewed-rich-text";
 
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -140,8 +140,6 @@ const READINESS_DESTINATION_TARGETS: Record<ReadinessDestination, ReadinessDesti
   "overview:pro": { tab: "overview", targetId: null },
   "overview:ipi": { tab: "overview", targetId: null },
   "overview:spotify_id": { tab: "overview", targetId: null },
-  "overview:spotify_followers": { tab: "overview", targetId: null },
-  "overview:spotify_popularity": { tab: "overview", targetId: null },
   "overview:instagram": { tab: "overview", targetId: null },
   "overview:tiktok": { tab: "overview", targetId: null },
   "tab:visuals": { tab: "visuals", targetId: "artist-image-uploader" },
@@ -155,12 +153,12 @@ export function readinessDestinationTarget(destination: ReadinessDestination): R
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "overview", label: "Overview" },
-  { key: "visuals", label: "Images" },
   { key: "releases", label: "Releases" },
   { key: "team", label: "Team" },
   { key: "rights", label: "Rights" },
   { key: "campaigns", label: "Campaigns" },
   { key: "analytics", label: "Analytics" },
+  { key: "visuals", label: "Images" },
 ];
 
 function formatNumber(value: number | null | undefined): string {
@@ -356,7 +354,7 @@ export function ArtistWorkspace({
           onOpenChange={setRouteEditOpen}
         />
       ) : null}
-      {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
+      {!canMutate && <p className="text-sm text-muted-foreground">Read-only for your role</p>}
       <header className="flex flex-wrap items-center gap-4 border-b border-border pb-5">
         <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-24">
           <ArtistHeroImage artist={artist} imageLink={heroImageLink} />
@@ -388,6 +386,7 @@ export function ArtistWorkspace({
               canMutate={canMutate}
               onReadinessAction={openReadinessDestination}
               health={health}
+              onShowReleases={() => setActiveTab("releases")}
             />
           )}
           {activeTab === "visuals" && (
@@ -404,13 +403,14 @@ export function ArtistWorkspace({
   );
 }
 
-function OverviewTab({ artist, releases, tasks, canMutate, onReadinessAction, health }: {
+function OverviewTab({ artist, releases, tasks, canMutate, onReadinessAction, health, onShowReleases }: {
   artist: ArtistDetail;
   releases: ArtistRelease[];
   tasks: ArtistTask[];
   canMutate: boolean;
   onReadinessAction: (destination: ReadinessDestination) => void;
   health: ArtistReadinessState;
+  onShowReleases: () => void;
 }) {
   const openTasks = tasks.filter(task => !["done", "complete", "completed", "cancelled"].includes((task.status || "").toLowerCase()));
   const bioDisplay = normalizeReviewedRichText(artist.bio_document, artist.bio, {
@@ -418,7 +418,7 @@ function OverviewTab({ artist, releases, tasks, canMutate, onReadinessAction, he
     reviewedHash: artist.bio_reviewed_hash ?? null,
   });
   return <div className="space-y-7">
-    <ReleaseSection releases={releases} />
+    <ReleaseSection releases={releases} onShowAll={onShowReleases} />
     {openTasks.length > 0 && <TaskList tasks={openTasks} />}
     <Accordion>
       <AccordionItem value="profile" className="border-y border-border">
@@ -437,21 +437,21 @@ function OverviewTab({ artist, releases, tasks, canMutate, onReadinessAction, he
 
 function ImagesTab({ artist, releases, assets, canMutate }: { artist: ArtistDetail; releases: ArtistRelease[]; assets: ArtistAsset[]; canMutate: boolean }) {
   return (
-    <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
-      {canMutate ? <ArtistAssetUploader artist={artist} releases={releases} /> : <p className="text-sm text-muted-foreground">Image uploads are read-only.</p>}
+    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
       <fieldset disabled={!canMutate}><ArtistAssetGallery artist={artist} assets={assets} /></fieldset>
+      {canMutate ? <ArtistAssetUploader artist={artist} releases={releases} /> : <p className="text-sm text-muted-foreground">Image uploads are read-only.</p>}
     </div>
   );
 }
 
-function ReleaseSection({ releases }: { releases: ArtistRelease[] }) {
+function ReleaseSection({ releases, onShowAll }: { releases: ArtistRelease[]; onShowAll?: () => void }) {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-tight">Releases</h2>
-        <span className="text-sm text-muted-foreground">{releases.length}</span>
+        {onShowAll && releases.length > 4 ? <Button variant="ghost" onClick={onShowAll}>View all {releases.length} releases</Button> : <span className="text-sm text-muted-foreground">{releases.length}</span>}
       </div>
-      <ReleaseGrid releases={releases} />
+      <ReleaseGrid releases={onShowAll ? releases.slice(0, 4) : releases} />
     </section>
   );
 }
@@ -473,6 +473,7 @@ function TeamTab({ primaryContact, rights }: { primaryContact: ArtistContact | n
     <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
       <section className="space-y-3">
         <h2 className="text-sm font-semibold tracking-tight">Primary contact</h2>
+        <p className="text-sm text-muted-foreground">Who to contact about the artist. Collaborators below come from linked work credits.</p>
         {primaryContact ? (
           <div className="mt-3 space-y-2">
             <p className="font-medium">{primaryContact.name}</p>
@@ -505,6 +506,14 @@ function TeamTab({ primaryContact, rights }: { primaryContact: ArtistContact | n
 }
 
 function RightsTab({ rights, documents }: { rights: ArtistRight[]; documents: ArtistDocument[] }) {
+  const works = new Map<string, ArtistRight[]>();
+  for (const right of rights) {
+    const key = right.work_id || right.work_title || "unlinked";
+    const rows = works.get(key) ?? [];
+    rows.push(right);
+    works.set(key, rows);
+  }
+
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <section id="artist-rights-panel" tabIndex={-1} className="space-y-3 scroll-mt-24">
@@ -512,15 +521,27 @@ function RightsTab({ rights, documents }: { rights: ArtistRight[]; documents: Ar
           <h2 className="text-lg font-semibold tracking-tight">Rights and credits</h2>
           <span className="text-sm text-muted-foreground">{rights.length}</span>
         </div>
-        <SimpleList
-          emptyTitle="No rights rows found for this artist catalog."
-          rows={rights.map((right) => ({
-            id: right.id,
-            title: right.work_title || "Untitled work",
-            meta: [right.role, right.ownership_type, right.scope].filter(Boolean).join(" - ") || "Rights row",
-            detail: `${right.contact_name || "No contact"}${right.percent_share == null ? "" : ` - ${right.percent_share}%`}${right.clearance_status ? ` - ${right.clearance_status}` : ""}`,
-          }))}
-        />
+        {!rights.length ? <p className="py-4 text-sm text-muted-foreground">No rights rows found for this artist catalog.</p> : (
+          <Accordion>
+            {Array.from(works, ([key, rows]) => (
+              <AccordionItem key={key} value={key}>
+                <AccordionTrigger>
+                  {rows[0].work_title || "Untitled work"}
+                  <span className="ml-auto mr-3 text-muted-foreground">{rows.length} {rows.length === 1 ? "entry" : "entries"}</span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {rows[0].work_id ? <a href={`/works/${encodeURIComponent(rows[0].work_id)}`} className="text-primary">Open work and edit rights</a> : null}
+                  <SimpleList emptyTitle="No rights entries." rows={rows.map(right => ({
+                    id: right.id,
+                    title: right.contact_name || "No contact",
+                    meta: [right.role, right.ownership_type, right.scope].filter(Boolean).join(" - ") || "Rights row",
+                    detail: `${right.percent_share == null ? "Share not recorded" : `${right.percent_share}%`}${right.clearance_status ? ` - ${right.clearance_status}` : ""}`,
+                  }))} />
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        )}
       </section>
 
       <DocumentList documents={documents} />
@@ -558,10 +579,13 @@ function AnalyticsTab({ artist, releases, campaigns }: { artist: ArtistDetail; r
   const activeCampaigns = campaigns.filter((campaign) => !["done", "complete", "completed", "archived"].includes((campaign.status || "").toLowerCase())).length;
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
-      <Metric label="Spotify followers" value={formatNumber(artist.spotify_followers)} detail={`Popularity ${artist.spotify_popularity ?? "-"}`} icon={<Users className="h-4 w-4" />} />
-      <Metric label="Release readiness" value={`${readyReleases}/${releases.length}`} detail="ready releases" icon={<CheckCircle2 className="h-4 w-4" />} />
-      <Metric label="Active campaigns" value={String(activeCampaigns)} detail="marketing context" icon={<Briefcase className="h-4 w-4" />} />
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Metric label="Spotify followers" value={formatNumber(artist.spotify_followers)} detail={`Popularity ${artist.spotify_popularity ?? "Not available"}`} icon={<Users className="h-4 w-4" />} />
+        <Metric label="Release readiness" value={`${readyReleases}/${releases.length}`} detail="ready releases" icon={<CheckCircle2 className="h-4 w-4" />} />
+        <Metric label="Active campaigns" value={String(activeCampaigns)} detail="marketing context" icon={<Briefcase className="h-4 w-4" />} />
+      </div>
+      <p className="text-sm text-muted-foreground">Spotify metrics are read-only stored values. They do not affect profile completion. <a href="/integrations" className="text-primary underline underline-offset-4">Review data connections</a> for provider updates.</p>
     </div>
   );
 }
@@ -685,14 +709,14 @@ function ArtistAssetUploader({ artist, releases }: { artist: ArtistDetail; relea
   }
 
   return (
-    <section id="artist-image-uploader" tabIndex={-1} className="scroll-mt-24 rounded-lg border border-border bg-background p-4">
+    <section id="artist-image-uploader" tabIndex={-1} className="scroll-mt-24 min-w-0 space-y-4">
       <div className="mb-4 space-y-2">
         <div className="flex items-center gap-2">
           <Upload className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold tracking-tight">Change artist image</h2>
         </div>
         <p className="text-sm leading-5 text-muted-foreground">
-          Upload a press photo or paste an image link. Leave "Use as primary artist image" checked to update the large artist photo immediately.
+          Upload a press photo or paste an image link. Leave "Use as primary artist image" checked to update the artist photo.
         </p>
       </div>
       <form onSubmit={onSubmit} className="space-y-3">
@@ -702,34 +726,19 @@ function ArtistAssetUploader({ artist, releases }: { artist: ArtistDetail; relea
             value={assetName}
             onChange={(event) => setAssetName(event.target.value)}
             placeholder={`${artist.name} press photo`}
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            className="w-full"
           />
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-3">
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Type</span>
-            <NativeSelect
-              value={assetType}
-              onChange={(event) => setAssetType(event.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-            >
-              {ASSET_TYPES.map((type) => (
-                <option key={type} value={type}>{type.replace(/_/g, " ")}</option>
-              ))}
-            </NativeSelect>
+            <Select aria-label="Asset type" value={assetType} onValueChange={value => setAssetType(value ?? "press_photo")} className="w-full min-w-0" options={ASSET_TYPES.map(type => ({ value: type, label: type.replace(/_/g, " ") }))} />
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Release</span>
-            <NativeSelect
-              value={releaseId}
-              onChange={(event) => setReleaseId(event.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="">Artist profile only</option>
-              {releases.map((release) => (
-                <option key={release.id} value={release.id}>{release.title}</option>
-              ))}
-            </NativeSelect>
+            <Select aria-label="Asset release" placeholder="Artist profile only" value={releaseId} onValueChange={value => setReleaseId(value ?? "")} className="w-full min-w-0" options={[
+              { value: "", label: "Artist profile only" }, ...releases.map(release => ({ value: release.id, label: release.title })),
+            ]} />
           </label>
         </div>
         <label className="flex min-h-20 cursor-pointer items-center justify-center rounded-md border border-dashed border-border px-3 py-2 text-center text-sm text-muted-foreground transition hover:bg-muted/30">
@@ -742,7 +751,7 @@ function ArtistAssetUploader({ artist, releases }: { artist: ArtistDetail; relea
             value={manualLink}
             onChange={(event) => setManualLink(event.target.value)}
             placeholder="https://... or artists/.../photo.jpg"
-            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+            className="w-full"
           />
         </label>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -755,10 +764,10 @@ function ArtistAssetUploader({ artist, releases }: { artist: ArtistDetail; relea
           Use as primary artist image
         </label>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <Button variant="ghost"
+        <Button
           type="submit"
           disabled={loading}
-          className="inline-flex h-9 w-full items-center justify-center rounded-md bg-neutral-900 px-3 text-sm font-medium text-white transition hover:bg-neutral-700 disabled:opacity-50"
+          className="w-full"
         >
           {loading ? "Saving image..." : useAsPrimary ? "Save artist image" : "Add to image library"}
         </Button>
@@ -1068,7 +1077,8 @@ function Metric({
 }
 
 function useResolvedImage(fileLink: string | null, imageWidth: 96 | 320 | 800): [string | null, (value: string | null) => void] {
-  const [url, setUrl] = useState<string | null>(/^https?:\/\//i.test(fileLink || "") ? fileLink : null);
+  // Mount images after hydration so load failures reach the fallback handler.
+  const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;

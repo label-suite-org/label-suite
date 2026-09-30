@@ -7,8 +7,6 @@ export type ReadinessDestination =
   | "overview:pro"
   | "overview:ipi"
   | "overview:spotify_id"
-  | "overview:spotify_followers"
-  | "overview:spotify_popularity"
   | "overview:instagram"
   | "overview:tiktok"
   | "tab:visuals"
@@ -78,16 +76,6 @@ const TARGET_KEYS: ReadinessTargetConfig[] = [
     label: "Spotify ID",
     test: (artist) => Boolean(artist.spotify_id),
     action: { kind: "edit", focusField: "spotify_id", destination: "overview:spotify_id" },
-  },
-  {
-    label: "Followers",
-    test: (artist) => artist.spotify_followers != null,
-    action: { kind: "edit", focusField: "spotify_followers", destination: "overview:spotify_followers" },
-  },
-  {
-    label: "Popularity",
-    test: (artist) => artist.spotify_popularity != null,
-    action: { kind: "edit", focusField: "spotify_popularity", destination: "overview:spotify_popularity" },
   },
   {
     label: "Instagram",
