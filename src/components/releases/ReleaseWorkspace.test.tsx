@@ -3,9 +3,19 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { ReleaseWorkspace } from "./ReleaseWorkspace";
+import { ReleaseDataPanel, ReleaseWorkspace } from "./ReleaseWorkspace";
+import { buildReleaseCockpit } from "../../server/analytics-command-center-core";
 
 describe("ReleaseWorkspace", () => {
+  it("names the actual imported period and withholds stale release totals", () => {
+    const cockpit = buildReleaseCockpit({ releaseId: "fixture", releaseTitle: "Fixture", artistName: null, format: null, releaseDate: null, trackCount: 0,
+      dailySources: [{ date: "2026-09-05", platform: "spotify", source: "fixture", streams: 12 }], tracks: [], cities: [], playlists: [], shazams: [] });
+    expect(cockpit.periods.find(period => period.key === "7d")?.label).toBe("7 days ending 2026-09-05");
+    const html = renderToStaticMarkup(<ReleaseDataPanel cockpit={{ ...cockpit, dataQuality: "stale" }} hasScopedAnalytics={true} />);
+    expect(html).toContain("Source data is stale");
+    expect(html).toContain("2026-09-05");
+    expect(html).not.toContain("Period streams");
+  });
   it("focuses a correction, preserves it when departure is cancelled, and restores its trigger on close", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => window.setTimeout(() => callback(0), 0));

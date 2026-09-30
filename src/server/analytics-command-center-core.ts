@@ -685,6 +685,7 @@ export interface ReleaseCockpitPeriodSummary {
 }
 
 export interface ReleaseCockpit {
+  dataQuality: "current" | "stale" | "partial" | "empty" | "failed" | "unknown";
   releaseId: string;
   releaseTitle: string;
   artistName: string | null;
@@ -802,12 +803,13 @@ export function buildReleaseCockpit(input: BuildReleaseCockpitInput): ReleaseCoc
       }
     }
 
-    return { key: p.k, label: p.l, from: p.k === "all" ? wf : from, to: wt,
+    return { key: p.k, label: p.d === null ? p.l : `${p.d} days ending ${wt ?? "unknown date"}`, from: p.k === "all" ? wf : from, to: wt,
       streamTotal, dailyTrend: buildDailyTrend(sel),
       changePct, topCity, topSource, insights, topCities, topSources };
   });
   return {
     releaseId: input.releaseId, releaseTitle: input.releaseTitle, artistName: input.artistName,
+    dataQuality: "unknown",
     format: input.format, releaseDate: input.releaseDate, trackCount: input.trackCount,
     defaultPeriod: "30d", dataWindow: { from: wf, to: wt }, periods,
     tracks: input.tracks, cities: input.cities, playlists: input.playlists, shazams: input.shazams,
