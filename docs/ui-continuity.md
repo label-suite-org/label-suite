@@ -38,8 +38,15 @@ Routes: `/catalog`, `/releases`, `/releases/:id`, `/releases/:id/tracks`,
 - [x] Use one unboxed selected-track editor instead of competing dashboard panels.
 - [ ] Apply the same rhythm to every release section: tracks/rights, timeline,
   campaigns, files, metadata and any section exposed by More.
-- [ ] Simplify artist and work pages: identity/list first; readiness evidence and
-  rights editing on demand. Preserve all relational fields and bulk actions.
+- [x] Simplify artist identity and release rows; disclose biography and profile
+  evidence and show distributor analytics only in the Analytics tab.
+- [x] Separate work publishing, master, credits, recordings and activity with
+  installed tabs; keep role drafts in parent state and preserve split tools.
+- [x] Use installed dialogs for artist/work/release/track editing and confirmation,
+  and DSP pitching; retain existing submission and authorization behavior.
+- [x] Add a Catalog phone drawer with focus return and 300ms desktop collapse.
+- [x] Disclose Samply setup and record authority evidence in release sections.
+- [ ] Finish artist/release/work index layouts and the remaining nested forms.
 - [ ] Finish collapse/restore and mobile contextual drawers throughout the flow.
 - [ ] Verify audio, versions, upload, linking, splits, forms and deep links unchanged.
 
@@ -99,6 +106,28 @@ Complete a workflow only when all of these hold:
 Use one reviewable workflow per delivery rather than adding a new page-specific
 theme. Keep unfinished items open. The public repository currently has Issues
 disabled; this checklist and the implementation PR carry rollout status.
+
+## Catalog continuation — 30 September 2026
+
+The artist and work detail layouts now follow the shared first-glance hierarchy.
+Artist navigation uses installed tabs; the work editor shows one rights scope at
+once. Existing row edits survive scope changes. Release evidence and Samply
+setup remain available through disclosures; editing and confirmation use the
+installed Dialog. Catalog browsing becomes a Sheet on phones.
+
+Browser review covers all seven artist tabs, all five work tabs, all eight release
+sections, Catalog collapse/restore, phone drawer focus return, edit-dialog Escape
+and the master-rights deep link. Artist and work detail fit at 320, 390, 1024 and
+1440 pixels; release sections were checked at 390 pixels. Disposable fixture
+screens include absent analytics and missing metadata; component regression
+checks include read-only rights navigation and draft preservation.
+
+Provider uploads, live audio/version playback, every permission/error variant,
+index layouts and full-flow column restoration still need verification. Final
+focused UI checks pass (34 tests), and schema/type/build checks pass. Full CI is
+blocked by 12 timeouts in the unchanged Sisense browser-contract suite; one also
+reproduced separately. Do not merge until the required checks are green. This is
+a local review and draft delivery, not visual acceptance or production deployment.
 
 ## First delivery boundary
 

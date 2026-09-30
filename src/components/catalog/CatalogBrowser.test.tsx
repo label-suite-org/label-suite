@@ -2,6 +2,8 @@
 import { act, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, it, vi } from "vitest";
+vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }));
+
 import { CatalogBrowser } from "./CatalogBrowser";
 
 vi.mock("@/lib/storage-client", () => ({ resolveFileUrl: vi.fn(async (key: string) => key === "audio-key" ? "https://example.test/audio.wav" : "https://example.test/art.png") }));

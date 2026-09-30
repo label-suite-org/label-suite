@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Disc3, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { resolveFileUrl } from "@/lib/storage-client";
 import type { listCatalogTracks } from "../../server/catalog";
@@ -20,6 +22,7 @@ function href(kind: "artist" | "release" | "track", id: string) {
 }
 
 export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedArtistId, selectedReleaseId, selectedTrackId }: Props) {
+  const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const [showBrowser, setShowBrowser] = useState(false);
   const [showDesktopBrowser, setShowDesktopBrowser] = useState(true);
@@ -58,18 +61,11 @@ export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedA
     </li>;
   }
 
-  return <div className="min-w-0">
-    <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-border pb-5">
-      <div className="relative min-w-0 flex-1 basis-64">
-        <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" aria-hidden />
-        <Input aria-label="Search artists, releases and tracks" placeholder="Search artists, releases or tracks" value={query} onChange={event => { setQuery(event.target.value); setShowBrowser(true); setShowDesktopBrowser(true); }} className="h-10 pl-9" />
-      </div>
-      <Button variant="ghost" size="sm" className="hidden md:inline-flex" aria-expanded={showDesktopBrowser} aria-controls="catalog-objects" onClick={() => setShowDesktopBrowser(!showDesktopBrowser)}>{showDesktopBrowser ? <PanelLeftClose aria-hidden /> : <PanelLeftOpen aria-hidden />}{showDesktopBrowser ? "Hide browser" : "Show browser"}</Button>
-      <Button variant="outline" className="md:hidden" aria-expanded={showBrowser} aria-controls="catalog-objects" onClick={() => setShowBrowser(!showBrowser)}>{showBrowser ? "Hide browser" : "Browse records"}</Button>
-    </div>
-    <div className={`grid min-w-0 gap-7 transition-[grid-template-columns] duration-200 motion-reduce:transition-none ${showDesktopBrowser ? "md:grid-cols-[minmax(12rem,17rem)_minmax(0,1fr)]" : "md:grid-cols-[0_minmax(0,1fr)]"} lg:gap-10`}>
-      <nav id="catalog-objects" aria-label="Artists, releases and tracks" className={`${showBrowser || needle ? "block" : "hidden"} min-w-0 overflow-hidden border-b border-border pb-5 md:block md:border-b-0 md:pr-5 ${showDesktopBrowser ? "md:visible md:border-r" : "md:invisible md:pointer-events-none"}`}>
-        {needle ? <SearchResults artists={artists.filter(item => matches([item.name]))} releases={releases.filter(item => matches([item.title, item.artist_name, item.upc_ean]))} tracks={tracks.filter(item => matches([item.title, item.isrc, item.version]))} /> : <>
+  const searchInput = <div className="relative min-w-0 flex-1 basis-64">
+    <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" aria-hidden />
+    <Input aria-label="Search artists, releases and tracks" placeholder="Search artists, releases or tracks" value={query} onChange={event => { setQuery(event.target.value); setShowDesktopBrowser(true); }} className="h-10 pl-9" />
+  </div>;
+  const browserContent = <>        {needle ? <SearchResults artists={artists.filter(item => matches([item.name]))} releases={releases.filter(item => matches([item.title, item.artist_name, item.upc_ean]))} tracks={tracks.filter(item => matches([item.title, item.isrc, item.version]))} /> : <>
           {artists.length > 1 && <Button variant="ghost" size="sm" aria-expanded={showArtists} aria-controls="catalog-artist-list" onClick={() => setShowArtists(!showArtists)} className="mb-4 w-full justify-between text-muted-foreground">{showArtists ? "Hide other artists" : "Browse artists"}<ChevronDown className={`size-4 transition-transform ${showArtists ? "rotate-180" : ""}`} aria-hidden /></Button>}
           <ul id="catalog-artist-list" className="space-y-2">
             {artists.filter(item => showArtists || item.id === artist?.id).map(item => <li key={item.id}>
@@ -83,8 +79,25 @@ export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedA
           </ul>
           {unlinkedReleases.length > 0 && <details open={Boolean(release && unlinkedReleases.includes(release))} className="mt-5"><summary className="cursor-pointer py-2 text-sm">Releases without an artist</summary><ul>{unlinkedReleases.map(releaseLink)}</ul></details>}
           {unlinkedTracks.length > 0 && <details open={Boolean(track && unlinkedTracks.includes(track))} className="mt-5"><summary className="cursor-pointer py-2 text-sm">Tracks without a release</summary><ul>{unlinkedTracks.map(item => <li key={item.id}><a className={linkClass} href={href("track", item.id)}>{item.title}</a></li>)}</ul></details>}
-        </>}
-      </nav>
+        </>}</>;
+
+  return <div className="min-w-0">
+    <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-border pb-5">
+      <div className="hidden min-w-0 flex-1 md:block">{searchInput}</div>
+      <Button variant="ghost" size="sm" className="hidden md:inline-flex" aria-expanded={showDesktopBrowser} aria-controls="catalog-objects" onClick={() => setShowDesktopBrowser(!showDesktopBrowser)}>{showDesktopBrowser ? <PanelLeftClose aria-hidden /> : <PanelLeftOpen aria-hidden />}{showDesktopBrowser ? "Hide browser" : "Show browser"}</Button>
+      <Sheet open={showBrowser && isMobile} onOpenChange={setShowBrowser}>
+        <SheetTrigger render={<Button variant="outline" className="md:hidden" />}>Browse records</SheetTrigger>
+        <SheetContent side="left" className="w-[min(90vw,24rem)] overflow-y-auto duration-300 motion-reduce:transition-none">
+          <SheetHeader><SheetTitle>Browse records</SheetTitle><SheetDescription>Find an artist, release or track.</SheetDescription></SheetHeader>
+          {isMobile && <div className="space-y-5 px-4 pb-6">{searchInput}<nav aria-label="Artists, releases and tracks">{browserContent}</nav></div>}
+        </SheetContent>
+      </Sheet>
+    </div>
+    <div className={`grid min-w-0 gap-7 transition-[grid-template-columns] duration-300 motion-reduce:transition-none ${showDesktopBrowser ? "md:grid-cols-[minmax(12rem,17rem)_minmax(0,1fr)]" : "md:grid-cols-[0_minmax(0,1fr)]"} lg:gap-10`}>
+      {!isMobile && <nav id="catalog-objects" aria-label="Artists, releases and tracks" className={`hidden min-w-0 overflow-hidden md:block md:pr-5 ${showDesktopBrowser ? "md:visible md:border-r md:border-border" : "md:invisible md:pointer-events-none"}`}>
+        {browserContent}
+      </nav>}
+
       <section className="min-w-0" aria-label="Selected record">
         {title ? <>
           <nav aria-label="Record path" className="mb-7 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

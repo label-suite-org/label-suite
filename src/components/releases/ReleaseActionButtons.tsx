@@ -6,12 +6,13 @@ import { type Release } from "./ReleaseForm";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 export function ReleaseEditButton({ release, artists, parentReleases = [] }: { release: Release; artists: Array<{ id: string; name: string }>; parentReleases?: Array<{ id: string; title: string; format?: string | null }> }) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button
+      <Button variant="outline"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
         className="px-2.5 py-1 text-xs font-medium text-foreground bg-muted hover:bg-accent rounded-md transition-colors"
         aria-label={`Edit ${release.title}`}
@@ -65,9 +66,9 @@ function EditDialog({ release, artists, parentReleases, onClose }: { release: Re
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold mb-4">Edit Release</h2>
+    <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" aria-describedby={undefined}>
+        <DialogTitle>Edit Release</DialogTitle>
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">Title *</label>
@@ -136,8 +137,8 @@ function EditDialog({ release, artists, parentReleases, onClose }: { release: Re
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -168,7 +169,7 @@ export function ReleaseDeleteButton({ release }: { release: Release }) {
 
   if (!confirming) {
     return (
-      <Button
+      <Button variant="destructive"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirming(true); }}
         className="rounded-md border border-destructive/35 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-destructive/20"
         aria-label={`Delete ${release.title}`}
@@ -179,21 +180,21 @@ export function ReleaseDeleteButton({ release }: { release: Release }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !loading && setConfirming(false)}>
-      <div className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold mb-2">Delete {release.title}?</h2>
+    <Dialog open={confirming} onOpenChange={open => { if (!loading) setConfirming(open); }}>
+      <DialogContent showCloseButton={!loading} aria-describedby={undefined}>
+        <DialogTitle>Delete {release.title}?</DialogTitle>
         <p className="text-sm text-muted-foreground mb-2">
           This deletes linked tracks, budget items, single-release pitches, and side-artist links. Multi-release pitches and other linked records keep their history and are detached.
         </p>
         {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
         <div className="flex gap-2 justify-end">
-          <Button onClick={() => setConfirming(false)} disabled={loading} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancel</Button>
+          <Button variant="ghost" onClick={() => setConfirming(false)} disabled={loading} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancel</Button>
           <Button variant="ghost" onClick={onDelete} disabled={loading}
             className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50">
             {loading ? "Deleting..." : "Delete"}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -166,6 +166,8 @@ describe("ReleaseWorkspace", () => {
       />));
       expect(host.textContent).not.toContain("Record authority & sign-off evidence");
       await act(async () => { [...host.querySelectorAll("button")].find(button => button.textContent === "View details")!.click(); });
+      expect(host.textContent).not.toContain("Record authority & sign-off evidence");
+      await act(async () => { [...host.querySelectorAll("button")].find(button => button.textContent === "Record evidence")!.click(); });
       expect(host.textContent).toContain("Record authority & sign-off evidence");
       expect(host.textContent).toContain("Release → catalog entry");
       expect(host.textContent).toContain("Label Suite release, catalog, track, work, and rights fields are canonical");

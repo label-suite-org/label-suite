@@ -189,6 +189,11 @@ describe("ArtistWorkspace readiness destinations", () => {
       );
     });
 
+    expect(container.querySelector('[data-testid="artist-bio-rendered"]')).toBeNull();
+    await act(async () => {
+      const disclosure = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Profile details and checks"));
+      disclosure?.click();
+    });
     const rendered = container.querySelector('[data-testid="artist-bio-rendered"]');
     expect(rendered?.textContent).toBe(unsafeLookingText);
     expect(rendered?.querySelector("script")).toBeNull();

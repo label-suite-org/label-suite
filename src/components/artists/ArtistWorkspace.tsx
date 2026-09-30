@@ -3,15 +3,12 @@
 import { useEffect, useState, type ReactNode, type SubmitEvent } from "react";
 import {
   AlertTriangle,
-  BarChart3,
   Briefcase,
   CheckCircle2,
-  Disc3,
   ExternalLink,
   FileText,
   Image as ImageIcon,
   ListChecks,
-  ShieldCheck,
   Upload,
   Users,
 } from "lucide-react";
@@ -23,7 +20,9 @@ import { normalizeReviewedRichText } from "../../lib/reviewed-rich-text";
 
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { openExternalUrl } from "@/lib/external-url";
 import { RichText } from "@/components/ui/rich-text";
 interface ArtistDetail extends Artist {
@@ -154,14 +153,14 @@ export function readinessDestinationTarget(destination: ReadinessDestination): R
   return READINESS_DESTINATION_TARGETS[destination];
 }
 
-const TABS: Array<{ key: TabKey; label: string; icon: ReactNode }> = [
-  { key: "overview", label: "Overview", icon: <ListChecks className="h-4 w-4" /> },
-  { key: "visuals", label: "Images", icon: <ImageIcon className="h-4 w-4" /> },
-  { key: "releases", label: "Releases", icon: <Disc3 className="h-4 w-4" /> },
-  { key: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
-  { key: "rights", label: "Rights", icon: <ShieldCheck className="h-4 w-4" /> },
-  { key: "campaigns", label: "Campaigns", icon: <Briefcase className="h-4 w-4" /> },
-  { key: "analytics", label: "Analytics", icon: <BarChart3 className="h-4 w-4" /> },
+const TABS: Array<{ key: TabKey; label: string }> = [
+  { key: "overview", label: "Overview" },
+  { key: "visuals", label: "Images" },
+  { key: "releases", label: "Releases" },
+  { key: "team", label: "Team" },
+  { key: "rights", label: "Rights" },
+  { key: "campaigns", label: "Campaigns" },
+  { key: "analytics", label: "Analytics" },
 ];
 
 function formatNumber(value: number | null | undefined): string {
@@ -257,7 +256,9 @@ export function ArtistWorkspace({
   initialTab,
   initialFocusField,
   initialReadinessDestination,
+  children,
 }: {
+  children?: ReactNode;
   artist: ArtistDetail;
   releases: ArtistRelease[];
   assets: ArtistAsset[];
@@ -296,18 +297,6 @@ export function ArtistWorkspace({
     tiktok: artist.tiktok,
   });
   const relationship = relationshipMeta(artist.relationship);
-  const bioDisplay = normalizeReviewedRichText(
-    artist.bio_document,
-    artist.bio,
-    {
-      reviewStatus: artist.bio_review_status === "reviewed" ? "reviewed" : "draft",
-      reviewedHash: artist.bio_reviewed_hash ?? null,
-    },
-  );
-  const upcoming = releases
-    .filter((release) => release.release_date && new Date(`${release.release_date}T00:00:00`).getTime() >= startOfToday())
-    .sort((a, b) => (a.release_date || "").localeCompare(b.release_date || ""))[0] ?? null;
-  const approvedAssets = assets.filter((asset) => asset.approval_status === "approved").length;
 
   useEffect(() => {
     if (!pendingDestination) return;
@@ -368,190 +357,82 @@ export function ArtistWorkspace({
         />
       ) : null}
       {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
-      <section className="grid gap-5 border-b border-border pb-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="space-y-3">
-            <div className="overflow-hidden rounded-lg border border-border bg-neutral-950">
-              <ArtistHeroImage artist={artist} imageLink={heroImageLink} />
-            </div>
-            {canMutate && <Button variant="ghost"
-              type="button"
-              onClick={jumpToImageUploader}
-              className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md bg-neutral-900 px-3 text-sm font-medium text-white transition hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <Upload className="h-4 w-4" />
-              {hasPrimaryImage ? "Change artist image" : heroImageLink ? "Set roster image" : "Add artist image"}
-            </Button>}
-            <p className="text-xs leading-5 text-muted-foreground">
-              This controls the large photo on this artist page and the image shown in the roster.
-            </p>
-          </div>
-
-          <div className="min-w-0 space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {artist.pro ? <span className="rounded-md border border-border bg-muted/35 px-2 py-1 text-xs font-medium">{artist.pro}</span> : null}
-              <span className={`rounded-md border px-2 py-1 text-xs font-medium ${relationship.className}`}>{relationship.label}</span>
-              <span className="rounded-md border border-border bg-muted/35 px-2 py-1 text-xs font-medium">{health.complete}% profile</span>
-              {upcoming ? <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">Upcoming</span> : null}
-            </div>
-
-            <div>
-              <h1 className="truncate text-4xl font-semibold tracking-tight">{artist.name}</h1>
-              <p className="mt-2 text-xs font-medium uppercase tracking-normal text-muted-foreground">{relationship.detail}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="rounded border border-border px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground" data-testid="artist-bio-state">
-                  {bioDisplay.state}
-                </span>
-              </div>
-              {bioDisplay.state === "missing" ? (
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">No bio has been added yet.</p>
-              ) : (
-                <RichText
-                  className="mt-2 min-w-0 max-w-3xl break-words text-sm leading-6 text-muted-foreground [&_a]:break-all [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
-                  data-testid="artist-bio-rendered"
-                  html={bioDisplay.html}
-                />
-              )}
-              {primaryContact ? (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Primary contact: <a href="/contacts" className="font-medium text-foreground hover:underline">{primaryContact.name}</a>
-                </p>
-              ) : null}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Metric label="Followers" value={formatNumber(artist.spotify_followers)} detail={`Popularity ${artist.spotify_popularity ?? "-"}`} icon={<Users className="h-4 w-4" />} />
-              <Metric label="Catalog" value={String(releases.length)} detail={`${releases.filter((release) => release.release_ready).length} ready`} icon={<Disc3 className="h-4 w-4" />} />
-              <Metric label="Assets" value={String(assets.length)} detail={`${approvedAssets} approved`} icon={<ImageIcon className="h-4 w-4" />} />
-            </div>
-
-            {canMutate && <div className="flex flex-wrap gap-2">
-              <Button variant="outline"
-                type="button"
-                onClick={jumpToImageUploader}
-                className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground transition hover:bg-muted"
-              >
-                <ImageIcon className="h-4 w-4" />
-                Manage images
-              </Button>
-              <ArtistEditButton artist={artist} contactOptions={contactOptions} />
-              <ArtistDeleteButton artist={artist} />
-            </div>}
-          </div>
+      <header className="flex flex-wrap items-center gap-4 border-b border-border pb-5">
+        <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-24">
+          <ArtistHeroImage artist={artist} imageLink={heroImageLink} />
         </div>
-
-        <aside className="rounded-lg border border-border bg-background p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Next move</p>
-              <p className="mt-1 text-lg font-semibold tracking-tight">
-                {upcoming ? upcoming.title : health.missing.length ? "Complete profile" : "Build visual kit"}
-              </p>
-            </div>
-            {health.missing.length ? <AlertTriangle className="h-5 w-5 text-amber-600" /> : <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {upcoming
-              ? `${formatDate(upcoming.release_date)} - ${upcoming.format || "release"}`
-              : health.missing.length
-                ? `Missing ${health.missing.slice(0, 3).join(", ")}${health.missing.length > 3 ? ` +${health.missing.length - 3}` : ""}`
-                : "Add a press photo, social crop, and one-sheet to round out the artist profile."}
-          </p>
-        </aside>
-      </section>
-
-      <nav className="flex gap-1 overflow-x-auto border-b border-border" aria-label="Artist sections">
-        {TABS.map((tab) => (
-          <Button
-            key={tab.key}
-            type="button"
-            variant="ghost"
-            onClick={() => setActiveTab(tab.key)}
-            aria-current={activeTab === tab.key ? "page" : undefined}
-            className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-none border-b-2 px-3 text-sm font-medium transition ${
-              activeTab === tab.key
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tab.icon}
-            {tab.label}
-          </Button>
-        ))}
-      </nav>
-
-      {activeTab === "overview" && (
-        <OverviewTab
-          artist={artist}
-          releases={releases}
-          assets={assets}
-          campaigns={campaigns}
-          tasks={tasks}
-          canMutate={canMutate}
-          onReadinessAction={openReadinessDestination}
-          health={health}
-        />
-      )}
-      {activeTab === "visuals" && (
-        <ImagesTab artist={artist} releases={releases} assets={assets} canMutate={canMutate} />
-      )}
-      {activeTab === "releases" && <ReleaseSection releases={releases} />}
-      {activeTab === "team" && <TeamTab primaryContact={primaryContact} rights={rights} />}
-      {activeTab === "rights" && <RightsTab rights={rights} documents={documents} />}
-      {activeTab === "campaigns" && <CampaignsTab campaigns={campaigns} tasks={tasks} />}
-      {activeTab === "analytics" && <AnalyticsTab artist={artist} releases={releases} campaigns={campaigns} />}
+        <div className="min-w-0 flex-1 basis-44">
+          <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">{artist.name}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{relationship.detail}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{releases.length} {releases.length === 1 ? "release" : "releases"} · {health.complete}% profile complete</p>
+        </div>
+        {canMutate && <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={jumpToImageUploader}><ImageIcon aria-hidden />{hasPrimaryImage ? "Manage images" : "Add artist image"}</Button>
+          <ArtistEditButton artist={artist} contactOptions={contactOptions} />
+          <a href={`/artists/${encodeURIComponent(artist.id)}/portal`} className={buttonVariants({ variant: "ghost" })}>Artist archive & form</a>
+          <ArtistDeleteButton artist={artist} />
+        </div>}
+      </header>
+      <Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)} className="gap-5 min-w-0">
+        <div className="overflow-x-auto border-b border-border">
+          <TabsList variant="line" aria-label="Artist sections" className="h-11">
+            {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key} className="px-3">{tab.label}</TabsTrigger>)}
+          </TabsList>
+        </div>
+        <TabsContent value={activeTab}>
+          {activeTab === "overview" && (
+            <OverviewTab
+              artist={artist}
+              releases={releases}
+              tasks={tasks}
+              canMutate={canMutate}
+              onReadinessAction={openReadinessDestination}
+              health={health}
+            />
+          )}
+          {activeTab === "visuals" && (
+            <ImagesTab artist={artist} releases={releases} assets={assets} canMutate={canMutate} />
+          )}
+          {activeTab === "releases" && <ReleaseSection releases={releases} />}
+          {activeTab === "team" && <TeamTab primaryContact={primaryContact} rights={rights} />}
+          {activeTab === "rights" && <RightsTab rights={rights} documents={documents} />}
+          {activeTab === "campaigns" && <CampaignsTab campaigns={campaigns} tasks={tasks} />}
+          {activeTab === "analytics" && <><AnalyticsTab artist={artist} releases={releases} campaigns={campaigns} />{children}</>}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function startOfToday(): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return today.getTime();
-}
-
-function OverviewTab({
-  artist,
-  releases,
-  assets,
-  campaigns,
-  tasks,
-  canMutate,
-  onReadinessAction,
-  health,
-}: {
+function OverviewTab({ artist, releases, tasks, canMutate, onReadinessAction, health }: {
   artist: ArtistDetail;
   releases: ArtistRelease[];
-  assets: ArtistAsset[];
-  campaigns: ArtistCampaign[];
   tasks: ArtistTask[];
   canMutate: boolean;
   onReadinessAction: (destination: ReadinessDestination) => void;
   health: ArtistReadinessState;
 }) {
-  const openTasks = tasks.filter((task) => !["done", "complete", "completed", "cancelled"].includes((task.status || "").toLowerCase()));
-  const activeCampaigns = campaigns.filter((campaign) => !["done", "complete", "completed", "archived"].includes((campaign.status || "").toLowerCase()));
-  const imageCount = assets.filter(isImageLike).length;
-
-  return (
-    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <section className="space-y-5" aria-label="Artist workspace overview">
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Metric label="Profile" value={`${health.complete}%`} detail={health.missing.length ? `${health.missing.length} gaps` : "complete"} icon={<ListChecks className="h-4 w-4" />} />
-          <Metric label="Images" value={String(imageCount)} detail={`${assets.length} total assets`} icon={<ImageIcon className="h-4 w-4" />} />
-          <Metric label="Campaigns" value={String(activeCampaigns.length)} detail={`${campaigns.length} logged`} icon={<Briefcase className="h-4 w-4" />} />
-          <Metric label="Open tasks" value={String(openTasks.length)} detail={openTasks[0]?.priority || "no priority"} icon={<AlertTriangle className="h-4 w-4" />} />
-        </section>
-
-        <ReleaseSection releases={releases} />
-      </section>
-
-      <aside className="space-y-5">
-        <ReadinessCard artist={artist} canMutate={canMutate} health={health} onReadinessAction={onReadinessAction} />
-        <TaskList tasks={openTasks.slice(0, 5)} />
-      </aside>
-    </div>
-  );
+  const openTasks = tasks.filter(task => !["done", "complete", "completed", "cancelled"].includes((task.status || "").toLowerCase()));
+  const bioDisplay = normalizeReviewedRichText(artist.bio_document, artist.bio, {
+    reviewStatus: artist.bio_review_status === "reviewed" ? "reviewed" : "draft",
+    reviewedHash: artist.bio_reviewed_hash ?? null,
+  });
+  return <div className="space-y-7">
+    <ReleaseSection releases={releases} />
+    {openTasks.length > 0 && <TaskList tasks={openTasks} />}
+    <Accordion>
+      <AccordionItem value="profile" className="border-y border-border">
+        <AccordionTrigger>Profile details and checks <span className="ml-auto mr-3 text-muted-foreground">{health.missing.length ? `${health.missing.length} missing` : "Complete"}</span></AccordionTrigger>
+        <AccordionContent className="space-y-5 pt-3">
+          <section className="max-w-prose">
+            <h2 className="mb-2 font-medium">Biography <span className="ml-2 text-xs text-muted-foreground" data-testid="artist-bio-state">{bioDisplay.state}</span></h2>
+            {bioDisplay.state === "missing" ? <p className="text-muted-foreground">No bio has been added yet.</p> : <RichText data-testid="artist-bio-rendered" html={bioDisplay.html} className="min-w-0 break-words text-sm leading-6 text-muted-foreground [&_a]:break-all [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5" />}
+          </section>
+          <ReadinessCard artist={artist} canMutate={canMutate} health={health} onReadinessAction={onReadinessAction} />
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  </div>;
 }
 
 function ImagesTab({ artist, releases, assets, canMutate }: { artist: ArtistDetail; releases: ArtistRelease[]; assets: ArtistAsset[]; canMutate: boolean }) {
@@ -590,7 +471,7 @@ function TeamTab({ primaryContact, rights }: { primaryContact: ArtistContact | n
 
   return (
     <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <section className="rounded-lg border border-border bg-background p-4">
+      <section className="space-y-3">
         <h2 className="text-sm font-semibold tracking-tight">Primary contact</h2>
         {primaryContact ? (
           <div className="mt-3 space-y-2">
@@ -693,11 +574,8 @@ function ArtistHeroImage({ artist, imageLink }: { artist: ArtistDetail; imageLin
   }
 
   return (
-    <div className="flex aspect-square h-full w-full items-end bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_38%),linear-gradient(145deg,#27272a_0%,#111113_52%,#050505_100%)] p-5">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-normal text-white/60">Artist image</p>
-        <p className="mt-2 text-5xl font-semibold tracking-tight text-white">{initials(artist.name)}</p>
-      </div>
+    <div className="grid aspect-square h-full w-full place-items-center bg-muted text-2xl font-medium text-muted-foreground" aria-label="No artist image">
+      {initials(artist.name)}
     </div>
   );
 }
@@ -705,7 +583,7 @@ function ArtistHeroImage({ artist, imageLink }: { artist: ArtistDetail; imageLin
 function ReleaseGrid({ releases }: { releases: ArtistRelease[] }) {
   if (!releases.length) {
     return (
-      <div className="rounded-lg border border-dashed border-border p-8 text-center">
+      <div className="py-6">
         <p className="text-sm font-medium text-foreground">No releases linked yet.</p>
         <p className="mt-1 text-sm text-muted-foreground">Create or link a release to start building the catalog view.</p>
       </div>
@@ -713,14 +591,14 @@ function ReleaseGrid({ releases }: { releases: ArtistRelease[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+    <div className="divide-y divide-border">
       {releases.map((release) => (
-        <a key={release.id} href={`/releases/${release.id}`} className="group rounded-lg border border-border bg-background p-3 transition hover:bg-muted/25">
+        <a key={release.id} href={`/releases/${release.id}`} className="group block rounded-md py-4 transition hover:bg-muted/25">
           <div className="flex items-start gap-3">
             <ReleaseCover release={release} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="truncate text-sm font-semibold text-foreground">{release.title}</h3>
+                <h3 className="break-words text-sm font-semibold text-foreground">{release.title}</h3>
                 <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium ${release.release_ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
                   {release.release_ready ? "Ready" : "Needs work"}
                 </span>
@@ -743,7 +621,7 @@ function ReleaseCover({ release }: { release: ArtistRelease }) {
   }
 
   return (
-    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-md bg-neutral-900 text-xs font-semibold text-white">
+    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">
       {initials(release.title)}
     </div>
   );
@@ -892,7 +770,7 @@ function ArtistAssetUploader({ artist, releases }: { artist: ArtistDetail; relea
 function ArtistAssetGallery({ artist, assets }: { artist: ArtistDetail; assets: ArtistAsset[] }) {
   if (!assets.length) {
     return (
-      <section className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
+      <section className="py-4 text-sm text-muted-foreground">
         <p className="font-medium text-foreground">No artist images yet.</p>
         <p className="mt-1">Add a press photo first; it becomes the artist image on this page.</p>
       </section>
@@ -938,13 +816,13 @@ function ArtistAssetRow({ artist, asset }: { artist: ArtistDetail; asset: Artist
   const isPrimary = Boolean(asset.file_link && artist.image_url === asset.file_link);
 
   return (
-    <div className="rounded-lg border border-border bg-background p-3">
+    <div className="py-4">
       <div className="flex gap-3">
         <AssetThumb asset={asset} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">{asset.asset_name}</p>
+              <p className="break-words text-sm font-medium text-foreground">{asset.asset_name}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
                 {[asset.asset_type?.replace(/_/g, " "), asset.release_title, asset.version].filter(Boolean).join(" - ") || "Artist asset"}
               </p>
@@ -988,7 +866,7 @@ function ReadinessCard({
   onReadinessAction: (destination: ReadinessDestination) => void;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-background p-4">
+    <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Profile readiness</h2>
         <span className="text-sm font-medium">{health.complete}%</span>
@@ -997,7 +875,7 @@ function ReadinessCard({
         {health.rows.map((row) => {
           if (row.ok) {
             return (
-              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
                   <span>Complete</span>
@@ -1009,7 +887,7 @@ function ReadinessCard({
 
           if (!canMutate || !row.action) {
             return (
-              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
                   <span>Missing</span>
@@ -1021,7 +899,7 @@ function ReadinessCard({
 
           if (row.action.kind === "edit") {
             return (
-              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+              <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
                 <ArtistEditButton
                   artist={artist}
@@ -1044,9 +922,10 @@ function ReadinessCard({
                   : `Fix ${row.label.toLowerCase()}`;
 
           return (
-            <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/25 px-3 py-2 text-sm">
+            <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 text-sm">
               <span className="text-muted-foreground">{row.label}</span>
               <Button
+                variant="outline"
                 type="button"
                 onClick={() => onReadinessAction(action.destination)}
                 className="inline-flex h-8 items-center rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
@@ -1112,28 +991,28 @@ function SimpleList({
 }) {
   if (!rows.length) {
     return (
-      <div className="rounded-lg border border-dashed border-border p-5 text-sm text-muted-foreground">
+      <div className="py-4 text-sm text-muted-foreground">
         {emptyTitle}
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="divide-y divide-border">
       {rows.map((row) => {
         const content = (
-          <div className="flex items-start gap-3 rounded-lg border border-border bg-background p-3 transition hover:bg-muted/20">
+          <div className="flex items-start gap-3 py-4 transition hover:bg-muted/20">
             <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
               {row.icon || <ListChecks className="h-4 w-4" />}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">{row.title}</p>
+              <p className="break-words text-sm font-medium text-foreground">{row.title}</p>
               {row.meta ? <p className="mt-1 text-xs text-muted-foreground">{row.meta}</p> : null}
-              {row.detail ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{row.detail}</p> : null}
+              {row.detail ? <p className="mt-1 break-words text-sm text-muted-foreground">{row.detail}</p> : null}
             </div>
           </div>
         );
-        return row.href ? <a key={row.id} href={row.href}>{content}</a> : <div key={row.id}>{content}</div>;
+        return row.href ? <a key={row.id} className="block" href={row.href}>{content}</a> : <div key={row.id}>{content}</div>;
       })}
     </div>
   );
@@ -1177,9 +1056,9 @@ function Metric({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background p-3">
+    <div className="py-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
         <span className="text-muted-foreground">{icon}</span>
       </div>
       <p className="mt-2 text-xl font-semibold tracking-tight">{value}</p>

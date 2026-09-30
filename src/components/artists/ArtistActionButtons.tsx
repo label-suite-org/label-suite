@@ -43,7 +43,7 @@ export function ArtistEditButton({
 
   return (
     <>
-      <Button
+      <Button variant="outline"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -138,19 +138,19 @@ export function ArtistDeleteButton({ artist }: { artist: Artist }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => !loading && setConfirming(false)}>
-      <div className="bg-card rounded-lg shadow-xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold mb-2">Delete {artist.name}?</h2>
+    <Dialog open={confirming} onOpenChange={open => { if (!loading) setConfirming(open); }}>
+      <DialogContent showCloseButton={!loading} aria-describedby={undefined}>
+        <DialogTitle>Delete {artist.name}?</DialogTitle>
         <p className="text-sm text-muted-foreground mb-4">This will permanently remove the artist. This action cannot be undone.</p>
         {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
         <div className="flex gap-2 justify-end">
-          <Button onClick={() => setConfirming(false)} disabled={loading} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancel</Button>
+          <Button variant="ghost" onClick={() => setConfirming(false)} disabled={loading} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancel</Button>
           <Button variant="ghost" onClick={onDelete} disabled={loading}
             className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50">
             {loading ? "Deleting..." : "Delete"}
           </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -35,6 +35,8 @@ import { buildReleaseOperationsBrief, type ReleaseBriefActionKey } from "../../s
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 interface ReleaseDetail extends Release {
   release_ready?: boolean | null;
@@ -593,7 +595,7 @@ export function ReleaseWorkspace({
       {activeSection === "details" && <div id="release-details" className="scroll-mt-16"><ReleaseOperationsBrief brief={operationsBrief} onAction={handleBriefAction} /></div>}
 
       {activeSection === "details" && (
-        <ReleaseAuthorityPanel release={release} tracks={tracks} works={works} />
+        <Accordion><AccordionItem value="evidence" className="border-y border-border"><AccordionTrigger>Record evidence</AccordionTrigger><AccordionContent><ReleaseAuthorityPanel release={release} tracks={tracks} works={works} /></AccordionContent></AccordionItem></Accordion>
       )}
 
       {activeSection === "details" && <section id="release-readiness" aria-label="Required release checks" className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -630,12 +632,13 @@ export function ReleaseWorkspace({
           action={<a href={`/releases/${release.id}/tracks`} className="text-xs font-medium text-muted-foreground hover:text-foreground">Manage tracks</a>}
         >
           <div className="space-y-3">
-            <SamplyReviewPanel
+            <Accordion><AccordionItem value="audio-review" className="border-y border-border"><AccordionTrigger>Audio review & Samply setup</AccordionTrigger><AccordionContent>            <SamplyReviewPanel
               releaseId={release.id}
               canManage={canManage}
               review={samplyReview}
               onUpdate={setSamplyReview}
             />
+</AccordionContent></AccordionItem></Accordion>
             <TrackTable
               tracks={tracks}
               works={works}
@@ -653,7 +656,7 @@ export function ReleaseWorkspace({
             <BudgetBucketSummary items={budgetItems} />
           </Panel>
           <div id="dsp-pitches" className="scroll-mt-4">
-            <Panel title="DSP pitches" action={<Button type="button" onClick={() => setPitchOpen(true)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Add pitch</Button>}>
+            <Panel title="DSP pitches" action={<Button variant="outline" type="button" onClick={() => setPitchOpen(true)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Add pitch</Button>}>
               <PitchList pitches={pitches} />
             </Panel>
           </div>
@@ -1690,7 +1693,7 @@ function ReleaseAssetsPanel({
 
 function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-border bg-background p-3">
+    <section className="space-y-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         {action}
@@ -1776,17 +1779,12 @@ function StatusPill({ ready }: { ready: boolean }) {
 }
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <Button variant="ghost" type="button" onClick={onClose} className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted">Close</Button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
+  return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
+    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" aria-describedby={undefined}>
+      <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+      {children}
+    </DialogContent>
+  </Dialog>;
 }
 
 function formatNumber(value: number): string {
