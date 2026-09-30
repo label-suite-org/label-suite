@@ -484,9 +484,59 @@ const RECORD_CHECKS: Record<string, Array<{ column: string; fields: string[]; li
   ],
 };
 
+const DIRECTORY_CHECKS = {
+  contacts: [
+    { column: "name", fields: ["Name", "Full Name", "Contact Name"] },
+    { column: "email", fields: ["E-Mail", "Email"] },
+    { column: "role", fields: ["Role", "Contact Role"] },
+    { column: "company", fields: ["Company", "Organization", "Organisation"] },
+  ],
+  organizations: [
+    { column: "name", fields: ["Name", "Company", "Organization"] },
+    { column: "type", fields: ["Role", "Organization Type", "Type"] },
+  ],
+};
+
 async function runRecordChecks(results: TableResult[]): Promise<ParityRecordCheck[]> {
   const checks: ParityRecordCheck[] = [];
   const mappingRows = await readOnlyQuery(`select airtable_table_name, airtable_record_id, postgres_table_name, postgres_record_id from ${qname("airtable_record_mappings")} where org_id = $1 and airtable_base_id = $2`, [ORG_ID, baseId]);
+  const directory = results.find(result => result.spec.airtable === "Contacts" && !result.error);
+  if (directory) {
+    const rows = [];
+    for (const [table, fields] of Object.entries(DIRECTORY_CHECKS)) {
+      const result = await readOnlyQuery(`select id, ${fields.map(field => field.column).join(", ")} from ${qname(table)} where org_id = $1`, [ORG_ID]);
+      rows.push(...result.rows.map(row => ({ ...row, record_kind: table })));
+    }
+    const available = new Set(directory.metadata?.fields.map(field => field.name) ?? []);
+    const organizationLinks = await readOnlyQuery(`select link.contact_id, link.organization_id from ${qname("contact_organizations")} link join ${qname("contacts")} contact on contact.id = link.contact_id and contact.org_id = link.org_id join ${qname("organizations")} organization on organization.id = link.organization_id and organization.org_id = link.org_id where link.org_id = $1`, [ORG_ID]);
+    const typeField = findFieldName(available, ["Type"]) ?? findFieldNameFromRecords(directory.records, ["Type"]);
+    for (const record of directory.records) {
+      const kind = fieldValues(typeField ? record.fields[typeField] : null).join(" ").trim().toLowerCase() === "organization" ? "organizations" : "contacts";
+      // ponytail: scan the small directory; index source mappings if audit volume grows.
+      const matches = rows.filter(row => row.id === record.id || mappingRows.rows.some(mapping =>
+        mapping.airtable_table_name === "Contacts" && mapping.airtable_record_id === record.id && mapping.postgres_table_name === row.record_kind && mapping.postgres_record_id === row.id));
+      matches.sort((a, b) => `${a.record_kind}:${a.id}`.localeCompare(`${b.record_kind}:${b.id}`));
+      checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: kind, field: "record_kind", sourceRecordId: record.id,
+        canonicalRecordIds: matches.map(row => `${row.record_kind}:${row.id}`), sourceValue: kind, canonicalValues: matches.map(row => row.record_kind) }, Boolean(typeField)));
+      const typedMatches = matches.filter(row => row.record_kind === kind);
+      for (const field of DIRECTORY_CHECKS[kind]) {
+        const name = findFieldName(available, field.fields) ?? findFieldNameFromRecords(directory.records, field.fields);
+        const values = fieldValues(name ? record.fields[name] : null);
+        checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: kind, field: field.column, sourceRecordId: record.id,
+          canonicalRecordIds: typedMatches.map(row => row.id), sourceValue: values.length ? values.join(" ").trim() : null,
+          canonicalValues: typedMatches.map(row => row[field.column] == null ? null : String(row[field.column]).trim()) }, Boolean(name)));
+      }
+      if (kind === "contacts") {
+        const name = findFieldName(available, ["Related Organization", "Related Company", "From field: Related Company"]);
+        const sourceIds = fieldValues(name ? record.fields[name] : null);
+        const resolved = sourceIds.map(id => rows.filter(row => row.record_kind === "organizations" && (row.id === id || mappingRows.rows.some(mapping => mapping.airtable_table_name === "Contacts" && mapping.airtable_record_id === id && mapping.postgres_table_name === "organizations" && mapping.postgres_record_id === row.id))));
+        const comparable = Boolean(name) && resolved.every(matches => matches.length === 1);
+        checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: "contacts", field: "linked_organizations", sourceRecordId: record.id,
+          canonicalRecordIds: typedMatches.map(row => row.id), sourceValue: JSON.stringify(comparable ? [...new Set(resolved.map(matches => matches[0].id))].sort() : sourceIds.sort()),
+          canonicalValues: typedMatches.map(row => JSON.stringify([...new Set(organizationLinks.rows.filter(link => link.contact_id === row.id).map(link => String(link.organization_id)))].sort())) }, comparable));
+      }
+    }
+  }
   const links = new Map<string, Map<string, Set<string>>>();
   for (const table of new Set(Object.values(RECORD_CHECKS).flatMap(fields => fields.flatMap(field => field.link ? [field.link] : [])))) {
     const ids = await readOnlyQuery(`select id from ${qname(table)} where org_id = $1`, [ORG_ID]);
@@ -676,6 +726,12 @@ function wantedFieldsFor(spec: TableSpec, metadata: AirtableTableMetadata): stri
   for (const check of [...(spec.checks ?? []), ...(RECORD_CHECKS[spec.airtable] ?? []).map(field => ({ airtableFields: field.fields }))]) {
     const field = findFieldName(available, check.airtableFields);
     if (field) wanted.add(field);
+  }
+
+  if (spec.airtable === "Contacts") {
+    for (const field of ["Type", "Related Organization", "Related Company", "From field: Related Company", ...Object.values(DIRECTORY_CHECKS).flatMap(fields => fields.flatMap(field => field.fields))]) {
+      if (available.has(field)) wanted.add(field);
+    }
   }
 
   if (spec.airtable === "Rights Lines (Roles)") {
