@@ -6,6 +6,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { chromium, errors, type ElementHandle, type Locator, type Page } from "playwright";
 import { Pool, type PoolClient } from "pg";
 import { logEvent } from "../src/server/observability";
+import { deriveReportingThrough } from "../src/server/analytics-data-quality";
 import { assertDisposableForcedFailureTarget } from "./sisense-fixture-safety";
 import {
   assertAnalyticsSandboxReplacementTarget,
@@ -375,15 +376,19 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
         stats.rowsUnchanged += fileStats.unchanged;
       }
       stats.filesDownloaded = acquisition.files.length;
+      const sourceFreshness = {
+        version: 1,
+        reportingThrough: deriveReportingThrough(prepared.flatMap((file) => file.normalizedRows))?.toISOString() ?? null,
+      };
       if (apply && client) {
-        await completeRun(client, { status: "completed", ...stats, completeness: acquisition.completeness, providerFilterState: acquisition.providerFilterState });
+        await completeRun(client, { status: "completed", ...stats, completeness: acquisition.completeness, providerFilterState: acquisition.providerFilterState, sourceFreshness });
       }
       if (publicationOpen && client) {
         await client.query("commit");
         publicationOpen = false;
       }
       console.log(`Rows imported: ${stats.rowsImported}`);
-      return { acquisition, stats };
+      return { acquisition, stats, sourceFreshness };
     } catch (error) {
       if (client && publicationOpen) {
         await client.query("rollback").catch(() => undefined);
@@ -1287,6 +1292,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
       error?: string;
       completeness?: ScrapeCompleteness | null;
       providerFilterState?: ProviderFilterState | null;
+      sourceFreshness?: { version: number; reportingThrough: string | null };
     },
   ): Promise<void> {
     await client.query(
@@ -1315,6 +1321,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
         JSON.stringify({
           ...(input.completeness ? { completeness: input.completeness } : {}),
           ...(input.providerFilterState ? { providerFilterState: input.providerFilterState } : {}),
+          ...(input.sourceFreshness ? { sourceFreshness: input.sourceFreshness } : {}),
         }),
       ],
     );

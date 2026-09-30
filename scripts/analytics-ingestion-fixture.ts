@@ -96,9 +96,15 @@ try {
     "--aggregation", "Daily", "--apply", "--no-upload"];
   const playlistEnv = { DATABASE_URL: databaseUrl, SISENSE_DB_SCHEMA: schema,
     SISENSE_ORG_ID: tenant, ANALYTICS_FIXTURE_DB: "1", ANALYTICS_FIXTURE_DISPOSABLE: "1" };
-  await writeFile(playlistPath, 'playlist__name,playlist__source_uri,streams\n,,1\n');
+  await writeFile(playlistPath, 'date,playlist__name,playlist__source_uri,streams\n2026-07-28,,,1\n');
   const seed = await runImporter(playlistArgs, playlistEnv);
   if (seed.status !== 0) throw new Error(`Playlist seed failed: ${seed.output}`);
+  const sourceFreshness = await client.query(`
+    select metadata->'sourceFreshness' as evidence from ${schema}.analytics_import_runs
+    where org_id = $1 and status = 'completed' order by completed_at desc limit 1
+  `, [tenant]);
+  const evidence = sourceFreshness.rows[0]?.evidence;
+  if (evidence?.version !== 1 || evidence.reportingThrough !== "2026-07-28T00:00:00.000Z") throw new Error("Successful import did not publish source freshness evidence");
   await writeFile(playlistPath, 'playlist__name,playlist__source_uri,streams\n"",,761\n"","",405\n');
   const imported = await runImporter(playlistArgs, playlistEnv);
   if (imported.status !== 0) throw new Error(`Distinct playlist import failed: ${imported.output}`);

@@ -166,9 +166,15 @@ export async function getAnalyticsIngestionServiceHealth(now = new Date()): Prom
       const failedRuns = Number(failed?.total ?? 0);
       const totalRows = Number(run.rowsImported ?? 0);
       const coverage = parseAnalyticsRunCompleteness(run.metadata, totalRows).coverage;
-      // A complete sync is an observed snapshot. Do not materialize metric
-      // rows on a public readiness probe just to derive a reporting date.
-      const freshness = resolveAnalyticsFreshness({ mode: run.mode, completedAt, reportingThrough: null, coverage, totalRows, now });
+      // The importer records source dates once; health must not scan metric rows
+      // or mistake a recent download of old data for current source evidence.
+      const metadata = run.metadata && typeof run.metadata === "object" ? run.metadata as Record<string, unknown> : {};
+      const source = z.object({ version: z.literal(1), reportingThrough: z.string().datetime({ offset: true }).nullable() }).safeParse(metadata.sourceFreshness);
+      if (!source.success) {
+        return { status: "degraded", freshness: "unknown", coverage };
+      }
+      const reportingThrough = dateOrNull(source.data.reportingThrough);
+      const freshness = resolveAnalyticsFreshness({ mode: run.mode, completedAt, reportingThrough, coverage, totalRows, now });
       return evaluateAnalyticsIngestionServiceHealth({ ...freshness, lastSuccessfulRunAt: completedAt, failedRuns }, now);
     });
   } catch {
@@ -224,7 +230,7 @@ export async function getAnalyticsIngestionServiceHealthFromProbe(
 }
 
 /** Source dates are evidence; ingestion timestamps only tell us when we observed them. */
-export function deriveReportingThrough(rows: ReadonlyArray<{ dimensions: Record<string, string | null>; rawRow: Record<string, string | null>; lastSeenAt: Date | string | null }>): Date | null {
+export function deriveReportingThrough(rows: ReadonlyArray<{ dimensions: Record<string, string | null>; rawRow: Record<string, string | null>; lastSeenAt?: Date | string | null }>): Date | null {
   const dates = rows.flatMap((row) => Object.entries({ ...row.dimensions, ...row.rawRow })
     .filter(([key]) => reportingPeriodFields.has(key.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "").toLowerCase()))
     .map(([, value]) => parseSourceDate(value))
