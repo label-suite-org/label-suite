@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   M0_DISPOSITIONS,
+  compareRecordEvidence,
   buildKeyRecordEvidence,
   assertM0AuditTargetHealth,
   buildM0Audit,
@@ -284,5 +285,33 @@ describe("M0 parity audit", () => {
     expect(serialized).not.toContain("private.example");
     expect(serialized).not.toContain("pat_secret_value_1234567890");
     expect(serialized).toMatch(/\[redacted:[a-f0-9]{12}\]/);
+  });
+});
+
+
+describe("record-level parity evidence", () => {
+  it("retains matched coverage and reports different, unmapped, ambiguous and unavailable identities without guessing", () => {
+    const base = { table: "Rights Lines (Roles)", canonicalTable: "roles", field: "ownership_type", sourceRecordId: "rec-role", sourceValue: "Rights", canonicalRecordIds: ["role-1"], canonicalValues: ["Rights"] };
+    expect(compareRecordEvidence(base).status).toBe("matched");
+    expect(compareRecordEvidence({ ...base, canonicalValues: ["Credit"] }).status).toBe("different");
+    expect(compareRecordEvidence({ ...base, canonicalRecordIds: [], canonicalValues: [] }).status).toBe("unmapped");
+    expect(compareRecordEvidence({ ...base, canonicalRecordIds: ["role-1", "role-2"], canonicalValues: ["Rights", "Rights"] }).status).toBe("ambiguous");
+    expect(compareRecordEvidence(base, false).status).toBe("unavailable");
+    const matched = compareRecordEvidence(base);
+    const different = compareRecordEvidence({ ...base, sourceRecordId: "rec-other", canonicalValues: ["Credit"] });
+    const report = buildM0Audit(parity({ recordChecks: [different, matched] }));
+    const reverse = buildM0Audit(parity({ recordChecks: [matched, different] }));
+    expect(report).toEqual(reverse);
+    expect(report.checks.records).toHaveLength(2);
+    const mismatch = report.mismatches.find(row => row.kind === "record_value")!;
+    expect(mismatch.sourceValue).toBe("Rights");
+    expect(mismatch.canonicalValue).toBe('["Credit"]');
+    expect(mismatch.sourceRecordIds).toEqual(["rec-other"]);
+    expect(mismatch.canonicalRecordIds).toEqual(["role-1"]);
+    expect(mismatch.proposedDisposition).toBe("Human review required");
+    const privateReport = buildM0Audit(parity({ recordChecks: [compareRecordEvidence({ ...base, sourceValue: "owner@example.com", canonicalValues: ["other@example.com"] })] }));
+    expect(JSON.stringify(privateReport)).not.toContain("@example.com");
+    expect(privateReport.checks.records[0].sourceValue).toMatch(/^\[email:/);
+    expect(report.safety.noMutation).toBe(true);
   });
 });

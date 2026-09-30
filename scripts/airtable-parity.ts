@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { writeFile } from "node:fs/promises";
 import { Pool } from "pg";
-import { buildKeyRecordEvidence, type ParityKeyRecord, type ParityKeyRow, type ParitySourceIdCheck } from "./m0-parity-audit-core";
+import { compareRecordEvidence, type ParityRecordCheck, buildKeyRecordEvidence, type ParityKeyRecord, type ParityKeyRow, type ParitySourceIdCheck } from "./m0-parity-audit-core";
 import { normalizeParityKey } from "./airtable-parity-key";
 
 if (process.argv.includes("--grants-v2")) {
@@ -462,6 +462,91 @@ const TABLE_SPECS: TableSpec[] = [
   },
 ];
 
+// These fields follow the existing import mappings; no source value authorizes a write.
+const RECORD_CHECKS: Record<string, Array<{ column: string; fields: string[]; link?: string; date?: boolean; numeric?: boolean; fallback?: string }>> = {
+  "Artists": [{ column: "contact_id", fields: ["Contact", "Primary Contact", "Manager"], link: "contacts" }],
+  "Releases (And Artist Events)": [
+    { column: "artist_id", fields: ["Artist", "Artists", "Linked Artist"], link: "artists" },
+    { column: "release_date", fields: ["Release Date", "Date"], date: true },
+    { column: "status", fields: ["Status"], fallback: "draft" },
+  ],
+  "Release Tracks": [
+    { column: "release_id", fields: ["Release", "Releases", "Release Event"], link: "releases" },
+    { column: "work_id", fields: ["WORKS", "Work Title", "Recording", "Master", "Work", "Recordings (Masters)"], link: "works" },
+  ],
+  "Rights Lines (Roles)": [
+    { column: "contact_id", fields: ["Contact", "Person", "Contributor", "Payee"], link: "contacts" },
+    { column: "work_id", fields: ["WORKS", "Recording", "Master", "Work", "Recordings (Masters)", "Track", "Release Track"], link: "works" },
+    { column: "ownership_type", fields: ["Ownership Type", "Ownership", "Type"], fallback: "Rights" },
+    { column: "scope", fields: ["Scope", "Rights Scope", "Clearance Scope"] },
+    { column: "percent_share", fields: ["Percent Share", "% Share", "Share", "Split %", "Share %"], numeric: true },
+    { column: "clearance_status", fields: ["Clearance Status", "Status", "Rights Status"], fallback: "Unknown" },
+  ],
+};
+
+async function runRecordChecks(results: TableResult[]): Promise<ParityRecordCheck[]> {
+  const checks: ParityRecordCheck[] = [];
+  const mappingRows = await readOnlyQuery(`select airtable_table_name, airtable_record_id, postgres_table_name, postgres_record_id from ${qname("airtable_record_mappings")} where org_id = $1 and airtable_base_id = $2`, [ORG_ID, baseId]);
+  const links = new Map<string, Map<string, Set<string>>>();
+  for (const table of new Set(Object.values(RECORD_CHECKS).flatMap(fields => fields.flatMap(field => field.link ? [field.link] : [])))) {
+    const ids = await readOnlyQuery(`select id from ${qname(table)} where org_id = $1`, [ORG_ID]);
+    const live = new Set(ids.rows.map(row => String(row.id)));
+    const map = new Map<string, Set<string>>(ids.rows.map(row => [String(row.id), new Set([String(row.id)])]));
+    for (const row of mappingRows.rows) {
+      if (row.postgres_table_name !== table || !live.has(String(row.postgres_record_id))) continue;
+      const source = String(row.airtable_record_id);
+      map.set(source, new Set([...(map.get(source) ?? []), String(row.postgres_record_id)]));
+    }
+    links.set(table, map);
+  }
+  // Rights may link through a release track, as in the existing importer.
+  const trackWorks = await readOnlyQuery(`select mapping.airtable_record_id, track.work_id from ${qname("airtable_record_mappings")} mapping join ${qname("tracks")} track on track.org_id = mapping.org_id and track.id = mapping.postgres_record_id join ${qname("works")} work on work.org_id = track.org_id and work.id = track.work_id where mapping.org_id = $1 and mapping.airtable_base_id = $2 and mapping.airtable_table_name = 'Release Tracks' and mapping.postgres_table_name = 'tracks'`, [ORG_ID, baseId]);
+  const works = links.get("works")!;
+  for (const row of trackWorks.rows) {
+    const source = String(row.airtable_record_id);
+    works.set(source, new Set([...(works.get(source) ?? []), String(row.work_id)]));
+  }
+  for (const result of results) {
+    const fields = RECORD_CHECKS[result.spec.airtable];
+    const table = result.spec.postgres;
+    if (!fields || !table || result.error) continue;
+    const canonical = await readOnlyQuery(`select id, ${fields.map(field => field.column).join(", ")} from ${qname(table)} where org_id = $1`, [ORG_ID]);
+    const byId = new Map(canonical.rows.map(row => [String(row.id), row]));
+    const available = new Set(result.metadata?.fields.map(field => field.name) ?? []);
+    for (const record of result.records) {
+      const ids = new Set<string>();
+      if (byId.has(record.id)) ids.add(record.id);
+      for (const row of mappingRows.rows) {
+        if (row.airtable_table_name === result.spec.airtable && row.postgres_table_name === table && row.airtable_record_id === record.id && byId.has(String(row.postgres_record_id))) ids.add(String(row.postgres_record_id));
+      }
+      const canonicalRecordIds = [...ids].sort();
+      for (const field of fields) {
+        const name = findFieldName(available, field.fields) ?? findFieldNameFromRecords(result.records, field.fields);
+        const values = name ? fieldValues(record.fields[name]) : [];
+        let sourceValue = values.length ? values.join(" ").trim() : field.fallback ?? null;
+        let comparable = Boolean(name);
+        if (field.numeric && sourceValue !== null) {
+          const numeric = Number(sourceValue.replace(/[%,$]/g, "").trim());
+          comparable = comparable && Number.isFinite(numeric);
+          if (comparable) sourceValue = String(numeric);
+        }
+        if (field.date && sourceValue) sourceValue = sourceValue.slice(0, 10);
+        if (field.link && values.length) {
+          const targets = values.length === 1 ? [...(links.get(field.link)?.get(values[0]) ?? [])] : [];
+          comparable = comparable && targets.length === 1;
+          if (comparable) sourceValue = targets[0];
+        }
+        const canonicalValues = canonicalRecordIds.map(id => {
+          const value = byId.get(id)![field.column];
+          return value == null ? null : value instanceof Date ? value.toISOString().slice(0, 10) : String(value).trim();
+        });
+        checks.push(compareRecordEvidence({ table: result.spec.airtable, canonicalTable: table, field: field.column, sourceRecordId: record.id, canonicalRecordIds, sourceValue, canonicalValues }, comparable));
+      }
+    }
+  }
+  return checks;
+}
+
 async function main() {
   try {
     const metadataByName = await readAirtableMetadata();
@@ -490,6 +575,8 @@ async function main() {
       ? []
       : await runSqlChecks(READINESS_CHECKS);
 
+    const recordChecks = options.countsOnly ? [] : await runRecordChecks(tableResults);
+
     const report = {
       generatedAt: new Date().toISOString(),
       baseId,
@@ -502,6 +589,7 @@ async function main() {
       keyChecks,
       sourceIdChecks,
       rightsSemantics,
+      recordChecks,
       integrityChecks,
       readinessChecks,
     };
@@ -585,7 +673,7 @@ function wantedFieldsFor(spec: TableSpec, metadata: AirtableTableMetadata): stri
     wanted.add(primaryField.name);
   }
 
-  for (const check of spec.checks ?? []) {
+  for (const check of [...(spec.checks ?? []), ...(RECORD_CHECKS[spec.airtable] ?? []).map(field => ({ airtableFields: field.fields }))]) {
     const field = findFieldName(available, check.airtableFields);
     if (field) wanted.add(field);
   }

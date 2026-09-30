@@ -86,6 +86,9 @@ export function approveM0Dispositions(
   approvedAt: string,
   approvedBy = REVIEWER,
 ): ApprovedM0Ledger {
+  if (audit.mismatches.some(row => row.kind === "record_value")) {
+    throw new Error("Record-field findings require explicit review; the historical disposition policy does not cover them.");
+  }
   const dispositions = audit.mismatches.map((mismatch): ApprovedM0Disposition => {
     const decision = mismatch.kind === "count_delta" || mismatch.kind === "key_extra"
       ? acceptedDifference(mismatch)
