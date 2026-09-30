@@ -119,18 +119,18 @@ export interface ParityRecordCheck {
   table: string;
   canonicalTable: string;
   field: string;
-  sourceRecordId: string;
+  sourceRecordId: string | null;
   canonicalRecordIds: string[];
   sourceValue: string | null;
   sourceField?: string | null;
   sourceRawValue?: string | null;
   canonicalValues: Array<string | null>;
-  status: "matched" | "different" | "unmapped" | "ambiguous" | "unavailable";
+  status: "matched" | "different" | "unmapped" | "ambiguous" | "unavailable" | "canonical-only";
 }
 
 // Compare only explicit source-ID matches; names are never identity evidence.
 export function compareRecordEvidence(check: Omit<ParityRecordCheck, "status">, available = true): ParityRecordCheck {
-  const status = !available ? "unavailable" : check.canonicalRecordIds.length === 0 ? "unmapped"
+  const status = check.sourceRecordId === null ? "canonical-only" : !available ? "unavailable" : check.canonicalRecordIds.length === 0 ? "unmapped"
     : check.canonicalRecordIds.length !== 1 ? "ambiguous"
     : check.sourceValue === check.canonicalValues[0] ? "matched" : "different";
   return { ...check, status };
@@ -152,6 +152,7 @@ export interface ParityReport {
   groupExceptions?: Record<string, string[]>;
   recordChecks?: ParityRecordCheck[];
   orgId?: string;
+  directoryCounts?: ParityTableResult[];
 }
 
 export interface M0Mismatch {
@@ -287,7 +288,7 @@ function addCountMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
     if (result.spec.status !== "mapped" || sourceCount === null || canonicalCount === null || sourceCount === canonicalCount) continue;
     const table = result.spec.airtable;
     mismatches.push(mismatchBase({
-      id: `count:${slug(table)}`,
+      id: `count:${slug(table)}${table === "Contacts" ? `:${slug(result.spec.postgres ?? "directory")}` : ""}`,
       domain: domainForTable(table),
       kind: "count_delta",
       sourceTable: table,
@@ -415,6 +416,8 @@ function sectionFor(issue: M0Section["issue"], mismatches: M0Mismatch[]): M0Sect
 }
 
 export function buildM0Audit(input: ParityReport): M0AuditReport {
+  if (!input.orgId?.trim()) throw new Error("M0 audit requires an explicit organization scope");
+  if (input.directoryCounts?.length) input = { ...input, tableResults: [...input.tableResults.filter(result => result.spec.airtable !== "Contacts"), ...input.directoryCounts] };
   if (input.tableResults.some(result => result.truncated || result.error)) {
     throw new Error("M0 audit requires complete source evidence; truncated or failed tables cannot certify coverage.");
   }
@@ -430,15 +433,15 @@ export function buildM0Audit(input: ParityReport): M0AuditReport {
     sourceRawValue: check.sourceRawValue == null ? check.sourceRawValue : redactValue(check.sourceRawValue),
     canonicalValues: check.canonicalValues.map(value => value === null ? null : redactValue(value)),
   })).sort((a, b) =>
-    `${a.table}/${a.sourceRecordId}/${a.field}`.localeCompare(`${b.table}/${b.sourceRecordId}/${b.field}`));
+    `${a.table}/${a.sourceRecordId ?? a.canonicalRecordIds.join(",")}/${a.field}`.localeCompare(`${b.table}/${b.sourceRecordId ?? b.canonicalRecordIds.join(",")}/${b.field}`));
   for (const check of recordChecks) {
     if (check.status === "matched") continue;
     mismatches.push(mismatchBase({
-      id: `record:${slug(check.table)}:${check.sourceRecordId}:${slug(check.field)}`,
+      id: `record:${slug(check.table)}:${check.sourceRecordId ?? `canonical:${check.canonicalTable}:${check.canonicalRecordIds.join(",")}`}:${slug(check.field)}`,
       domain: domainForTable(check.table), kind: "record_value",
       sourceTable: check.table, canonicalTable: check.canonicalTable,
       sourceValue: check.sourceValue, canonicalValue: JSON.stringify(check.canonicalValues),
-      sourceRecordIds: [check.sourceRecordId], canonicalRecordIds: check.canonicalRecordIds,
+      sourceRecordIds: check.sourceRecordId === null ? [] : [check.sourceRecordId], canonicalRecordIds: check.canonicalRecordIds,
       comparisonField: check.field, evidence: `Source-ID record comparison: ${check.status}. No business-data correction is inferred.`,
     }));
   }

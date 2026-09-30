@@ -475,6 +475,7 @@ const RECORD_CHECKS: Record<string, Array<{ column: string; fields: string[]; li
     { column: "work_id", fields: ["WORKS", "Work Title", "Recording", "Master", "Work", "Recordings (Masters)"], link: "works" },
   ],
   "Rights Lines (Roles)": [
+    { column: "role", fields: ["Role", "Credit", "Role Type"], fallback: "Rights" },
     { column: "contact_id", fields: ["Contact", "Person", "Contributor", "Payee"], link: "contacts" },
     { column: "work_id", fields: ["WORKS", "Recording", "Master", "Work", "Recordings (Masters)", "Track", "Release Track"], link: "works" },
     { column: "ownership_type", fields: ["Ownership Type", "Ownership", "Type"], fallback: "Rights" },
@@ -497,8 +498,9 @@ const DIRECTORY_CHECKS = {
   ],
 };
 
-async function runRecordChecks(results: TableResult[]): Promise<ParityRecordCheck[]> {
+async function runRecordChecks(results: TableResult[]): Promise<{ checks: ParityRecordCheck[]; directoryCounts: TableResult[] }> {
   const checks: ParityRecordCheck[] = [];
+  const directoryCounts: TableResult[] = [];
   const mappingRows = await readOnlyQuery(`select airtable_table_name, airtable_record_id, postgres_table_name, postgres_record_id from ${scopedTable("airtable_record_mappings")} where org_id = $1 and airtable_base_id = $2`, [ORG_ID, baseId]);
   const directory = results.find(result => result.spec.airtable === "Contacts" && !result.error);
   if (directory) {
@@ -510,6 +512,12 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
     const available = new Set(directory.metadata?.fields.map(field => field.name) ?? []);
     const organizationLinks = await readOnlyQuery(`select link.contact_id, link.organization_id from ${scopedTable("contact_organizations")} link join ${scopedTable("contacts")} contact on contact.id = link.contact_id and contact.org_id = link.org_id join ${scopedTable("organizations")} organization on organization.id = link.organization_id and organization.org_id = link.org_id where link.org_id = $1`, [ORG_ID]);
     const typeField = findFieldName(available, ["Type"]) ?? findFieldNameFromRecords(directory.records, ["Type"]);
+    const matchedDirectory = new Set<string>();
+    for (const [table] of Object.entries(DIRECTORY_CHECKS)) {
+      const records = directory.records.filter(record => (fieldValues(typeField ? record.fields[typeField] : null).join(" ").trim().toLowerCase() === "organization" ? "organizations" : "contacts") === table);
+      const canonicalRecordIds = rows.filter(row => row.record_kind === table).map(row => row.id).sort();
+      directoryCounts.push({ spec: { ...directory.spec, postgres: table }, records, airtableCount: records.length, postgresCount: canonicalRecordIds.length, canonicalRecordIds, truncated: directory.truncated, error: typeField ? undefined : "Directory classification unavailable" });
+    }
     for (const record of directory.records) {
       const kind = fieldValues(typeField ? record.fields[typeField] : null).join(" ").trim().toLowerCase() === "organization" ? "organizations" : "contacts";
       // ponytail: scan the small directory; index source mappings if audit volume grows.
@@ -520,6 +528,7 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
         sourceField: typeField, sourceRawValue: fieldValues(typeField ? record.fields[typeField] : null).join(" ") || null,
         canonicalRecordIds: matches.map(row => `${row.record_kind}:${row.id}`), sourceValue: kind, canonicalValues: matches.map(row => row.record_kind) }, Boolean(typeField)));
       const typedMatches = matches.filter(row => row.record_kind === kind);
+      for (const row of typedMatches) matchedDirectory.add(`${row.record_kind}:${row.id}`);
       for (const field of DIRECTORY_CHECKS[kind]) {
         const name = findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
         const values = fieldValues(name ? record.fields[name] : null);
@@ -538,6 +547,14 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
           sourceField: name, sourceRawValue: JSON.stringify(sourceIds),
           canonicalRecordIds: typedMatches.map(row => row.id), sourceValue: JSON.stringify(comparable ? [...new Set(resolved.map(matches => matches[0].id))].sort() : sourceIds.sort()),
           canonicalValues: typedMatches.map(row => JSON.stringify([...new Set(organizationLinks.rows.filter(link => link.contact_id === row.id).map(link => String(link.organization_id)))].sort())) }, comparable));
+      }
+    }
+    for (const row of rows.filter(row => !matchedDirectory.has(`${row.record_kind}:${row.id}`))) {
+      const columns = ["record_kind", ...DIRECTORY_CHECKS[row.record_kind as keyof typeof DIRECTORY_CHECKS].map(field => field.column), ...(row.record_kind === "contacts" ? ["linked_organizations"] : [])];
+      for (const column of columns) {
+        const value = column === "linked_organizations" ? JSON.stringify([...new Set(organizationLinks.rows.filter(link => link.contact_id === row.id).map(link => String(link.organization_id)))].sort()) : row[column];
+        checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: row.record_kind, field: column, sourceRecordId: null, sourceValue: null,
+          canonicalRecordIds: [row.id], canonicalValues: [value == null ? null : String(value).trim()] }));
       }
     }
   }
@@ -567,12 +584,14 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
     const canonical = await readOnlyQuery(`select id, ${fields.map(field => field.column).join(", ")} from ${scopedTable(table)} where org_id = $1`, [ORG_ID]);
     const byId = new Map(canonical.rows.map(row => [String(row.id), row]));
     const available = new Set(result.metadata?.fields.map(field => field.name) ?? []);
+    const matchedCanonical = new Set<string>();
     for (const record of result.records) {
       const ids = new Set<string>();
       for (const row of mappingRows.rows) {
         if (row.airtable_table_name === result.spec.airtable && row.postgres_table_name === table && row.airtable_record_id === record.id && byId.has(String(row.postgres_record_id))) ids.add(String(row.postgres_record_id));
       }
       const canonicalRecordIds = [...ids].sort();
+      for (const id of canonicalRecordIds) matchedCanonical.add(id);
       for (const field of fields) {
         const name = findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
         const values = name ? fieldValues(record.fields[name]) : [];
@@ -596,8 +615,15 @@ async function runRecordChecks(results: TableResult[]): Promise<ParityRecordChec
         checks.push(compareRecordEvidence({ table: result.spec.airtable, canonicalTable: table, field: field.column, sourceRecordId: record.id, sourceField: name, sourceRawValue: values.length ? values.join(" ") : null, canonicalRecordIds, sourceValue, canonicalValues }, comparable));
       }
     }
+    for (const row of canonical.rows.filter(row => !matchedCanonical.has(String(row.id)))) {
+      for (const field of fields) {
+        const value = row[field.column];
+        checks.push(compareRecordEvidence({ table: result.spec.airtable, canonicalTable: table, field: field.column, sourceRecordId: null, sourceValue: null,
+          canonicalRecordIds: [String(row.id)], canonicalValues: [value == null ? null : value instanceof Date ? value.toISOString().slice(0, 10) : String(value).trim()] }));
+      }
+    }
   }
-  return checks;
+  return { checks, directoryCounts };
 }
 
 async function main() {
@@ -628,7 +654,7 @@ async function main() {
       ? []
       : await runSqlChecks(READINESS_CHECKS);
 
-    const recordChecks = options.countsOnly ? [] : await runRecordChecks(tableResults);
+    const recordEvidence = options.countsOnly ? { checks: [], directoryCounts: [] } : await runRecordChecks(tableResults);
 
     const report = {
       generatedAt: new Date().toISOString(),
@@ -643,7 +669,8 @@ async function main() {
       keyChecks,
       sourceIdChecks,
       rightsSemantics,
-      recordChecks,
+      recordChecks: recordEvidence.checks,
+      directoryCounts: recordEvidence.directoryCounts.map(({ records, ...rest }) => ({ ...rest, sourceRecordIds: records.map(record => record.id).sort() })),
       integrityChecks,
       readinessChecks,
     };
@@ -733,12 +760,14 @@ function wantedFieldsFor(spec: TableSpec, metadata: AirtableTableMetadata): stri
   }
 
   for (const field of (RECORD_CHECKS[spec.airtable] ?? []).flatMap(check => check.fields)) {
-    if (available.has(field)) wanted.add(field);
+    const actual = findFieldName(available, [field]);
+    if (actual) wanted.add(actual);
   }
 
   if (spec.airtable === "Contacts") {
     for (const field of ["Type", "Related Organization", "Related Company", "From field: Related Company", ...Object.values(DIRECTORY_CHECKS).flatMap(fields => fields.flatMap(field => field.fields))]) {
-      if (available.has(field)) wanted.add(field);
+      const actual = findFieldName(available, [field]);
+      if (actual) wanted.add(actual);
     }
   }
 

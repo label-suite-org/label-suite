@@ -13,6 +13,7 @@ import {
 function parity(overrides: Partial<ParityReport> = {}): ParityReport {
   return {
     generatedAt: "2026-08-16T04:15:11.616Z",
+    orgId: "fixture-org",
     baseId: "app-test",
     schema: "label_suite",
     metadataAvailable: true,
@@ -292,6 +293,7 @@ describe("M0 parity audit", () => {
 
 describe("record-level parity evidence", () => {
   it("scopes every canonical table and rejects partial source coverage", () => {
+    expect(() => buildM0Audit(parity({ orgId: undefined }))).toThrow("explicit organization scope");
     expect(scopedParityTable("label_suite", "contacts", "owner's-org")).toBe('(select * from "label_suite"."contacts" where org_id = \'owner\'\'s-org\')');
     const report = parity();
     report.tableResults[0].truncated = true;
@@ -299,6 +301,19 @@ describe("record-level parity evidence", () => {
     report.tableResults[0].truncated = false;
     report.tableResults[0].error = "source unavailable";
     expect(() => buildM0Audit(report)).toThrow("complete source evidence");
+  });
+  it("retains canonical-only evidence and compares split directory counts", () => {
+    const canonical = compareRecordEvidence({ table: "Contacts", canonicalTable: "contacts", field: "name", sourceRecordId: null, sourceValue: null, canonicalRecordIds: ["native-contact"], canonicalValues: ["Native contact"] });
+    const report = buildM0Audit(parity({ recordChecks: [canonical], tableResults: [{ spec: { airtable: "Contacts", postgres: "contacts", status: "mapped" }, airtableCount: 3, postgresCount: 1 }], directoryCounts: [
+      { spec: { airtable: "Contacts", postgres: "contacts", status: "mapped" }, airtableCount: 1, postgresCount: 1 },
+      { spec: { airtable: "Contacts", postgres: "organizations", status: "mapped" }, airtableCount: 2, postgresCount: 2 },
+    ] }));
+    expect(report.scope.countDeltas).toBe(0);
+    expect(report.checks.tableCounts).toHaveLength(2);
+    expect(report.checks.records[0].status).toBe("canonical-only");
+    expect(report.mismatches[0].sourceRecordIds).toEqual([]);
+    expect(report.mismatches[0].canonicalRecordIds).toEqual(["native-contact"]);
+    expect(report.mismatches[0].proposedDisposition).toBe("Human review required");
   });
   it("retains matched coverage and reports different, unmapped, ambiguous and unavailable identities without guessing", () => {
     const base = { table: "Rights Lines (Roles)", canonicalTable: "roles", field: "ownership_type", sourceRecordId: "rec-role", sourceValue: "Rights", canonicalRecordIds: ["role-1"], canonicalValues: ["Rights"] };
@@ -319,7 +334,7 @@ describe("record-level parity evidence", () => {
     expect(mismatch.sourceRecordIds).toEqual(["rec-other"]);
     expect(mismatch.canonicalRecordIds).toEqual(["role-1"]);
     expect(mismatch.proposedDisposition).toBe("Human review required");
-    const privateReport = buildM0Audit(parity({ recordChecks: [compareRecordEvidence({ ...base, sourceValue: "owner@example.com", canonicalValues: ["other@example.com"] })] }));
+    const privateReport = buildM0Audit(parity({ recordChecks: [compareRecordEvidence({ ...base, sourceValue: "owner@example.com", sourceRawValue: "owner@example.com", sourceField: "Role", canonicalValues: ["other@example.com"] })] }));
     expect(JSON.stringify(privateReport)).not.toContain("@example.com");
     expect(privateReport.checks.records[0].sourceValue).toMatch(/^\[email:/);
     expect(report.safety.noMutation).toBe(true);
