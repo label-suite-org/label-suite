@@ -2,7 +2,7 @@
 import AuthLayout from "../layouts/AuthLayout.astro";
 import { LoginForm } from "../components/auth/LoginForm";
 export const prerender = false;
-const ssoEnabled = Boolean(process.env.NEXTCLOUD_OIDC_CLIENT_ID && process.env.NEXTCLOUD_OIDC_CLIENT_SECRET);
+const ssoEnabled = Boolean(process.env.POCKET_ID_OIDC_CLIENT_ID && process.env.POCKET_ID_OIDC_CLIENT_SECRET);
 ---
 <AuthLayout>
   <LoginForm client:load ssoEnabled={ssoEnabled} />
