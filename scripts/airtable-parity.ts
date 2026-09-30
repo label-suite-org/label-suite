@@ -2,7 +2,7 @@ import "dotenv/config";
 import { writeFile } from "node:fs/promises";
 import { Pool } from "pg";
 import { scopedParityTable, compareRecordEvidence, type ParityRecordCheck, buildKeyRecordEvidence, type ParityKeyRecord, type ParityKeyRow, type ParitySourceIdCheck } from "./m0-parity-audit-core";
-import { normalizeParityKey } from "./airtable-parity-key";
+import { normalizeParityKey, findFieldName, fieldValues, sourceFieldName } from "./airtable-parity-key";
 
 if (process.argv.includes("--grants-v2")) {
   const { runGrantsV2ParityCli } = await import("./airtable-grants-v2");
@@ -536,7 +536,7 @@ async function runRecordChecks(results: TableResult[]): Promise<{ checks: Parity
       const typedMatches = matches.filter(row => row.record_kind === kind);
       for (const row of typedMatches) matchedDirectory.add(`${row.record_kind}:${row.id}`);
       for (const field of DIRECTORY_CHECKS[kind]) {
-        const name = findFieldName(new Set(Object.keys(record.fields).filter(key => fieldValues(record.fields[key]).length > 0)), field.fields) ?? findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
+        const name = sourceFieldName(record.fields, field.fields, available);
         const values = fieldValues(name ? record.fields[name] : null);
         checks.push(compareRecordEvidence({ table: "Contacts", canonicalTable: kind, field: field.column, sourceRecordId: record.id,
           sourceField: name, sourceRawValue: values.length ? values.join(" ") : null,
@@ -545,7 +545,7 @@ async function runRecordChecks(results: TableResult[]): Promise<{ checks: Parity
       }
       if (kind === "contacts") {
         const aliases = ["Related Organization", "Related Company", "From field: Related Company"];
-        const name = findFieldName(new Set(Object.keys(record.fields)), aliases) ?? findFieldName(available, aliases);
+        const name = sourceFieldName(record.fields, aliases, available);
         const sourceIds = fieldValues(name ? record.fields[name] : null);
         const resolved = sourceIds.map(id => rows.filter(row => row.record_kind === "organizations" && (mappingRows.rows.some(mapping => mapping.airtable_table_name === "Contacts" && mapping.airtable_record_id === id && mapping.postgres_table_name === "organizations" && mapping.postgres_record_id === row.id))));
         const comparable = Boolean(name) && resolved.every(matches => matches.length === 1);
@@ -599,7 +599,7 @@ async function runRecordChecks(results: TableResult[]): Promise<{ checks: Parity
       const canonicalRecordIds = [...ids].sort();
       for (const id of canonicalRecordIds) matchedCanonical.add(id);
       for (const field of fields) {
-        const name = findFieldName(new Set(Object.keys(record.fields).filter(key => fieldValues(record.fields[key]).length > 0)), field.fields) ?? findFieldName(new Set(Object.keys(record.fields)), field.fields) ?? findFieldName(available, field.fields);
+        const name = sourceFieldName(record.fields, field.fields, available);
         const values = name ? fieldValues(record.fields[name]) : [];
         let sourceValue = values.length ? values.join(" ").trim() : null;
         let comparable = Boolean(name);
@@ -889,7 +889,8 @@ async function runKeyChecks(tableResults: TableResult[]): Promise<KeyCheckResult
       }
 
       const airtableRows = result.records.flatMap((record): ParityKeyRow[] => {
-        const value = fieldValues(record.fields[airtableField]).join(" ");
+        const field = sourceFieldName(record.fields, check.airtableFields, available);
+        const value = fieldValues(field ? record.fields[field] : null).join(" ");
         const normalizedValue = normalizeParityKey(result.spec.airtable, check.label, value);
         if (!normalizedValue) return [];
         return [{ recordId: record.id, normalizedValue, value }];
@@ -1381,20 +1382,6 @@ function tallyField(records: AirtableRecord[], candidates: string[]): Record<str
   return tally;
 }
 
-function findFieldName(available: Set<string>, candidates: string[]): string | null {
-  for (const candidate of candidates) {
-    if (available.has(candidate)) return candidate;
-  }
-
-  const lower = new Map([...available].map((field) => [field.toLowerCase(), field]));
-  for (const candidate of candidates) {
-    const exact = lower.get(candidate.toLowerCase());
-    if (exact) return exact;
-  }
-
-  return null;
-}
-
 function findFieldNameFromRecords(
   records: AirtableRecord[],
   candidates: string[],
@@ -1406,17 +1393,6 @@ function findFieldNameFromRecords(
     }
   }
   return findFieldName(available, candidates);
-}
-
-function fieldValues(value: unknown): string[] {
-  if (value == null || value === "") return [];
-  if (Array.isArray(value)) {
-    return value.flatMap(fieldValues);
-  }
-  if (typeof value === "object") {
-    return [JSON.stringify(value)];
-  }
-  return [String(value)];
 }
 
 function formatSamples(samples: string[]): string {
