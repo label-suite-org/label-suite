@@ -12,7 +12,6 @@ export function WorkCreateDialog() {
     return (
       <Button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/80 transition-colors"
       >
         + New Work
       </Button>
@@ -91,14 +90,12 @@ export function WorkDeleteButton({ work }: { work: Work & { id: string } }) {
             <p className="text-sm text-muted-foreground mb-4">
               This will remove <strong>{work.title}</strong>. Tracks linked to this work will be orphaned.
             </p>
-            {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+            {error && <p className="text-sm text-destructive mb-3">{error}</p>}
             <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setConfirming(false)}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
-              <Button variant="ghost" onClick={doDelete} disabled={loading}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50">
+              <Button variant="destructive" onClick={doDelete} disabled={loading}>
                 {loading ? "Deleting..." : "Delete"}
               </Button>
             </div>

@@ -23,7 +23,7 @@ describe("out-of-scope read-only affordances", () => {
   it("hides release mutations for fundraiser while retaining operator controls", () => {
     const fundraiser = renderToStaticMarkup(<ReleaseRoster releases={[]} artists={[]} canMutate={false} />);
     const operator = renderToStaticMarkup(<ReleaseRoster releases={[]} artists={[]} canMutate />);
-    expect(fundraiser).toContain("Read-only for fundraiser");
+    expect(fundraiser).toContain("Read-only for your role");
     expect(fundraiser).not.toContain("New Release");
     expect(operator).toContain("New Release");
   });

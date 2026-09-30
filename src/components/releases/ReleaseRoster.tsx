@@ -4,11 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
-  ArrowUpDown,
   CalendarDays,
   CheckCircle2,
   Search,
-  SlidersHorizontal,
 } from "lucide-react";
 import { ReleaseDeleteButton, ReleaseEditButton } from "./ReleaseActionButtons";
 import { ReleaseCreateDialog } from "./ReleaseCreateDialog";
@@ -17,7 +15,10 @@ import type { ReleaseRosterRow } from "../../server/releases";
 import { resolveFileUrl } from "../../lib/storage-client";
 
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@/components/ui/item";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 type FilterMode = "all" | "upcoming" | "ready" | "attention" | "released";
 type SortMode = "date" | "readiness" | "budget" | "title";
 
@@ -66,14 +67,14 @@ function normalizedStatus(value: string | null): string {
   return "draft";
 }
 
-function statusStyle(row: ReleaseRosterRow): { label: string; className: string } {
+function statusStyle(row: ReleaseRosterRow): { label: string; variant: React.ComponentProps<typeof Badge>["variant"] } {
   const status = normalizedStatus(row.status);
-  if (row.release_ready) return { label: "Ready", className: "border-emerald-200 bg-emerald-50 text-emerald-700" };
-  if (status === "released") return { label: "Released", className: "border-sky-200 bg-sky-50 text-sky-700" };
-  if (status === "scheduled") return { label: "Scheduled", className: "border-indigo-200 bg-indigo-50 text-indigo-700" };
-  if (status === "in_production") return { label: "In Production", className: "border-neutral-200 bg-neutral-100 text-neutral-700" };
-  if (row.missing_release_fields.length >= 4) return { label: "Setup", className: "border-amber-200 bg-amber-50 text-amber-800" };
-  return { label: row.status || "Draft", className: "border-neutral-200 bg-neutral-100 text-neutral-700" };
+  if (row.release_ready) return { label: "Ready", variant: "success" };
+  if (status === "released") return { label: "Released", variant: "secondary" };
+  if (status === "scheduled") return { label: "Scheduled", variant: "secondary" };
+  if (status === "in_production") return { label: "In Production", variant: "secondary" };
+  if (row.missing_release_fields.length >= 4) return { label: "Setup", variant: "warning" };
+  return { label: row.status || "Draft", variant: "secondary" };
 }
 
 function nextAction(row: ReleaseRosterRow): string {
@@ -148,7 +149,7 @@ export function ReleaseRoster({
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[1.5rem] border border-neutral-300 bg-neutral-100 px-4 py-4 shadow-[0_20px_70px_rgba(0,0,0,0.06)] dark:border-neutral-700 dark:bg-neutral-900 sm:px-5">
+      <section className="border-b border-border pb-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -157,49 +158,22 @@ export function ReleaseRoster({
               onChange={(event) => setQuery(event.target.value)}
               aria-label="Search releases"
               placeholder="Search the record catalog..."
-              className="h-11 w-full rounded-full border border-neutral-400 bg-white pl-9 pr-4 text-sm text-neutral-950 shadow-sm outline-none transition placeholder:text-neutral-500 hover:border-neutral-500 focus:border-neutral-700 focus:ring-2 focus:ring-neutral-300 dark:border-neutral-600 dark:bg-neutral-950 dark:text-neutral-100 dark:placeholder:text-neutral-400"
+              className="w-full pl-9"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex h-11 items-center gap-2 rounded-full border border-neutral-400 bg-white px-3 text-sm text-neutral-600 shadow-sm transition hover:border-neutral-500 focus-within:border-neutral-700 focus-within:ring-2 focus-within:ring-neutral-300 dark:border-neutral-600 dark:bg-neutral-950 dark:text-neutral-300">
-              <SlidersHorizontal className="h-4 w-4" />
-              <NativeSelect
-                value={filter}
-                onChange={(event) => setFilter(event.target.value as FilterMode)}
-                aria-label="Filter releases by status"
-                className="bg-transparent text-foreground outline-none"
-              >
-                <option value="all">All records</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="ready">Ready</option>
-                <option value="attention">Needs care</option>
-                <option value="released">Released</option>
-              </NativeSelect>
-            </label>
-            <label className="inline-flex h-11 items-center gap-2 rounded-full border border-neutral-400 bg-white px-3 text-sm text-neutral-600 shadow-sm transition hover:border-neutral-500 focus-within:border-neutral-700 focus-within:ring-2 focus-within:ring-neutral-300 dark:border-neutral-600 dark:bg-neutral-950 dark:text-neutral-300">
-              <ArrowUpDown className="h-4 w-4" />
-              <NativeSelect
-                value={sort}
-                onChange={(event) => setSort(event.target.value as SortMode)}
-                aria-label="Sort releases"
-                className="bg-transparent text-foreground outline-none"
-              >
-                <option value="date">Release date</option>
-                <option value="readiness">Most urgent</option>
-                <option value="budget">Budget</option>
-                <option value="title">Title</option>
-              </NativeSelect>
-            </label>
+            <Select value={filter} onValueChange={value => setFilter((value ?? "all") as FilterMode)} aria-label="Filter releases by status" className="max-sm:w-full" options={[{ value: "all", label: "All records" }, { value: "upcoming", label: "Upcoming" }, { value: "ready", label: "Ready" }, { value: "attention", label: "Needs care" }, { value: "released", label: "Released" }]} />
+            <Select value={sort} onValueChange={value => setSort((value ?? "date") as SortMode)} aria-label="Sort releases" className="max-sm:w-full" options={[{ value: "date", label: "Release date" }, { value: "readiness", label: "Most urgent" }, { value: "budget", label: "Budget" }, { value: "title", label: "Title" }]} />
             {canMutate ? <ReleaseCreateDialog artists={artists} parentReleases={releases} /> : <ReadOnlyNotice />}
           </div>
         </div>
       </section>
 
       {visible.length ? (
-        <ReleaseGallery releases={visible} artists={artists} canMutate={canMutate} />
+        <ReleaseRows releases={visible} artists={artists} canMutate={canMutate} />
       ) : (
-        <div className="rounded-[1.5rem] border border-dashed border-border py-16 text-center">
+        <div className="py-12 text-center">
           <p className="text-sm font-medium text-foreground">No releases match this catalog view.</p>
           <p className="mt-1 text-sm text-muted-foreground">Adjust search or filters to bring the records back.</p>
         </div>
@@ -208,7 +182,7 @@ export function ReleaseRoster({
   );
 }
 
-function ReleaseGallery({
+function ReleaseRows({
   releases,
   artists,
   canMutate,
@@ -218,54 +192,38 @@ function ReleaseGallery({
   canMutate: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-x-5 gap-y-8 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="divide-y divide-border">
       {releases.map((release) => {
         const status = statusStyle(release);
-        const pct = readiness(release);
-        const releaseForActions = release as Release;
         return (
-          <article key={release.id} className="group">
-            <a href={`/releases/${release.id}`} className="block">
-              <CoverThumb release={release} size="gallery" />
-              <div className="mt-3 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    {release.catalog_number && <span className="shrink-0 font-mono text-[11px] font-medium text-muted-foreground">{release.catalog_number}</span>}
-                    <h2 className="truncate text-base font-semibold tracking-tight text-foreground">{release.title}</h2>
-                  </div>
-                  <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                    {release.artist_name || "No artist"} · {release.format || "No format"}
-                  </p>
-                </div>
-                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium ${status.className}`}>{status.label}</span>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                <Signal icon={<CalendarDays className="h-3.5 w-3.5" />} label={dateLabel(release.release_date)} />
-                <span>{releaseTimingLabel(release.release_date)}</span>
-              </div>
-
-              <div className="mt-3 h-1.5 rounded-full bg-muted">
-                <div className="h-full rounded-full bg-neutral-900 transition-all" style={{ width: `${pct}%` }} />
-              </div>
-            </a>
-
-            <div className="mt-3 flex items-center justify-between gap-2">
-              {release.missing_release_fields.length ? (
-                <div className="min-w-0 inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{nextAction(release)}</span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-1 text-xs text-emerald-700">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Delivery ready
-                </div>
-              )}
-              {canMutate && <div className="flex shrink-0 gap-1.5 opacity-70 transition group-hover:opacity-100">
-                <ReleaseEditButton release={releaseForActions} artists={artists} />
-                <ReleaseDeleteButton release={releaseForActions} />
-              </div>}
+          <article key={release.id} className="py-3">
+            <Item className="px-0 py-0">
+              <ItemMedia><a href={`/releases/${release.id}`} aria-label={`Open ${release.title}`}><CoverThumb release={release} /></a></ItemMedia>
+              <ItemContent className="min-w-0">
+                <ItemTitle><a href={`/releases/${release.id}`} className="hover:underline">{release.title}</a></ItemTitle>
+                <ItemDescription>{release.artist_name || "No artist"} · {release.format || "No format"}</ItemDescription>
+              </ItemContent>
+              <Badge variant={status.variant}>{status.label}</Badge>
+              <span className="hidden text-xs text-muted-foreground sm:block">{dateLabel(release.release_date)}</span>
+            </Item>
+            <div className="mt-2 pl-[58px]">
+              <a href={`/releases/${release.id}`} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:underline">
+                {release.release_ready ? <CheckCircle2 className="size-3.5" /> : <AlertTriangle className="size-3.5" />}
+                {nextAction(release)}
+              </a>
+              <Accordion>
+                <AccordionItem value="details">
+                  <AccordionTrigger className="py-1.5">Details <span className="sr-only">for {release.title}</span></AccordionTrigger>
+                  <AccordionContent className="space-y-3">
+                    <Signal icon={<CalendarDays className="size-3.5" />} label={`${dateLabel(release.release_date)} · ${releaseTimingLabel(release.release_date)}`} />
+                    <p className="text-xs text-muted-foreground">{readiness(release)}% metadata complete · {release.ready_track_count} of {release.track_count} tracks ready{release.catalog_number ? ` · ${release.catalog_number}` : ""}</p>
+                    {canMutate && <div className="flex gap-2">
+                      <ReleaseEditButton release={release as Release} artists={artists} parentReleases={releases} />
+                      <ReleaseDeleteButton release={release as Release} />
+                    </div>}
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           </article>
         );
@@ -275,10 +233,10 @@ function ReleaseGallery({
 }
 
 function ReadOnlyNotice() {
-  return <span className="text-sm text-muted-foreground">Read-only for fundraiser</span>;
+  return <span className="text-sm text-muted-foreground">Read-only for your role</span>;
 }
 
-function CoverThumb({ release, size = "list" }: { release: ReleaseRosterRow; size?: "list" | "gallery" }) {
+function CoverThumb({ release }: { release: ReleaseRosterRow }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -293,7 +251,7 @@ function CoverThumb({ release, size = "list" }: { release: ReleaseRosterRow; siz
       setSrc(isUsableRemoteImageUrl(release.cover_art_url) ? release.cover_art_url : null);
       return;
     }
-    resolveFileUrl(release.cover_art_url, size === "gallery" ? 320 : 96)
+    resolveFileUrl(release.cover_art_url, 96)
       .then((url) => {
         if (!cancelled) setSrc(url);
       })
@@ -305,16 +263,16 @@ function CoverThumb({ release, size = "list" }: { release: ReleaseRosterRow; siz
     };
   }, [release.cover_art_url]);
 
-  const sizeClass = size === "gallery" ? "aspect-square w-full" : "h-12 w-12";
+  const sizeClass = "h-12 w-12";
 
   if (src && !failed) {
     return (
-      <div className={`${sizeClass} overflow-hidden border border-border bg-neutral-900 shadow-[0_24px_55px_rgba(0,0,0,0.12)] transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_30px_70px_rgba(0,0,0,0.16)]`}>
+      <div className={`${sizeClass} overflow-hidden rounded-lg bg-muted`}>
         <img
           src={src}
           alt=""
-          width={size === "gallery" ? 320 : 96}
-          height={size === "gallery" ? 320 : 96}
+          width={96}
+          height={96}
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover"
@@ -325,7 +283,7 @@ function CoverThumb({ release, size = "list" }: { release: ReleaseRosterRow; siz
   }
 
   return (
-    <div className={`grid ${sizeClass} shrink-0 place-items-center border border-border bg-[radial-gradient(circle_at_30%_20%,#525252,#111)] text-xl font-semibold text-white shadow-[0_24px_55px_rgba(0,0,0,0.12)]`}>
+    <div className={`grid ${sizeClass} shrink-0 place-items-center rounded-lg bg-muted text-sm font-medium text-muted-foreground`}>
       {initials(release.title)}
     </div>
   );

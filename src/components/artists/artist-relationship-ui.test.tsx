@@ -53,7 +53,7 @@ describe("artist relationship UI", () => {
     expect(html).not.toContain("Core roster: True Blue, Former Actress, and Emanuella.");
   });
 
-  it("surfaces relationship provenance and missing-contact state", () => {
+  it("keeps relationship provenance behind a named disclosure", () => {
     const html = renderToStaticMarkup(
       <ArtistRoster
         artists={[{
@@ -65,7 +65,8 @@ describe("artist relationship UI", () => {
       />,
     );
 
-    expect(html).toContain("Evidence: Unclassified in Label Suite · no artist contact · Airtable mapping rec-artist-1");
+    expect(html).toContain("Details <span class=\"sr-only\">for Unmatched Artist</span>");
+    expect(html).not.toContain("Evidence:");
   });
 
   it("renders relationship and contact controls in the artist editor", () => {

@@ -174,3 +174,39 @@ visual acceptance and remaining route migrations are still pending.
 This delivery establishes common tokens and repairs the track editor. It does
 not claim that all routes, column controls, forms or portals have been migrated.
 The remaining workflow passes above are required for full-suite acceptance.
+
+## Catalog adoption — 30 September 2026
+
+After owner acceptance of the baseline as a starting point, the artist, release
+and work indices adopt shared Item rows, Badge states, Select filters,
+Accordion evidence and an actual Table for artist comparison. Duplicate desktop
+section headings and KPI/card stacks are removed. Mobile retains a visible
+section heading when the primary sidebar is hidden. Identity and the next
+useful action remain visible; provenance, provider observations and clearance
+evidence remain reachable through disclosures. Search/filter/sort behavior and
+readiness links are retained.
+
+Artist, release and work forms use shared FieldLabel/FieldError and default
+Input/Button styling, with stacked fields on phones. Release creation now uses
+the installed Dialog, and release editing reuses ReleaseForm instead of a
+second copy. Roster projection includes the existing parent release ID so
+editing retains rollout membership; legacy format/status values remain visible.
+Select menus are bounded by available viewport height.
+
+Catalog stories use fictional records and check filtering, comparison, evidence,
+rights navigation, EP parent selection and Dialog Escape/focus return. Integrated
+review uses the private True Nature preview; data and screenshots remain outside
+Git. This pass covers the indices and their forms. Remaining nested controls,
+provider uploads, live audio/version playback and full workflow persistence
+remain separate verification work. The UI pull request remains a draft; no
+merge or production deployment is claimed.
+
+Verification for this Catalog pass: 31 Chromium Storybook checks, Storybook
+TypeScript/static build, and complete local `npm run ci` pass (3,537 passed,
+215 skipped; separate Sisense stage 36 passed; schema check, Astro check with
+0 errors/0 warnings and app build pass). The CI fixture database is separate
+from the private preview. The previous remote failure was an obsolete
+pre-hydration heading assertion; it now verifies record identity and release
+section navigation. Those surfaces were observed with JavaScript disabled at
+1440/390/320px, without horizontal overflow. Updated remote release-gate results
+remain pending.

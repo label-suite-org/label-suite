@@ -3,7 +3,8 @@
 import { useId, useState, type SubmitEvent } from "react";
 
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
+import { FieldLabel, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 export interface Release {
   id: string;
@@ -73,71 +74,63 @@ export function ReleaseForm({ initial, artists, parentReleases = [], onClose }: 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label htmlFor={`${formId}-title`} className="block text-sm font-medium text-neutral-700 mb-1">Title *</label>
+        <FieldLabel htmlFor={`${formId}-title`} className="mb-2">Title *</FieldLabel>
         <Input id={`${formId}-title`} value={title} onChange={(e) => setTitle(e.target.value)} required
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+          className="w-full" />
       </div>
       <div>
-        <label htmlFor={`${formId}-artist`} className="block text-sm font-medium text-neutral-700 mb-1">Artist</label>
-        <NativeSelect id={`${formId}-artist`} value={artistId} onChange={(e) => setArtistId(e.target.value)}
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900">
-          <option value="">— Select artist —</option>
-          {artists.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-        </NativeSelect>
+        <FieldLabel htmlFor={`${formId}-artist`} className="mb-2">Artist</FieldLabel>
+        <Select id={`${formId}-artist`} placeholder="Select artist" value={artistId} onValueChange={value => setArtistId(value ?? "")} className="w-full" options={[
+          { value: "", label: "Select artist" }, ...artists.map(artist => ({ value: artist.id, label: artist.name })),
+        ]} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-release-date`} className="block text-sm font-medium text-neutral-700 mb-1">Release Date</label>
+          <FieldLabel htmlFor={`${formId}-release-date`} className="mb-2">Release Date</FieldLabel>
           <Input id={`${formId}-release-date`} type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+            className="w-full" />
         </div>
         <div>
-          <label htmlFor={`${formId}-format`} className="block text-sm font-medium text-neutral-700 mb-1">Format</label>
-          <NativeSelect id={`${formId}-format`} value={format} onChange={(e) => { setFormat(e.target.value); if (e.target.value.toLowerCase() !== "single") setParentReleaseId(""); }}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900">
-            <option value="single">Single</option>
-            <option value="EP">EP</option>
-            <option value="album">Album</option>
-          </NativeSelect>
+          <FieldLabel htmlFor={`${formId}-format`} className="mb-2">Format</FieldLabel>
+          <Select id={`${formId}-format`} value={format} onValueChange={value => { setFormat(value ?? "single"); if (value?.toLowerCase() !== "single") setParentReleaseId(""); }} className="w-full" options={[
+            { value: "single", label: "Single" }, { value: "EP", label: "EP" }, { value: "album", label: "Album" },
+            ...(!["single", "EP", "album"].includes(format) ? [{ value: format, label: format }] : []),
+          ]} />
         </div>
       </div>
       {isSingle && parentReleases.length > 0 && (
         <div>
-          <label htmlFor={`${formId}-parent-release`} className="block text-sm font-medium text-neutral-700 mb-1">Part of an EP rollout</label>
-          <NativeSelect id={`${formId}-parent-release`} value={parentReleaseId} onChange={(e) => setParentReleaseId(e.target.value)} className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900">
-            <option value="">— Independent release —</option>
-            {parentReleases.filter((release) => release.id !== initial?.id && release.format != null && ["ep", "album"].includes(release.format.toLowerCase())).map((release) => <option key={release.id} value={release.id}>{release.title} ({release.format})</option>)}
-          </NativeSelect>
+          <FieldLabel htmlFor={`${formId}-parent-release`} className="mb-2">Part of an EP rollout</FieldLabel>
+          <Select id={`${formId}-parent-release`} placeholder="Independent release" value={parentReleaseId} onValueChange={value => setParentReleaseId(value ?? "")} className="w-full" options={[
+            { value: "", label: "Independent release" },
+            ...parentReleases.filter(release => release.id !== initial?.id && release.format != null && ["ep", "album"].includes(release.format.toLowerCase())).map(release => ({ value: release.id, label: `${release.title} (${release.format})` })),
+          ]} />
           <p className="mt-1 text-xs text-muted-foreground">The single keeps its own release plan, budget, and results, while appearing in the parent EP’s rollout.</p>
         </div>
       )}
       <div>
-        <label htmlFor={`${formId}-status`} className="block text-sm font-medium text-neutral-700 mb-1">Status</label>
-        <NativeSelect id={`${formId}-status`} value={status} onChange={(e) => setStatus(e.target.value)}
-          className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900">
-          <option value="draft">Draft</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="released">Released</option>
-          <option value="archived">Archived</option>
-        </NativeSelect>
+        <FieldLabel htmlFor={`${formId}-status`} className="mb-2">Status</FieldLabel>
+        <Select id={`${formId}-status`} value={status} onValueChange={value => setStatus(value ?? "draft")} className="w-full" options={[
+          { value: "draft", label: "Draft" }, { value: "scheduled", label: "Scheduled" }, { value: "released", label: "Released" }, { value: "archived", label: "Archived" },
+          ...(!["draft", "scheduled", "released", "archived"].includes(status) ? [{ value: status, label: status }] : []),
+        ]} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-upc`} className="block text-sm font-medium text-neutral-700 mb-1">UPC/EAN</label>
+          <FieldLabel htmlFor={`${formId}-upc`} className="mb-2">UPC/EAN</FieldLabel>
           <Input id={`${formId}-upc`} value={upc} onChange={(e) => setUpc(e.target.value)}
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+            className="w-full" />
         </div>
         <div>
-          <label htmlFor={`${formId}-cover-art`} className="block text-sm font-medium text-neutral-700 mb-1">Cover Art URL</label>
+          <FieldLabel htmlFor={`${formId}-cover-art`} className="mb-2">Cover Art URL</FieldLabel>
           <Input id={`${formId}-cover-art`} value={coverArt} onChange={(e) => setCoverArt(e.target.value)} placeholder="https://..."
-            className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900" />
+            className="w-full" />
         </div>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FieldError>{error}</FieldError>}
       <div className="flex gap-2 justify-end">
-        <Button variant="ghost" type="button" onClick={onClose} className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900">Cancel</Button>
-        <Button variant="ghost" type="submit" disabled={loading}
-          className="px-4 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 disabled:opacity-50">
+        <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : isEdit ? "Save Changes" : "Create Release"}
         </Button>
       </div>

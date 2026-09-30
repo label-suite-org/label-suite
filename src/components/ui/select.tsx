@@ -50,7 +50,7 @@ export function Select({
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
         <SelectPrimitive.Positioner sideOffset={6} className="z-50 outline-none">
-          <SelectPrimitive.Popup className="min-w-(--anchor-width) overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none">
+          <SelectPrimitive.Popup className="max-h-(--available-height) min-w-(--anchor-width) overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none">
             <SelectPrimitive.List>
               {options.map((option) => (
                 <SelectPrimitive.Item

@@ -50,9 +50,9 @@ Start at **Library / Patterns / Foundations**, then review:
 - **Patterns:** release rows, tabs and optional details, comparable rights data,
   empty catalog, loading and recoverable failure.
 - **Layers:** confirmation and context panel, including Escape and focus return.
-- **Navigation / Sidebar** and **Artists / Workspace:** actual consumer components.
+- **Navigation / Sidebar**, **Artists / Workspace** and **Catalog / Working views:** actual consumer components, including lists, comparison and creation/editing forms.
 
-Stories use fictional records. Example actions change local story state only;
+Stories use fictional records. Example actions change local story state only; Catalog form previews exercise selection and dismissal without submission;
 they do not upload, save catalog data, remove assets or retry a real provider.
 See `docs/storybook.md` for commands and the official MCP.
 

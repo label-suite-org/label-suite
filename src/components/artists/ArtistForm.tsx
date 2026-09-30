@@ -7,6 +7,7 @@ import { CampaignRichTextEditor } from "../campaigns/CampaignRichTextEditor";
 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { FieldLabel, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 export interface ContactOption {
   id: string;
@@ -135,12 +136,12 @@ export function ArtistForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4 text-left">
       <div>
-        <label htmlFor={`${formId}-name`} className="block text-sm font-medium text-foreground mb-1">Name *</label>
+        <FieldLabel htmlFor={`${formId}-name`} className="mb-2">Name *</FieldLabel>
         <Input id={`${formId}-name`} value={name} onChange={(e) => setName(e.target.value)} required
           className="w-full" />
       </div>
       <div>
-        <label htmlFor={`${formId}-image`} className="block text-sm font-medium text-foreground mb-1">Artist image (optional)</label>
+        <FieldLabel htmlFor={`${formId}-image`} className="mb-2">Artist image (optional)</FieldLabel>
         <Input id={`${formId}-image`} value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://... or artists/.../photo.jpg"
           className="w-full" />
       </div>
@@ -171,12 +172,12 @@ export function ArtistForm({
           }}
         />
         {bioFallback ? (
-          <div className="mt-2 space-y-2 text-xs text-amber-700" role="alert">
+          <div className="mt-2 space-y-2 text-xs text-warning-foreground" role="alert">
             <p>This stored biography is invalid. It is shown safely and cannot be edited or reviewed until it is explicitly replaced.</p>
             <Button variant="outline"
               type="button"
               onClick={replaceInvalidBio}
-              className="rounded border border-amber-300 bg-amber-50 px-3 py-1.5 font-medium text-amber-900"
+
             >
               Replace invalid biography
             </Button>
@@ -187,50 +188,50 @@ export function ArtistForm({
             type="button"
             onClick={reviewBio}
             disabled={reviewingBio || bioDirty || bioFallback || bioState === "missing" || bioState === "reviewed"}
-            className="mt-2 rounded border border-neutral-300 px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-2"
           >
             {bioFallback ? "Replace invalid biography first" : bioDirty ? "Save before review" : reviewingBio ? "Reviewing…" : bioState === "reviewed" ? "Reviewed" : "Mark biography reviewed"}
           </Button>
         ) : null}
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-pro`} className="block text-sm font-medium text-foreground mb-1">PRO</label>
+          <FieldLabel htmlFor={`${formId}-pro`} className="mb-2">PRO</FieldLabel>
           <Input id={`${formId}-pro`} value={pro} onChange={(e) => setPro(e.target.value)} placeholder="ASCAP, KODA..." autoFocus={focusField === "pro"}
             className="w-full" />
         </div>
         <div>
-          <label htmlFor={`${formId}-spotify-id`} className="block text-sm font-medium text-foreground mb-1">Spotify ID</label>
+          <FieldLabel htmlFor={`${formId}-spotify-id`} className="mb-2">Spotify ID</FieldLabel>
           <Input id={`${formId}-spotify-id`} value={spotifyId} onChange={(e) => setSpotifyId(e.target.value)} autoFocus={focusField === "spotify_id"}
             className="w-full" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-ipi`} className="block text-sm font-medium text-foreground mb-1">IPI</label>
+          <FieldLabel htmlFor={`${formId}-ipi`} className="mb-2">IPI</FieldLabel>
           <Input id={`${formId}-ipi`} value={ipi} onChange={(e) => setIpi(e.target.value)} autoFocus={focusField === "ipi"}
             className="w-full" />
         </div>
         <div>
-          <label htmlFor={`${formId}-instagram`} className="block text-sm font-medium text-foreground mb-1">Instagram</label>
+          <FieldLabel htmlFor={`${formId}-instagram`} className="mb-2">Instagram</FieldLabel>
           <Input id={`${formId}-instagram`} value={instagram} onChange={(e) => setInstagram(e.target.value)} autoFocus={focusField === "instagram"}
             className="w-full" />
         </div>
       </div>
       <div>
-        <label htmlFor={`${formId}-tiktok`} className="block text-sm font-medium text-foreground mb-1">TikTok</label>
+        <FieldLabel htmlFor={`${formId}-tiktok`} className="mb-2">TikTok</FieldLabel>
         <Input id={`${formId}-tiktok`} value={tiktok} onChange={(e) => setTiktok(e.target.value)} autoFocus={focusField === "tiktok"}
           className="w-full" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-relationship`} className="block text-sm font-medium text-foreground mb-1">Roster relationship</label>
+          <FieldLabel htmlFor={`${formId}-relationship`} className="mb-2">Roster relationship</FieldLabel>
           <Select id={`${formId}-relationship`} aria-label="Roster relationship" placeholder="Unclassified" value={relationship} onValueChange={value => setRelationship(value ?? "")} className="w-full" options={[
             { value: "", label: "Unclassified" }, { value: "roster", label: "Roster" }, { value: "collaborator", label: "Collaborator" },
           ]} />
         </div>
         <div>
-          <label htmlFor={`${formId}-contact`} className="block text-sm font-medium text-foreground mb-1">Primary contact</label>
+          <FieldLabel htmlFor={`${formId}-contact`} className="mb-2">Primary contact</FieldLabel>
           <Select id={`${formId}-contact`} aria-label="Primary contact" placeholder="None" value={contactId} onValueChange={value => setContactId(value ?? "")} className="w-full" options={[
             { value: "", label: "None" }, ...safeContactOptions.map(contact => ({ value: contact.id, label: contact.name })),
           ]} />
@@ -238,11 +239,10 @@ export function ArtistForm({
       </div>
         </div>
       </details>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FieldError>{error}</FieldError>}
       <div className="flex gap-2 justify-end">
-        <Button variant="ghost" type="button" onClick={onClose} className="px-4 py-2 text-sm text-neutral-600 hover:text-neutral-900">Cancel</Button>
-        <Button type="submit" disabled={loading}
-          >
+        <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : isEdit ? "Save Changes" : "Create Artist"}
         </Button>
       </div>

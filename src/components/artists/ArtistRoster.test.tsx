@@ -36,7 +36,7 @@ function makeArtist(overrides: Partial<ArtistRosterRow>): ArtistRosterRow {
   };
 }
 
-describe("ArtistRoster gallery cards", () => {
+describe("ArtistRoster browsing rows", () => {
   it("renders representative upcoming, incomplete, complete, and empty-catalog artists with textual readiness", () => {
     const html = renderToStaticMarkup(
       <ArtistRoster

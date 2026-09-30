@@ -7,7 +7,9 @@ catalog database or load production credentials.
 Start visual review at **Library / Patterns / Foundations**. The shared
 [component baseline](component-library.md) records sizing, typography, state
 and which component to use for each purpose. Actions, Fields, Patterns and
-Layers show meaningful states; Navigation and Artists show actual consumers.
+Layers show meaningful states; Navigation, Artists and Catalog show actual consumers.
+Catalog stories cover list filtering, evidence disclosures, comparison, release
+rollout selection, and creation-dialog Escape with focus return.
 
 ```sh
 npm run storybook
