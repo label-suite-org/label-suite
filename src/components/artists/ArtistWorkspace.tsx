@@ -19,6 +19,7 @@ import type { Artist, ArtistFocusField, ContactOption } from "./ArtistForm";
 import { normalizeReviewedRichText } from "../../lib/reviewed-rich-text";
 
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
@@ -623,9 +624,9 @@ function ReleaseGrid({ releases }: { releases: ArtistRelease[] }) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="break-words text-sm font-semibold text-foreground">{release.title}</h3>
-                <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium ${release.release_ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
+                <Badge variant={release.release_ready ? "success" : "warning"}>
                   {release.release_ready ? "Ready" : "Needs work"}
-                </span>
+                </Badge>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{release.format || "No format"} - {formatDate(release.release_date)}</p>
               <p className="mt-2 text-xs capitalize text-muted-foreground">{normalizeStatus(release.status)}</p>
@@ -837,7 +838,7 @@ function ArtistAssetRow({ artist, asset }: { artist: ArtistDetail; asset: Artist
               </p>
             </div>
             {asset.file_link ? (
-              <Button variant="outline" type="button" onClick={openAsset} className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={`Open ${asset.asset_name}`}>
+              <Button variant="outline" size="icon" type="button" onClick={openAsset} aria-label={`Open ${asset.asset_name}`}>
                 <ExternalLink className="h-4 w-4" />
               </Button>
             ) : null}
@@ -852,7 +853,7 @@ function ArtistAssetRow({ artist, asset }: { artist: ArtistDetail; asset: Artist
               type="button"
               onClick={makePrimary}
               disabled={settingPrimary}
-              className="mt-3 inline-flex h-8 items-center rounded-md border border-border px-2.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+              className="mt-3"
             >
               {settingPrimary ? "Setting..." : "Set primary image"}
             </Button>
@@ -886,10 +887,10 @@ function ReadinessCard({
             return (
               <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                <Badge variant="success">
                   <span>Complete</span>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                </span>
+                  <CheckCircle2 aria-hidden="true" />
+                </Badge>
               </div>
             );
           }
@@ -898,10 +899,10 @@ function ReadinessCard({
             return (
               <div key={row.label} className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-3 text-sm">
                 <span className="text-muted-foreground">{row.label}</span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                <Badge variant="warning">
                   <span>Missing</span>
-                  <AlertTriangle className="h-4 w-4 text-amber-700" />
-                </span>
+                  <AlertTriangle aria-hidden="true" />
+                </Badge>
               </div>
             );
           }
@@ -937,7 +938,6 @@ function ReadinessCard({
                 variant="outline"
                 type="button"
                 onClick={() => onReadinessAction(action.destination)}
-                className="inline-flex h-8 items-center rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
               >
                 {actionLabel}
               </Button>
@@ -1043,14 +1043,14 @@ function AssetThumb({ asset }: { asset: ArtistAsset }) {
 
 function StatusPill({ value }: { value: string }) {
   const tone = value === "approved" || value === "delivered"
-    ? "bg-emerald-50 text-emerald-700"
+    ? "success"
     : value === "changes_requested" || value === "queued"
-      ? "bg-amber-50 text-amber-800"
+      ? "warning"
       : value === "rejected"
-        ? "bg-red-50 text-red-700"
-        : "bg-muted text-muted-foreground";
+        ? "destructive"
+        : "secondary";
 
-  return <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium capitalize ${tone}`}>{value.replace(/_/g, " ")}</span>;
+  return <Badge variant={tone} className="capitalize">{value.replace(/_/g, " ")}</Badge>;
 }
 
 function Metric({

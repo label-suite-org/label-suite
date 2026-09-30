@@ -60,6 +60,9 @@ provider-owned, read-only observations, never profile inputs or readiness tasks.
 Review shared components and meaningful states in Storybook using the same
 tokens and fictional records. Follow `docs/storybook.md`, then check the actual
 route: an isolated story does not establish integrated workflow correctness.
+The [component baseline](docs/component-library.md) documents shared defaults,
+component selection and adoption. Review it before continuing page migrations;
+avoid overriding primitive appearance in individual pages.
 
 ## Evidence and truth
 

@@ -162,6 +162,15 @@ Owner acceptance, remote CI, merge and deployment remain separate gates.
 
 ## First delivery boundary
 
+The component workshop now includes a reviewable shared baseline in
+`docs/component-library.md`: foundations, actions, fields, record lists,
+tabs/disclosures, feedback and layers. Twenty-four fictional stories exercise
+the installed components and actual artist/navigation consumers. Artist release,
+asset and readiness states use the shared Badge variants; local action-button
+styling is removed. Select now matches Input height, radius and focus treatment.
+Context Sheet motion and loading indicators respect reduced motion. Baseline
+visual acceptance and remaining route migrations are still pending.
+
 This delivery establishes common tokens and repairs the track editor. It does
 not claim that all routes, column controls, forms or portals have been migrated.
 The remaining workflow passes above are required for full-suite acceptance.

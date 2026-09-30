@@ -4,6 +4,11 @@ Storybook uses the app's React components and `global.css`, including installed
 shadcn components. Stories contain fictional records and do not connect to a
 catalog database or load production credentials.
 
+Start visual review at **Library / Patterns / Foundations**. The shared
+[component baseline](component-library.md) records sizing, typography, state
+and which component to use for each purpose. Actions, Fields, Patterns and
+Layers show meaningful states; Navigation and Artists show actual consumers.
+
 ```sh
 npm run storybook
 npm run storybook:build
