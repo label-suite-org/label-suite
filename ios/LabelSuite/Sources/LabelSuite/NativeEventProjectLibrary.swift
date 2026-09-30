@@ -48,9 +48,13 @@ public struct NativeLinkedRecord: Codable, Equatable, Identifiable, Sendable {
   public let name: String
   public let status: String?
   public let nextAction: String?
+  public let resourceKind: NativeResourceKind?
+  public let resourceID: String?
   enum CodingKeys: String, CodingKey {
     case id, name, status
     case nextAction = "next_action"
+    case resourceKind = "resource_kind"
+    case resourceID = "resource_id"
   }
 }
 public struct NativeBudgetRecord: Codable, Equatable, Identifiable, Sendable {
@@ -269,9 +273,19 @@ public struct NativeEventCreateInput: Encodable, Sendable {
   public let status: String?
   public let projectID: String?
   public let agenda: String?
+  public let artistID: String?
+  public let releaseID: String?
+  public let contactID: String?
+  public let ownerContactID: String?
+  public let endDate: String?
+  public let startsAt: String?
+  public let endsAt: String?
+  public let timezone: String?
+  public let venueName: String?
   public init(
     title: String, eventType: String, startDate: String, status: String? = nil,
-    projectID: String? = nil, agenda: String? = nil
+    projectID: String? = nil, agenda: String? = nil,
+    artistID: String? = nil, releaseID: String? = nil, contactID: String? = nil, ownerContactID: String? = nil, endDate: String? = nil, startsAt: String? = nil, endsAt: String? = nil, timezone: String? = nil, venueName: String? = nil
   ) {
     self.title = title
     self.eventType = eventType
@@ -279,6 +293,15 @@ public struct NativeEventCreateInput: Encodable, Sendable {
     self.status = status
     self.projectID = projectID
     self.agenda = agenda
+    self.artistID = artistID
+    self.releaseID = releaseID
+    self.contactID = contactID
+    self.ownerContactID = ownerContactID
+    self.endDate = endDate
+    self.startsAt = startsAt
+    self.endsAt = endsAt
+    self.timezone = timezone
+    self.venueName = venueName
   }
   enum CodingKeys: String, CodingKey {
     case title
@@ -287,6 +310,15 @@ public struct NativeEventCreateInput: Encodable, Sendable {
     case status
     case projectID = "project_id"
     case agenda = "notes"
+    case artistID = "artist_id"
+    case releaseID = "release_id"
+    case contactID = "contact_id"
+    case ownerContactID = "owner_contact_id"
+    case endDate = "end_date"
+    case startsAt = "starts_at"
+    case endsAt = "ends_at"
+    case timezone
+    case venueName = "venue_name"
   }
 }
 public struct NativeEventUpdateInput: Encodable, Sendable {
@@ -297,9 +329,19 @@ public struct NativeEventUpdateInput: Encodable, Sendable {
   public let startDate: String??
   public let endDate: String??
   public let expectedRevision: String
+  public let projectID: String??
+  public let artistID: String??
+  public let releaseID: String??
+  public let contactID: String??
+  public let ownerContactID: String??
+  public let startsAt: String??
+  public let endsAt: String??
+  public let timezone: String??
+  public let venueName: String??
   public init(
     title: String? = nil, status: String? = nil, agenda: String?? = nil, startDate: String?? = nil,
-    endDate: String?? = nil, expectedRevision: String
+    endDate: String?? = nil, expectedRevision: String,
+    projectID: String?? = nil, artistID: String?? = nil, releaseID: String?? = nil, contactID: String?? = nil, ownerContactID: String?? = nil, startsAt: String?? = nil, endsAt: String?? = nil, timezone: String?? = nil, venueName: String?? = nil
   ) {
     self.title = title
     self.status = status
@@ -307,6 +349,15 @@ public struct NativeEventUpdateInput: Encodable, Sendable {
     self.startDate = startDate
     self.endDate = endDate
     self.expectedRevision = expectedRevision
+    self.projectID = projectID
+    self.artistID = artistID
+    self.releaseID = releaseID
+    self.contactID = contactID
+    self.ownerContactID = ownerContactID
+    self.startsAt = startsAt
+    self.endsAt = endsAt
+    self.timezone = timezone
+    self.venueName = venueName
   }
   enum CodingKeys: String, CodingKey {
     case title, status
@@ -314,6 +365,15 @@ public struct NativeEventUpdateInput: Encodable, Sendable {
     case startDate = "start_date"
     case endDate = "end_date"
     case expectedRevision = "expected_revision"
+    case projectID = "project_id"
+    case artistID = "artist_id"
+    case releaseID = "release_id"
+    case contactID = "contact_id"
+    case ownerContactID = "owner_contact_id"
+    case startsAt = "starts_at"
+    case endsAt = "ends_at"
+    case timezone
+    case venueName = "venue_name"
   }
   public func encode(to encoder: Encoder) throws {
     var values = encoder.container(keyedBy: CodingKeys.self)
@@ -322,6 +382,15 @@ public struct NativeEventUpdateInput: Encodable, Sendable {
     if let agenda { try values.encode(agenda, forKey: .agenda) }
     if let startDate { try values.encode(startDate, forKey: .startDate) }
     if let endDate { try values.encode(endDate, forKey: .endDate) }
+    if let projectID { try values.encode(projectID, forKey: .projectID) }
+    if let artistID { try values.encode(artistID, forKey: .artistID) }
+    if let releaseID { try values.encode(releaseID, forKey: .releaseID) }
+    if let contactID { try values.encode(contactID, forKey: .contactID) }
+    if let ownerContactID { try values.encode(ownerContactID, forKey: .ownerContactID) }
+    if let startsAt { try values.encode(startsAt, forKey: .startsAt) }
+    if let endsAt { try values.encode(endsAt, forKey: .endsAt) }
+    if let timezone { try values.encode(timezone, forKey: .timezone) }
+    if let venueName { try values.encode(venueName, forKey: .venueName) }
     try values.encode(expectedRevision, forKey: .expectedRevision)
   }
 }
@@ -330,19 +399,35 @@ public struct NativeProjectCreateInput: Encodable, Sendable {
   public let projectType: String?
   public let goal: String?
   public let startDate: String?
+  public let status: String?
+  public let endDate: String?
+  public let artistID: String?
+  public let releaseID: String?
+  public let ownerContactID: String?
   public init(
-    name: String, projectType: String? = nil, goal: String? = nil, startDate: String? = nil
+    name: String, projectType: String? = nil, goal: String? = nil, startDate: String? = nil,
+    status: String? = nil, endDate: String? = nil, artistID: String? = nil, releaseID: String? = nil, ownerContactID: String? = nil
   ) {
     self.name = name
     self.projectType = projectType
     self.goal = goal
     self.startDate = startDate
+    self.status = status
+    self.endDate = endDate
+    self.artistID = artistID
+    self.releaseID = releaseID
+    self.ownerContactID = ownerContactID
   }
   enum CodingKeys: String, CodingKey {
     case name
     case projectType = "project_type"
     case goal = "description"
     case startDate = "start_date"
+    case status
+    case endDate = "end_date"
+    case artistID = "artist_id"
+    case releaseID = "release_id"
+    case ownerContactID = "owner_contact_id"
   }
 }
 public struct NativeProjectUpdateInput: Encodable, Sendable {
@@ -353,9 +438,13 @@ public struct NativeProjectUpdateInput: Encodable, Sendable {
   public let startDate: String??
   public let endDate: String??
   public let expectedRevision: String
+  public let artistID: String??
+  public let releaseID: String??
+  public let ownerContactID: String??
   public init(
     name: String? = nil, goal: String?? = nil, status: String? = nil, startDate: String?? = nil,
-    endDate: String?? = nil, expectedRevision: String
+    endDate: String?? = nil, expectedRevision: String,
+    artistID: String?? = nil, releaseID: String?? = nil, ownerContactID: String?? = nil
   ) {
     self.name = name
     self.goal = goal
@@ -363,6 +452,9 @@ public struct NativeProjectUpdateInput: Encodable, Sendable {
     self.startDate = startDate
     self.endDate = endDate
     self.expectedRevision = expectedRevision
+    self.artistID = artistID
+    self.releaseID = releaseID
+    self.ownerContactID = ownerContactID
   }
   enum CodingKeys: String, CodingKey {
     case name
@@ -371,6 +463,9 @@ public struct NativeProjectUpdateInput: Encodable, Sendable {
     case startDate = "start_date"
     case endDate = "end_date"
     case expectedRevision = "expected_revision"
+    case artistID = "artist_id"
+    case releaseID = "release_id"
+    case ownerContactID = "owner_contact_id"
   }
   public func encode(to encoder: Encoder) throws {
     var values = encoder.container(keyedBy: CodingKeys.self)
@@ -379,6 +474,9 @@ public struct NativeProjectUpdateInput: Encodable, Sendable {
     try values.encodeIfPresent(status, forKey: .status)
     if let startDate { try values.encode(startDate, forKey: .startDate) }
     if let endDate { try values.encode(endDate, forKey: .endDate) }
+    if let artistID { try values.encode(artistID, forKey: .artistID) }
+    if let releaseID { try values.encode(releaseID, forKey: .releaseID) }
+    if let ownerContactID { try values.encode(ownerContactID, forKey: .ownerContactID) }
     try values.encode(expectedRevision, forKey: .expectedRevision)
   }
 }
@@ -604,7 +702,7 @@ struct NativeEventDetailView: View {
           partial: detail.relationshipWindows?.files?.partial)
         relation(
           "Shared documents", detail.relationships.documents ?? [],
-          partial: detail.relationshipWindows?.documents?.partial)
+          partial: detail.relationshipWindows?.documents?.partial, resourceKind: .documents)
         if let source = detail.sourceContext.sourceSystem {
           Section("Imported source · read-only") {
             Text(source)
@@ -635,7 +733,7 @@ struct NativeEventDetailView: View {
         relation(
           "Assets", detail.relationships.assets,
           partial: detail.relationshipWindows?.assets?.partial,
-          availability: detail.relationshipAvailability?.assets)
+          availability: detail.relationshipAvailability?.assets, resourceKind: .assets)
         if let project = detail.relationships.project {
           Section("Project") {
             NavigationLink(project.name) {
@@ -670,13 +768,26 @@ struct NativeEventDetailView: View {
   }
   private func relation(
     _ title: String, _ values: [NativeLinkedRecord], partial: Bool?,
-    availability: NativeRelationshipAvailability? = nil
+    availability: NativeRelationshipAvailability? = nil, resourceKind: NativeResourceKind? = nil,
+    grantApplications: Bool = false
   ) -> some View {
     Section(title) {
       availabilityText(availability)
       if values.isEmpty { Text("No linked \(title.lowercased()).").foregroundStyle(.secondary) }
-      ForEach(values) {
-        Text([$0.name, $0.status, $0.nextAction].compactMap { $0 }.joined(separator: " · "))
+      ForEach(values) { item in
+        let label = [item.name, item.status, item.nextAction].compactMap { $0 }.joined(separator: " · ")
+        if let kind = resourceKind ?? item.resourceKind, let resourceID = resourceKind == nil ? item.resourceID : item.id {
+          NavigationLink(label) {
+            NativeResourceDetailView(kind: kind, id: resourceID, workspace: workspace, session: session, api: api)
+          }
+        } else if grantApplications {
+          NavigationLink(label) {
+            NativeGrantsView(workspace: workspace, session: session, api: api, applicationID: item.id)
+          }
+        } else {
+          Text(label)
+          if title == "Files" { Text("No canonical Asset or Document is linked to this file.").font(.caption).foregroundStyle(.secondary) }
+        }
       }
       if partial == true {
         Text("Showing a partial list.").font(.caption).foregroundStyle(.secondary)
@@ -823,7 +934,7 @@ struct NativeProjectDetailView: View {
           partial: detail.relationshipWindows?.files?.partial)
         relation(
           "Documents", detail.relationships.documents ?? [],
-          partial: detail.relationshipWindows?.documents?.partial)
+          partial: detail.relationshipWindows?.documents?.partial, resourceKind: .documents)
         if let source = detail.sourceContext.sourceSystem {
           Section("Imported source · read-only") {
             Text(source)
@@ -854,10 +965,10 @@ struct NativeProjectDetailView: View {
         relation(
           "Assets", detail.relationships.assets,
           partial: detail.relationshipWindows?.assets?.partial,
-          availability: detail.relationshipAvailability?.assets)
+          availability: detail.relationshipAvailability?.assets, resourceKind: .assets)
         relation(
           "Grant applications", detail.relationships.grants,
-          partial: detail.relationshipWindows?.grants?.partial)
+          partial: detail.relationshipWindows?.grants?.partial, grantApplications: true)
         Section("Campaigns for the same artist or release") {
           if detail.relationships.campaigns.isEmpty {
             Text("No campaigns linked to this artist or release.").foregroundStyle(.secondary)
@@ -901,7 +1012,8 @@ struct NativeProjectDetailView: View {
   }
   private func relation(
     _ title: String, _ values: [NativeLinkedRecord], partial: Bool?,
-    availability: NativeRelationshipAvailability? = nil
+    availability: NativeRelationshipAvailability? = nil, resourceKind: NativeResourceKind? = nil,
+    grantApplications: Bool = false
   ) -> some View {
     Section(title) {
       if let availability, availability.status != "available" {
@@ -909,8 +1021,20 @@ struct NativeProjectDetailView: View {
           .foregroundStyle(.secondary)
       }
       if values.isEmpty { Text("No linked \(title.lowercased()).").foregroundStyle(.secondary) }
-      ForEach(values) {
-        Text([$0.name, $0.status, $0.nextAction].compactMap { $0 }.joined(separator: " · "))
+      ForEach(values) { item in
+        let label = [item.name, item.status, item.nextAction].compactMap { $0 }.joined(separator: " · ")
+        if let kind = resourceKind ?? item.resourceKind, let resourceID = resourceKind == nil ? item.resourceID : item.id {
+          NavigationLink(label) {
+            NativeResourceDetailView(kind: kind, id: resourceID, workspace: workspace, session: session, api: api)
+          }
+        } else if grantApplications {
+          NavigationLink(label) {
+            NativeGrantsView(workspace: workspace, session: session, api: api, applicationID: item.id)
+          }
+        } else {
+          Text(label)
+          if title == "Files" { Text("No canonical Asset or Document is linked to this file.").font(.caption).foregroundStyle(.secondary) }
+        }
       }
       if partial == true {
         Text("Showing a partial list.").font(.caption).foregroundStyle(.secondary)
@@ -953,6 +1077,70 @@ struct NativeProjectDetailView: View {
     }
   }
 }
+private struct NativeEventTimeField: View {
+  let title: String
+  @Binding var value: String
+  private var date: Date? {
+    let fractional = ISO8601DateFormatter()
+    fractional.formatOptions.insert(.withFractionalSeconds)
+    return fractional.date(from: value) ?? ISO8601DateFormatter().date(from: value)
+  }
+  var body: some View {
+    Section(title) {
+      Toggle("Time recorded", isOn: Binding(get: { !value.isEmpty }, set: { value = $0 ? ISO8601DateFormatter().string(from: Date()) : "" }))
+      if !value.isEmpty {
+        DatePicker(title, selection: Binding(get: { date ?? Date() }, set: { value = ISO8601DateFormatter().string(from: $0) }))
+      }
+    }
+  }
+}
+private struct NativeEventProjectLinkPicker: View {
+  let title: String
+  let kind: String
+  @Binding var selectedID: String?
+  let workspace: Workspace
+  @ObservedObject var session: NativeSessionController
+  let api: NativeAPI
+  @State private var query = ""
+  @State private var results: [NativeSearchItem] = []
+  @State private var selectedName: String?
+  @State private var searching = false
+  @State private var errorMessage: String?
+  var body: some View {
+    DisclosureGroup(title + ": " + (selectedName ?? (selectedID == nil ? "None" : "Linked record"))) {
+      if selectedID != nil {
+        Text(selectedName ?? selectedID!).font(.caption).foregroundStyle(.secondary)
+        Button("Remove " + title) { selectedID = nil; selectedName = nil }
+      }
+      TextField("Search " + title.lowercased(), text: $query).onSubmit { Task { await search() } }.onChange(of: query) { _, _ in results = []; errorMessage = nil }
+      Button(searching ? "Searching…" : "Search") { Task { await search() } }
+        .disabled(searching || query.nativeTrimmed == nil)
+      if let errorMessage { Text(errorMessage).foregroundStyle(.orange) }
+      ForEach(results) { item in
+        Button { selectedID = item.id; selectedName = item.title; results = [] } label: {
+          VStack(alignment: .leading) {
+            Text(item.title)
+            if let subtitle = item.subtitle { Text(subtitle).font(.caption).foregroundStyle(.secondary) }
+          }
+        }
+      }
+    }
+  }
+  private func search() async {
+    guard !searching, let query = query.nativeTrimmed, let requestSession = session.sessionForRequests() else { return }
+    searching = true; errorMessage = nil; results = []
+    defer { searching = false }
+    do {
+      let response = try await api.search(query: query, workspace: workspace, session: requestSession)
+      guard session.acceptsResponse(for: requestSession, workspaceID: workspace.id), self.query.nativeTrimmed == query else { return }
+      results = response.groups.filter { $0.kind == kind }.flatMap(\.items)
+      if results.isEmpty { errorMessage = "No matching " + title.lowercased() + " in this workspace." }
+    } catch {
+      guard session.acceptsResponse(for: requestSession, workspaceID: workspace.id), self.query.nativeTrimmed == query else { return }
+      errorMessage = "Search failed. Your selection is unchanged. Try again."
+    }
+  }
+}
 private struct NativeEventProjectCreateView: View {
   let root: NativeLibraryRoot
   let workspace: Workspace
@@ -964,6 +1152,19 @@ private struct NativeEventProjectCreateView: View {
   @State private var name = ""
   @State private var type = "other"
   @State private var date = ""
+  @State private var endDate = ""
+  @State private var status = "planned"
+  @State private var notes = ""
+  @State private var startsAt = ""
+  @State private var endsAt = ""
+  @State private var timezone = ""
+  @State private var venueName = ""
+  @State private var artistID: String?
+  @State private var releaseID: String?
+  @State private var ownerContactID: String?
+  @State private var contactID: String?
+  @State private var projectID: String?
+
   @State private var confirmation = NativeMutationConfirmation()
   @State private var errorMessage: String?
   @State private var saving = false
@@ -979,7 +1180,26 @@ private struct NativeEventProjectCreateView: View {
             Text(value.replacingOccurrences(of: "_", with: " ").capitalized).tag(value)
           }
         }
-        if root == .events { TextField("Start date (YYYY-MM-DD)", text: $date) }
+        TextField("Status", text: $status)
+        NativeGrantDateField(title: "Start date", value: $date, optional: root != .events)
+        NativeGrantDateField(title: "End date", value: $endDate)
+        TextField(root == .events ? "Agenda" : "Goal", text: $notes, axis: .vertical)
+        if root == .events {
+          NativeEventTimeField(title: "Starts at", value: $startsAt)
+          NativeEventTimeField(title: "Ends at", value: $endsAt)
+          TextField("Time zone (optional)", text: $timezone)
+          TextField("Venue (optional)", text: $venueName)
+        }
+        NativeEventProjectLinkPicker(title: "Artist", kind: "artist", selectedID: $artistID, workspace: workspace, session: session, api: api)
+        NativeEventProjectLinkPicker(title: "Release", kind: "release", selectedID: $releaseID, workspace: workspace, session: session, api: api)
+        NativeEventProjectLinkPicker(title: "Owner", kind: "contact", selectedID: $ownerContactID, workspace: workspace, session: session, api: api)
+        if root == .events {
+          NativeEventProjectLinkPicker(title: "Contact", kind: "contact", selectedID: $contactID, workspace: workspace, session: session, api: api)
+        }
+        if root == .events {
+          NativeEventProjectLinkPicker(title: "Project", kind: "project", selectedID: $projectID, workspace: workspace, session: session, api: api)
+        }
+
         if let errorMessage { Text(errorMessage).foregroundStyle(.orange) }
         Button("Review create") {
           confirmation.present(
@@ -1017,11 +1237,11 @@ private struct NativeEventProjectCreateView: View {
     do {
       if root == .events {
         _ = try await api.createEvent(
-          input: .init(title: name, eventType: type, startDate: date), workspace: workspace,
+          input: .init(title: name, eventType: type, startDate: date, status: status.nativeTrimmed, projectID: projectID, agenda: notes.nativeTrimmed, artistID: artistID, releaseID: releaseID, contactID: contactID, ownerContactID: ownerContactID, endDate: endDate.nativeTrimmed, startsAt: startsAt.nativeTrimmed, endsAt: endsAt.nativeTrimmed, timezone: timezone.nativeTrimmed, venueName: venueName.nativeTrimmed), workspace: workspace,
           session: s)
       } else {
         _ = try await api.createProject(
-          input: .init(name: name, projectType: type.nativeTrimmed), workspace: workspace,
+          input: .init(name: name, projectType: type.nativeTrimmed, goal: notes.nativeTrimmed, startDate: date.nativeTrimmed, status: status.nativeTrimmed, endDate: endDate.nativeTrimmed, artistID: artistID, releaseID: releaseID, ownerContactID: ownerContactID), workspace: workspace,
           session: s)
       }
       guard session.acceptsResponse(for: s, workspaceID: workspace.id) else { return }
@@ -1068,6 +1288,16 @@ private struct NativeEventProjectEditorView: View {
   @State private var notes: String
   @State private var startDate: String
   @State private var endDate: String
+  @State private var startsAt: String
+  @State private var endsAt: String
+  @State private var timezone: String
+  @State private var venueName: String
+  @State private var artistID: String?
+  @State private var releaseID: String?
+  @State private var ownerContactID: String?
+  @State private var contactID: String?
+  @State private var projectID: String?
+
   @State private var confirmation = NativeMutationConfirmation()
   @State private var errorMessage: String?
   @State private var saving = false
@@ -1089,6 +1319,15 @@ private struct NativeEventProjectEditorView: View {
     _notes = State(initialValue: event.agenda ?? "")
     _startDate = State(initialValue: event.startDate)
     _endDate = State(initialValue: event.endDate ?? "")
+    _artistID = State(initialValue: event.artistID)
+    _releaseID = State(initialValue: event.releaseID)
+    _ownerContactID = State(initialValue: event.ownerContactID)
+    _contactID = State(initialValue: event.contactID)
+    _projectID = State(initialValue: event.projectID)
+    _startsAt = State(initialValue: event.startsAt ?? "")
+    _endsAt = State(initialValue: event.endsAt ?? "")
+    _timezone = State(initialValue: event.timezone ?? "")
+    _venueName = State(initialValue: event.venueName ?? "")
   }
   init(
     project: NativeProjectDetail, workspace: Workspace, session: NativeSessionController,
@@ -1108,6 +1347,15 @@ private struct NativeEventProjectEditorView: View {
     _notes = State(initialValue: project.goal ?? "")
     _startDate = State(initialValue: project.startDate ?? "")
     _endDate = State(initialValue: project.endDate ?? "")
+    _artistID = State(initialValue: project.artistID)
+    _releaseID = State(initialValue: project.releaseID)
+    _ownerContactID = State(initialValue: project.ownerContactID)
+    _contactID = State(initialValue: nil)
+    _projectID = State(initialValue: nil)
+    _startsAt = State(initialValue: "")
+    _endsAt = State(initialValue: "")
+    _timezone = State(initialValue: "")
+    _venueName = State(initialValue: "")
   }
   private var identity: NativeLibraryIdentity {
     .init(
@@ -1119,9 +1367,25 @@ private struct NativeEventProjectEditorView: View {
       Form {
         TextField(event == nil ? "Project name" : "Event title", text: $name)
         TextField("Status", text: $status)
-        TextField("Start date (YYYY-MM-DD)", text: $startDate)
-        TextField("End date (YYYY-MM-DD, optional)", text: $endDate)
+        NativeGrantDateField(title: "Start date", value: $startDate, optional: event == nil)
+        NativeGrantDateField(title: "End date", value: $endDate)
         TextField(event == nil ? "Goal" : "Agenda", text: $notes, axis: .vertical)
+        if event != nil {
+          NativeEventTimeField(title: "Starts at", value: $startsAt)
+          NativeEventTimeField(title: "Ends at", value: $endsAt)
+          TextField("Time zone (optional)", text: $timezone)
+          TextField("Venue (optional)", text: $venueName)
+        }
+        NativeEventProjectLinkPicker(title: "Artist", kind: "artist", selectedID: $artistID, workspace: workspace, session: session, api: api)
+        NativeEventProjectLinkPicker(title: "Release", kind: "release", selectedID: $releaseID, workspace: workspace, session: session, api: api)
+        NativeEventProjectLinkPicker(title: "Owner", kind: "contact", selectedID: $ownerContactID, workspace: workspace, session: session, api: api)
+        if event != nil {
+          NativeEventProjectLinkPicker(title: "Contact", kind: "contact", selectedID: $contactID, workspace: workspace, session: session, api: api)
+        }
+        if event != nil {
+          NativeEventProjectLinkPicker(title: "Project", kind: "project", selectedID: $projectID, workspace: workspace, session: session, api: api)
+        }
+
         if let errorMessage { Text(errorMessage).foregroundStyle(.orange) }
         Button("Review changes") {
           confirmation.present(
@@ -1150,11 +1414,23 @@ private struct NativeEventProjectEditorView: View {
       return name != event.title || status.nativeTrimmed != event.status
         || notes.nativeTrimmed != event.agenda || startDate != event.startDate
         || endDate.nativeTrimmed != event.endDate
+        || artistID != event.artistID
+        || releaseID != event.releaseID
+        || ownerContactID != event.ownerContactID
+        || contactID != event.contactID
+        || projectID != event.projectID
+        || startsAt.nativeTrimmed != event.startsAt
+        || endsAt.nativeTrimmed != event.endsAt
+        || timezone.nativeTrimmed != event.timezone
+        || venueName.nativeTrimmed != event.venueName
     }
     guard let project else { return false }
     return name != project.name || status.nativeTrimmed != project.status
       || notes.nativeTrimmed != project.goal || startDate.nativeTrimmed != project.startDate
       || endDate.nativeTrimmed != project.endDate
+      || artistID != project.artistID
+      || releaseID != project.releaseID
+      || ownerContactID != project.ownerContactID
   }
   private func save() async {
     let revision = event?.revision ?? project?.revision
@@ -1179,7 +1455,16 @@ private struct NativeEventProjectEditorView: View {
             agenda: notes.nativeTrimmed == event.agenda ? nil : .some(notes.nativeTrimmed),
             startDate: startDate == event.startDate ? nil : .some(startDate.nativeTrimmed),
             endDate: endDate.nativeTrimmed == event.endDate ? nil : .some(endDate.nativeTrimmed),
-            expectedRevision: event.revision), workspace: workspace, session: s)
+            expectedRevision: event.revision,
+            projectID: projectID == event.projectID ? nil : .some(projectID),
+            artistID: artistID == event.artistID ? nil : .some(artistID),
+            releaseID: releaseID == event.releaseID ? nil : .some(releaseID),
+            contactID: contactID == event.contactID ? nil : .some(contactID),
+            ownerContactID: ownerContactID == event.ownerContactID ? nil : .some(ownerContactID),
+            startsAt: startsAt.nativeTrimmed == event.startsAt ? nil : .some(startsAt.nativeTrimmed),
+            endsAt: endsAt.nativeTrimmed == event.endsAt ? nil : .some(endsAt.nativeTrimmed),
+            timezone: timezone.nativeTrimmed == event.timezone ? nil : .some(timezone.nativeTrimmed),
+            venueName: venueName.nativeTrimmed == event.venueName ? nil : .some(venueName.nativeTrimmed)), workspace: workspace, session: s)
         guard session.acceptsResponse(for: s, workspaceID: workspace.id) else { return }
         eventSaved?(updated)
       } else if let project {
@@ -1192,7 +1477,10 @@ private struct NativeEventProjectEditorView: View {
             startDate: startDate.nativeTrimmed == project.startDate
               ? nil : .some(startDate.nativeTrimmed),
             endDate: endDate.nativeTrimmed == project.endDate ? nil : .some(endDate.nativeTrimmed),
-            expectedRevision: project.revision), workspace: workspace, session: s)
+            expectedRevision: project.revision,
+            artistID: artistID == project.artistID ? nil : .some(artistID),
+            releaseID: releaseID == project.releaseID ? nil : .some(releaseID),
+            ownerContactID: ownerContactID == project.ownerContactID ? nil : .some(ownerContactID)), workspace: workspace, session: s)
         guard session.acceptsResponse(for: s, workspaceID: workspace.id) else { return }
         projectSaved?(updated)
       }

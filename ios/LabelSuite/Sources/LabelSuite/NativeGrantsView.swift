@@ -395,7 +395,7 @@ private struct NativeGrantCatalogForm: View {
   }
 }
 
-private struct NativeGrantDateField: View {
+struct NativeGrantDateField: View {
   let title: String
   @Binding var value: String
   var optional = true

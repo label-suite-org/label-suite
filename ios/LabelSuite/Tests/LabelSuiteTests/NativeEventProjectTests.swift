@@ -38,6 +38,23 @@ final class NativeEventProjectTests: XCTestCase {
 
   }
 
+  func testFileDestinationUsesCanonicalResourceIdentity() throws {
+    let linked = try JSONDecoder().decode(NativeLinkedRecord.self, from: Data(#"{"id":"file-a","name":"Brief","resource_kind":"assets","resource_id":"asset-a"}"#.utf8))
+    XCTAssertEqual(linked.id, "file-a")
+    XCTAssertEqual(linked.resourceKind, .assets)
+    XCTAssertEqual(linked.resourceID, "asset-a")
+    let unowned = try JSONDecoder().decode(NativeLinkedRecord.self, from: Data(#"{"id":"file-b","name":"Unowned"}"#.utf8))
+    XCTAssertNil(unowned.resourceKind)
+    XCTAssertNil(unowned.resourceID)
+  }
+
+  func testRelationshipUpdatesPreserveUnchangedFieldsAndExplicitClears() throws {
+    let event = try JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeEventUpdateInput(expectedRevision: "r1", projectID: .some(nil), ownerContactID: "owner-a", startsAt: "2026-12-04T19:00:00+01:00"))) as! [String: Any]
+    XCTAssertEqual(event as NSDictionary, ["expected_revision": "r1", "project_id": NSNull(), "owner_contact_id": "owner-a", "starts_at": "2026-12-04T19:00:00+01:00"])
+    let project = try JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeProjectCreateInput(name: "Tour", status: "active", endDate: "2026-12-04", artistID: "artist-a", ownerContactID: "owner-a"))) as! [String: Any]
+    XCTAssertEqual(project as NSDictionary, ["name": "Tour", "status": "active", "end_date": "2026-12-04", "artist_id": "artist-a", "owner_contact_id": "owner-a"])
+  }
+
   func testCompositeIdentityPreventsEventProjectCollision() {
     let event = NativeLibraryIdentity(workspaceID: "org-a", recordType: .event, recordID: "same")
     let project = NativeLibraryIdentity(workspaceID: "org-a", recordType: .project, recordID: "same")

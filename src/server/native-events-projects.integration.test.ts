@@ -84,6 +84,8 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
     expect(event!.relationships.people.map((person) => person.id)).toEqual(['native-event-contact', 'native-owner']);
     expect(project!.relationships.files.map((file) => file.id)).toEqual(['native-project-file']);
     expect(event!.relationships.files.map((file) => file.id)).toEqual(['native-event-file']);
+    expect(event!.relationships.files[0]).toMatchObject({ resource_kind: 'assets', resource_id: 'native-asset-event' });
+    expect(project!.relationships.files[0]).toMatchObject({ resource_kind: 'assets', resource_id: 'native-asset-own' });
     expect(project!.relationships.documents.map((document) => document.id)).toEqual(['native-document']);
     expect(event!.relationships.documents.map((document) => document.id)).toEqual(['native-document']);
     expect(JSON.stringify(project!.relationships.files)).not.toMatch(/storage_key|storage_bucket/);
@@ -96,6 +98,11 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
     await service.updateNativeEvent(orgA, { id: 'native-event', title: 'Renamed happening', expected_revision: before!.revision }, userA);
     const [saved] = await sql!`select title, project_id from label_suite.project_events where id='native-event' and org_id=${orgA}`;
     expect(saved).toEqual({ title: 'Renamed happening', project_id: 'native-project' });
+  });
+  it("does not invent a canonical destination for an unowned attachment", async () => {
+    await sql!`insert into label_suite.media_asset_files (id, org_id, source_postgres_table, source_postgres_record_id, file_name, storage_bucket, storage_key) values ('native-unowned-file', ${orgA}, 'project_events', 'native-event', 'unowned.pdf', 'native', 'unowned.pdf')`;
+    const event = await service.getNativeEventDetail(orgA, 'native-event');
+    expect(event!.relationships.files.find((file) => file.id === 'native-unowned-file')).toMatchObject({ resource_kind: null, resource_id: null });
   });
   it("detects a canonical web edit before native save", async () => {
     const { updateProjectEvent } = await import('./project-events');
