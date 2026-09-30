@@ -2147,7 +2147,7 @@ private struct NativeSignInView: View {
       TextField("Email", text: $email)
       SecureField("Password", text: $password)
       Button("Sign in") { signingIn = true; Task { await session.signIn(email: email, password: password, api: configuration.api); signingIn = false } }
-      Button("Use a passkey", systemImage: "person.badge.key") {
+      Button("Sign in with Pocket ID", systemImage: "person.badge.key") {
         signingIn = true; signInError = nil
         Task {
           defer { signingIn = false }
@@ -2161,7 +2161,7 @@ private struct NativeSignInView: View {
             if workspaces.count == 1 { await session.select(workspaces[0], api: configuration.api) }
           } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
             // Cancellation leaves password sign-in available and does not create a native session.
-          } catch { signInError = "Passkey sign-in was not completed. Try again or use your password." }
+          } catch { signInError = "Pocket ID sign-in was not completed. Try again or use your password." }
         }
       }
       if let signInError { Text(signInError).foregroundStyle(.red).accessibilityLabel(signInError) }
