@@ -10,6 +10,7 @@ import { hasCapability } from "../../../../server/native-capabilities";
 import { HttpError } from "../../../../server/errors";
 import { getNativeReleaseProviderContext } from "../../../../server/native-release-provider-context";
 
+import { listAuditEvents } from "../../../../server/integrations";
 import { listCampaignsForRelease } from "../../../../server/campaigns";
 
 export const prerender = false;
@@ -30,13 +31,14 @@ export const GET: APIRoute = async ({ params, request }) => {
   return runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => {
     const release = await getReleaseDetail(actor.workspace.org.id, releaseID);
     if (!release) return json({ error: "Release not found" }, 404);
-    const [timeline, providerContext, linkedCampaigns] = await Promise.all([
+    const [timeline, providerContext, linkedCampaigns, activity] = await Promise.all([
       getReleaseTimeline(actor.workspace.org.id, releaseID),
       getNativeReleaseProviderContext(actor.workspace.org.id, releaseID),
       listCampaignsForRelease(actor.workspace.org.id, releaseID),
+      listAuditEvents(actor.workspace.org.id, { object_type: "release", object_id: releaseID, limit: 51 }),
     ]);
     const childReleases = timeline.phases.flatMap((phase) => phase.childReleases);
-    return json({ ...projectNativeReleaseDetail({ ...release, timeline: { ...timeline, childReleases } }), provider_context: providerContext, campaigns: projectNativeReleaseCampaigns(linkedCampaigns), freshness: { state: "fresh", fetched_at: new Date().toISOString() } });
+    return json({ ...projectNativeReleaseDetail({ ...release, timeline: { ...timeline, childReleases } }), activity: { items: activity.slice(0, 50).map((event) => ({ id: event.id, event_type: event.event_type, occurred_at: event.created_at?.toISOString() ?? null })), partial: activity.length > 50 }, provider_context: providerContext, campaigns: projectNativeReleaseCampaigns(linkedCampaigns), freshness: { state: "fresh", fetched_at: new Date().toISOString() } });
   });
 };
 

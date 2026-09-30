@@ -109,6 +109,32 @@ describe.skipIf(!enabled)("native Budget canonical writes", () => {
     expect((await sql`select planned_amount,paid_amount from label_suite.budget_line_items where id=${lineId}`)[0]).toMatchObject({ planned_amount: 500, paid_amount: null });
   });
 
+  it("limits release navigation to linked projects and rejects foreign or unrelated scopes", async () => {
+    const release = `${orgId}-release`;
+    await sql`insert into label_suite.releases (id,org_id,title) values (${release},${orgId},'Budget release')`;
+    await sql`update label_suite.budget_projects set release_id=${release} where id=${projectId}`;
+    const read = (await import('./native-budget')).getNativeBudget;
+    try {
+      expect((await read(orgId, actorId, { release_id: release })).projects.map((project) => project.id)).toEqual([projectId]);
+      await expect(read(otherOrg, actorId, { release_id: release })).rejects.toThrow('not found');
+      await sql`update label_suite.budget_projects set release_id=null where id=${projectId}`;
+      expect((await read(orgId, actorId, { release_id: release })).projects).toEqual([]);
+      await sql`update label_suite.budget_line_items set release_id=${release} where id=${lineId}`;
+      expect((await read(orgId, actorId, { release_id: release })).projects.map((project) => project.id)).toEqual([projectId]);
+      expect((await read(orgId, actorId, { release_id: release, line_id: lineId })).focus?.line.id).toBe(lineId);
+      await sql`update label_suite.budget_line_items set project_id=null where id=${lineId}`;
+      expect((await read(orgId, actorId, { release_id: release })).unprojected_lines).toEqual([{ id: lineId, name: 'Mastering' }]);
+      expect((await read(orgId, actorId, { release_id: release, line_id: lineId })).focus?.line.currency).toBeNull();
+      await sql`update label_suite.budget_line_items set project_id=${projectId},release_id=null where id=${lineId}`;
+      await expect(read(orgId, actorId, { release_id: release, line_id: lineId })).rejects.toThrow('not found');
+      await expect(read(orgId, actorId, { release_id: release, project_id: projectId })).rejects.toThrow('not found');
+    } finally {
+      await sql`update label_suite.budget_line_items set project_id=${projectId},release_id=null where id=${lineId}`;
+      await sql`update label_suite.budget_projects set release_id=null where id=${projectId}`;
+      await sql`delete from label_suite.releases where id=${release}`;
+    }
+  });
+
   it("reads one consistent snapshot and preserves evidence identity without private URLs", async () => {
     const documentId = `${orgId}-quote`;
     await sql`insert into label_suite.documents (id,org_id,name,file_link) values (${documentId},${orgId},'Mastering quote','https://private.example.test/secret')`;

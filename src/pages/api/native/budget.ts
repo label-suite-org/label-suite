@@ -32,6 +32,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     const snapshot = await getNativeBudget(actor.workspace.org.id, actor.userId, {
       line_id: url.searchParams.get("line") ?? undefined,
       variance_id: url.searchParams.get("variance") ?? undefined,
+      release_id: url.searchParams.get("release") ?? undefined,
       project_id: url.searchParams.get("project") ?? undefined,
       project_offset: url.searchParams.get("project_offset") ?? undefined,
       line_offset: url.searchParams.get("line_offset") ?? undefined,

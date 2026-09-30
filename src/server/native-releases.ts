@@ -1,3 +1,5 @@
+import type { ReleaseTimeline, ReleaseTimelinePhase, ReleaseTimelineTask } from "./release-timeline-core";
+
 export type NativeReleasePipelineSource = {
   id: string;
   title: string;
@@ -40,7 +42,10 @@ export type NativeReleaseDetailSource = {
   release_missing: string | null;
   timeline: {
     currentPhaseKey: string | null;
-    phases: Array<{ key: string; label: string }>;
+    phases: Array<{ key: string; label: string } & Partial<Omit<ReleaseTimelinePhase, "key" | "label">>>;
+    today?: string;
+    unphasedTasks?: ReleaseTimelineTask[];
+    planningOptions?: ReleaseTimeline["planningOptions"];
     childReleases: Array<{ id: string; title: string; releaseDate: string | null; status: string | null; ready: boolean | null }>;
   };
 };
@@ -53,7 +58,7 @@ export type NativeReleaseCampaignSource = {
 };
 
 const sectionDefinitions = [
-  ["overview", "Overview"], ["timeline", "Timeline"], ["tracks", "Tracks"], ["works", "Works"],
+  ["overview", "Overview"], ["timeline", "Release schedule"], ["tracks", "Tracks"], ["works", "Works"],
   ["campaigns", "Campaigns"], ["analytics", "Analytics"], ["royalties", "Royalties"], ["budget", "Budget"],
   ["assets", "Assets"], ["documents", "Documents"], ["tasks", "Tasks"], ["activity", "Activity"],
 ] as const;
@@ -155,6 +160,26 @@ export function projectNativeReleaseCampaigns(rows: NativeReleaseCampaignSource[
   return rows.map((campaign) => ({ id: campaign.id, name: campaign.campaign_name, type: campaign.campaign_type, status: campaign.status }));
 }
 
+export function projectNativeReleaseSchedule(timeline: NativeReleaseDetailSource["timeline"]) {
+  const members = new Map(timeline.planningOptions?.members.map((member) => [member.id, member.name]));
+  const dependencies = new Map(timeline.planningOptions?.tasks.map((task) => [task.id, task]));
+  const task = (item: ReleaseTimelineTask) => ({
+    id: item.id, title: item.title, dueDate: item.dueDate, status: item.status, priority: item.priority, owner: item.owner,
+    assignees: (item.assigneeIds ?? []).map((id) => ({ id, name: members.get(id) ?? null })),
+    labels: item.labels ?? [],
+    dependencies: (item.dependencyIds ?? []).map((id) => ({ id, title: dependencies.get(id)?.title ?? null, status: dependencies.get(id)?.status ?? null })),
+  });
+  return {
+    today: timeline.today ?? null,
+    phases: timeline.phases.map((phase) => ({
+      key: phase.key, label: phase.label, startDate: phase.startDate ?? null, endDate: phase.endDate ?? null, health: phase.health ?? "not_started",
+      tasks: (phase.tasks ?? []).map(task),
+      milestones: (phase.milestones ?? []).map((item) => ({ id: item.id, title: item.title, dueDate: item.dueDate, status: item.status, owner: item.owner, isBlocking: item.isBlocking })),
+    })),
+    unphasedTasks: (timeline.unphasedTasks ?? []).map(task),
+  };
+}
+
 export function projectNativeReleaseDetail(source: NativeReleaseDetailSource) {
   const missing = blockers(source.release_missing);
   const state = readiness(source.release_ready, missing);
@@ -184,6 +209,7 @@ export function projectNativeReleaseDetail(source: NativeReleaseDetailSource) {
     phase: source.timeline.currentPhaseKey ?? source.status,
     readiness: { state, blockers: missing },
     next_action: nextAction,
+    schedule: projectNativeReleaseSchedule(source.timeline),
     sections: sectionDefinitions.map(([key, title]) => ({ key, title })),
     child_releases: source.timeline.childReleases.slice(0, NATIVE_RELEASE_CHILD_LIMIT).map((child) => ({
       id: child.id,

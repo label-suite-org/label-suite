@@ -285,6 +285,25 @@ public struct NativeReleaseSection: Codable, Equatable, Identifiable, Sendable {
   public var id: String { key }
 }
 
+public struct NativeReleaseSchedule: Codable, Equatable, Sendable {
+  public struct Assignee: Codable, Equatable, Identifiable, Sendable { public let id: String; public let name: String? }
+  public struct Dependency: Codable, Equatable, Identifiable, Sendable { public let id: String; public let title: String?; public let status: String? }
+  public struct Task: Codable, Equatable, Identifiable, Sendable {
+    public let id: String; public let title: String; public let dueDate: String?; public let status: String
+    public let priority: String?; public let owner: String?; public let assignees: [Assignee]; public let labels: [String]; public let dependencies: [Dependency]
+  }
+  public struct Milestone: Codable, Equatable, Identifiable, Sendable {
+    public let id: String; public let title: String; public let dueDate: String?; public let status: String; public let owner: String?; public let isBlocking: Bool
+  }
+  public struct Phase: Codable, Equatable, Identifiable, Sendable {
+    public let key: String; public let label: String; public let startDate: String?; public let endDate: String?; public let health: String
+    public let tasks: [Task]; public let milestones: [Milestone]; public var id: String { key }
+  }
+  public let today: String?
+  public let phases: [Phase]
+  public let unphasedTasks: [Task]
+}
+
 public struct NativeReleaseChildSummary: Codable, Equatable, Identifiable, Sendable {
   public let id: String
   public let title: String
@@ -395,6 +414,17 @@ public struct NativeReleaseProviderContext: Codable, Equatable, Sendable {
   public let dsp: NativeReleaseDSPProviderContext
 }
 
+public struct NativeReleaseActivity: Codable, Equatable, Sendable {
+  public struct Item: Codable, Equatable, Identifiable, Sendable {
+    public let id: String
+    public let eventType: String
+    public let occurredAt: String?
+    enum CodingKeys: String, CodingKey { case id, eventType = "event_type", occurredAt = "occurred_at" }
+  }
+  public let items: [Item]
+  public let partial: Bool
+}
+
 public struct NativeReleaseDetail: Codable, Equatable, Identifiable, Sendable {
   public let release: NativeReleaseDetailRecord
   public let phase: String?
@@ -405,8 +435,10 @@ public struct NativeReleaseDetail: Codable, Equatable, Identifiable, Sendable {
   public let providerContext: NativeReleaseProviderContext?
   public let freshness: NativeReleaseFreshness
   public let campaigns: [NativeReleaseCampaignSummary]?
+  public var schedule: NativeReleaseSchedule? = nil
+  public var activity: NativeReleaseActivity? = nil
   public var id: String { release.id }
-  enum CodingKeys: String, CodingKey { case release, phase, readiness, nextAction = "next_action", sections, childReleases = "child_releases", providerContext = "provider_context", campaigns, freshness }
+  enum CodingKeys: String, CodingKey { case release, phase, readiness, nextAction = "next_action", sections, childReleases = "child_releases", providerContext = "provider_context", campaigns, schedule, activity, freshness }
 }
 
 public struct NativeLabelOverview: Codable, Equatable, Sendable {

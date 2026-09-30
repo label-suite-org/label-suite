@@ -37,7 +37,7 @@ export async function listBudgetGrantGuidance(orgId: string) {
 }
 
 // ─── Project listing ─────────────────────────────────────
-export async function listBudgetProjects(orgId: string) {
+export async function listBudgetProjects(orgId: string, releaseId?: string) {
   return db
     .select({
       id: budget_projects.id,
@@ -57,7 +57,10 @@ export async function listBudgetProjects(orgId: string) {
     .from(budget_projects)
     .leftJoin(artists, and(eq(budget_projects.artist_id, artists.id), eq(artists.org_id, orgId)))
     .leftJoin(releases, and(eq(budget_projects.release_id, releases.id), eq(releases.org_id, orgId)))
-    .where(eq(budget_projects.org_id, orgId))
+    .where(and(eq(budget_projects.org_id, orgId), releaseId ? sql`(${budget_projects.release_id} = ${releaseId} or exists (
+      select 1 from label_suite.budget_line_items line
+      where line.org_id = ${orgId} and line.project_id = ${budget_projects.id} and line.release_id = ${releaseId}
+    ))` : undefined))
     .orderBy(asc(budget_projects.name));
 }
 

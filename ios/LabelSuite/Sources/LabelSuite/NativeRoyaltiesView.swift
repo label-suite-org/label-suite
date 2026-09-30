@@ -5,6 +5,7 @@ struct NativeRoyaltiesView: View {
   @ObservedObject var session: NativeSessionController
   let api: NativeAPI
   var statementID: String? = nil
+  var releaseID: String? = nil
   @State private var section: NativeRoyaltySection = .statements
   @State private var offset = 0
   @State private var page: NativeRoyaltyPage?
@@ -15,7 +16,7 @@ struct NativeRoyaltiesView: View {
   @State private var snapshotKey: RequestKey?
 
   struct RequestKey: Hashable {
-    let owner: NativeContactRequestOwner?; let canReviewPayouts: Bool; let section: NativeRoyaltySection; let offset: Int; let statement: String?
+    let owner: NativeContactRequestOwner?; let canReviewPayouts: Bool; let section: NativeRoyaltySection; let offset: Int; let statement: String?; var release: String? = nil
   }
   var navigationWorkspace: Workspace? {
     guard case let .authenticated(active) = session.state, active.id == workspace.id,
@@ -28,14 +29,15 @@ struct NativeRoyaltiesView: View {
   }
   var requestKey: RequestKey {
     .init(owner: owner, canReviewPayouts: navigationWorkspace?.capabilities["royalties.mutate"] == true,
-      section: section, offset: offset, statement: statementID)
+      section: releaseID == nil ? section : .earnings, offset: offset, statement: statementID, release: releaseID)
   }
 
   var body: some View {
     List {
+      if releaseID != nil { Text("Earnings linked to this release or its tracks. Statements and balances can cover several releases.").font(.caption) }
       if let message { Text(message).foregroundStyle(.orange) }
       if owner == nil { Text("Royalty access is unavailable for this workspace. Refresh workspace access to continue.") }
-      if statementID == nil {
+      if statementID == nil && releaseID == nil {
         Picker("Royalty records", selection: Binding(get: { section }, set: { section = $0; offset = 0 })) {
           ForEach(NativeRoyaltySection.allCases, id: \.self) { Text($0.label).tag($0) }
         }.disabled(loading || owner == nil)
@@ -249,9 +251,9 @@ struct NativeRoyaltiesView: View {
         guard value.statement.id == statementID, !value.paymentExecution else { throw NativeAPIError.conflict }
         detail = value
       } else {
-        let value = try await api.royalties(section: section, offset: offset, workspace: workspace, session: actor)
+        let value = try await api.royalties(section: releaseID == nil ? section : .earnings, offset: offset, releaseID: releaseID, workspace: workspace, session: actor)
         guard generation == token, requestKey == key, session.acceptsResponse(for: actor, workspaceID: workspace.id, requiring: "royalties.read") else { return }
-        guard value.section == section, !value.paymentExecution else { throw NativeAPIError.conflict }
+        guard value.section == key.section, !value.paymentExecution else { throw NativeAPIError.conflict }
         page = value
       }
       snapshotKey = key; message = nil

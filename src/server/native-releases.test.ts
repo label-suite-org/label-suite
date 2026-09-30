@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { projectNativeReleaseCampaigns, projectNativeReleaseDetail, projectNativeReleasePipeline, projectNativeReleaseProviderContext } from "./native-releases";
+import { projectNativeReleaseSchedule, projectNativeReleaseCampaigns, projectNativeReleaseDetail, projectNativeReleasePipeline, projectNativeReleaseProviderContext } from "./native-releases";
 
 describe("native release projections", () => {
+  it("retains schedule deadlines, multiple assignees, labels and dependencies without financial data", () => {
+    const task = { id: "task-a", title: "Deliver masters", phase: "assets_metadata" as const, dueDate: "2026-11-01", status: "todo", priority: "P1", owner: null, milestoneId: null, assigneeIds: ["member-a", "missing-member"], labels: ["audio"], dependencyIds: ["task-b", "missing-task"] };
+    const result = projectNativeReleaseSchedule({ currentPhaseKey: "assets_metadata", today: "2026-09-30", childReleases: [],
+      phases: [{ key: "assets_metadata", label: "Assets", tasks: [task], budget: { planned: 999, committed: 99, paid: 9 } }],
+      unphasedTasks: [{ ...task, id: "unphased", phase: null }],
+      planningOptions: { members: [{ id: "member-a", name: "Maya" }], tasks: [{ id: "task-b", title: "Approve mixes", status: "done", dueDate: null, dependencyIds: [], labels: [] }] },
+    });
+    expect(result.phases[0].tasks[0]).toMatchObject({ dueDate: "2026-11-01", assignees: [{ id: "member-a", name: "Maya" }, { id: "missing-member", name: null }], labels: ["audio"], dependencies: [{ id: "task-b", title: "Approve mixes", status: "done" }, { id: "missing-task", title: null, status: null }] });
+    expect(result.unphasedTasks[0].id).toBe("unphased");
+    expect(JSON.stringify(result)).not.toMatch(/budget|planned|committed|paid/);
+  });
   it("projects canonical campaign relationships", () => {
     expect(projectNativeReleaseCampaigns([{ id: "campaign-a", campaign_name: "Autumn", campaign_type: "editorial", status: "active" }])).toEqual([{ id: "campaign-a", name: "Autumn", type: "editorial", status: "active" }]);
   });
@@ -84,7 +95,7 @@ describe("native release projections", () => {
       next_action: { label: "Resolve UPC/EAN", href: "/releases/release-a?section=overview&focus=upc" },
       sections: [
         { key: "overview", title: "Overview" },
-        { key: "timeline", title: "Timeline" },
+        { key: "timeline", title: "Release schedule" },
         { key: "tracks", title: "Tracks" },
         { key: "works", title: "Works" },
         { key: "campaigns", title: "Campaigns" },
@@ -96,6 +107,7 @@ describe("native release projections", () => {
         { key: "tasks", title: "Tasks" },
         { key: "activity", title: "Activity" },
       ],
+      schedule: { today: null, phases: [], unphasedTasks: [] },
       child_releases: [{ id: "child-a", title: "Child A", release_date: null, status: "draft", ready: false }],
     });
   });

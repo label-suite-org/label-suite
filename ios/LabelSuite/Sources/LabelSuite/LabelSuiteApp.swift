@@ -1218,7 +1218,7 @@ struct NativeReleaseDetailView: View {
         }
         NativeResourceLinks(context: .init(kind: .release, id: releaseID), contextName: detail.release.title, workspace: workspace, session: session, api: api)
         NativeTracksView(releaseID: releaseID, workspace: workspace, session: session, api: api, inline: true)
-        Section("Release sections") { ForEach(detail.sections) { section in NavigationLink(section.title) { NativeReleaseSectionView(title: section.title, detail: detail) } } }
+        Section("Release sections") { ForEach(detail.sections) { section in NavigationLink(section.title) { NativeReleaseSectionView(section: section, detail: detail, workspace: workspace, session: session, api: api) } } }
         if !detail.childReleases.isEmpty { Section("Child releases") { ForEach(detail.childReleases) { child in NavigationLink(child.title) { NativeReleaseDetailView(releaseID: child.id, workspace: workspace, session: session, api: api) } } } }
       } else if loading { Section { ProgressView("Loading release…") } }
       if let errorMessage { Section { Label(errorMessage, systemImage: "wifi.exclamationmark").foregroundStyle(.orange); Button(loading ? "Refreshing…" : NativeCopy.retry) { Task { await load() } }.disabled(loading) } }
@@ -1267,9 +1267,136 @@ struct NativeReleaseDetailView: View {
 }
 
 private struct NativeReleaseSectionView: View {
-  let title: String
+  let section: NativeReleaseSection
   let detail: NativeReleaseDetail
-  var body: some View { List { Section(title) { Text("This read-only section is available from the canonical Release route.").foregroundStyle(.secondary); Label("No mutation authority", systemImage: "eye") } }.navigationTitle(title) }
+  let workspace: Workspace
+  @ObservedObject var session: NativeSessionController
+  let api: NativeAPI
+  var body: some View {
+    switch section.key {
+    case "tracks": NativeTracksView(releaseID: detail.id, workspace: workspace, session: session, api: api)
+    case "works": NativeTracksView(releaseID: detail.id, workspace: workspace, session: session, api: api, showingWorks: true)
+    case "royalties": NativeRoyaltiesView(workspace: workspace, session: session, api: api, releaseID: detail.id)
+    case "budget": NativeBudgetView(workspace: workspace, session: session, api: api, releaseID: detail.id)
+    case "analytics": NativeAnalyticsView(workspace: workspace, session: session, api: api, releaseID: detail.id)
+    case "assets", "documents":
+      NativeResourcesView(kind: section.key == "assets" ? .assets : .documents, context: .init(kind: .release, id: detail.id), contextName: detail.release.title, workspace: workspace, session: session, api: api)
+    case "activity": NativeReleaseScheduleView(releaseID: detail.id, workspace: workspace, session: session, api: api, showingActivity: true)
+    case "timeline", "tasks":
+      NativeReleaseScheduleView(releaseID: detail.id, workspace: workspace, session: session, api: api)
+    case "campaigns":
+      List {
+        if let campaigns = detail.campaigns {
+          if campaigns.isEmpty { Text("No campaigns linked to this release.") }
+          ForEach(campaigns) { campaign in
+            NavigationLink(campaign.name) { NativeCampaignDetailView(campaignID: campaign.id, workspace: workspace, session: session, api: api) }
+          }
+        } else { Text("Campaign relationships could not be loaded. Refresh the release to retry.") }
+      }.navigationTitle("Campaigns")
+    case "overview":
+      List {
+        Text(detail.release.title).font(.title2.bold())
+        LabeledContent("Artist", value: detail.release.artistName ?? "Not assigned")
+        LabeledContent("Release date", value: detail.release.releaseDate ?? "Not scheduled")
+        LabeledContent("Readiness", value: detail.readiness.state)
+        ForEach(detail.readiness.blockers, id: \.self) { Text($0) }
+      }.navigationTitle("Overview")
+    default:
+      ContentUnavailableView("Native section not implemented", systemImage: "rectangle.on.rectangle.slash", description: Text("\(section.title) still needs a native path for this release."))
+        .navigationTitle(section.title)
+    }
+  }
+}
+
+private struct NativeReleaseScheduleView: View {
+  let releaseID: String
+  let workspace: Workspace
+  @ObservedObject var session: NativeSessionController
+  let api: NativeAPI
+  var showingActivity = false
+  @State private var detail: NativeReleaseDetail?
+  @State private var loading = false
+  @State private var stale = false
+  @State private var message: String?
+
+  var body: some View {
+    List {
+      if let detail {
+        Section(detail.release.title) {
+          LabeledContent("Release date", value: detail.release.releaseDate ?? "Not scheduled")
+          Text(stale ? "Previously loaded schedule · refresh failed" : "Updated \(detail.freshness.fetchedAt)").font(.caption).foregroundStyle(.secondary)
+        }
+        if showingActivity {
+          Section("Release activity") {
+            Text("Recorded events for this release. Linked records have their own activity.").font(.caption)
+            if let activity = detail.activity {
+              ForEach(activity.items) { item in
+                VStack(alignment: .leading) { Text(item.eventType); Text(item.occurredAt ?? "Date unavailable").font(.caption) }
+              }
+              if activity.items.isEmpty { Text("No recorded release events.") }
+              if activity.partial { Text("Showing the latest 50 events; earlier history is not included.").font(.caption) }
+            } else { Text("Activity is unavailable. Refresh to retry.") }
+          }
+        } else if let schedule = detail.schedule {
+          ForEach(schedule.phases) { phase in
+            Section(phase.label) {
+              Text([phase.startDate, phase.endDate].compactMap { $0 }.joined(separator: " → ")).font(.caption)
+              Text(phase.health.replacingOccurrences(of: "_", with: " ")).font(.caption)
+              ForEach(phase.milestones) { milestone in
+                VStack(alignment: .leading) {
+                  Label(milestone.title, systemImage: milestone.isBlocking ? "exclamationmark.flag" : "flag")
+                  Text("\(milestone.status) · Due \(milestone.dueDate ?? "not set")").font(.caption)
+                  if let owner = milestone.owner { Text(owner).font(.caption) }
+                }
+              }
+              ForEach(phase.tasks) { task in taskRow(task) }
+              if phase.tasks.isEmpty && phase.milestones.isEmpty { Text("No work planned in this phase.").foregroundStyle(.secondary) }
+            }
+          }
+          if !schedule.unphasedTasks.isEmpty { Section("Tasks without a phase") { ForEach(schedule.unphasedTasks) { task in taskRow(task) } } }
+        } else { Text("Schedule data is unavailable. Refresh after the Suite update.") }
+      }
+      if loading { ProgressView("Loading release schedule…") }
+      if let message { Text(message).foregroundStyle(.orange); Button("Retry") { Task { await load() } }.disabled(loading) }
+    }
+    .navigationTitle(showingActivity ? "Activity" : "Release schedule")
+    .refreshable { await load() }
+    .task { await load() }
+  }
+
+  private func taskRow(_ task: NativeReleaseSchedule.Task) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      NavigationLink(task.title) { NativeTaskDetailView(taskID: task.id, workspace: workspace, session: session, api: api, onMutation: { await load() }) }
+      Text("\(task.status) · Due \(task.dueDate ?? "not set")").font(.caption)
+      if !task.assignees.isEmpty { Text("Assigned: " + task.assignees.map { $0.name ?? "Unavailable member" }.joined(separator: ", ")).font(.caption) }
+      else { Text(task.owner ?? "Unassigned").font(.caption) }
+      if !task.labels.isEmpty { Text("Labels: " + task.labels.joined(separator: ", ")).font(.caption) }
+      ForEach(task.dependencies) { dependency in
+        if let title = dependency.title {
+          NavigationLink("Depends on \(title) · \(dependency.status ?? "unknown")") { NativeTaskDetailView(taskID: dependency.id, workspace: workspace, session: session, api: api, onMutation: { await load() }) }.font(.caption)
+        } else { Text("A dependency is unavailable in this workspace.").font(.caption).foregroundStyle(.secondary) }
+      }
+    }.padding(.vertical, 4)
+  }
+
+  private func load() async {
+    guard !loading, let actor = session.sessionForRequests() else { return }
+    loading = true; defer { loading = false }
+    do {
+      let fresh = try await api.release(id: releaseID, workspace: workspace, session: actor)
+      guard !Task.isCancelled, session.acceptsResponse(for: actor, workspaceID: workspace.id) else { return }
+      detail = fresh; stale = false; message = nil
+    } catch {
+      guard !Task.isCancelled, session.acceptsResponse(for: actor, workspaceID: workspace.id) else { return }
+      stale = detail != nil; message = "Release schedule could not be refreshed."
+      switch error {
+      case NativeAPIError.reauthenticationRequired: detail = nil; try? session.sessionExpired()
+      case NativeAPIError.workspaceAccessRemoved: detail = nil; await session.workspaceAccessRemoved(workspaceID: workspace.id, userID: actor.userID, api: api)
+      case NativeAPIError.insufficientPermissions, NativeAPIError.notFound: detail = nil
+      default: break
+      }
+    }
+  }
 }
 
 func protectedSnapshotAge(_ date: Date) -> String {

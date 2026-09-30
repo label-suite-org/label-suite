@@ -5,6 +5,7 @@ struct NativeAnalyticsView: View {
   let workspace: Workspace
   @ObservedObject var session: NativeSessionController
   let api: NativeAPI
+  let releaseID: String
   @Environment(\.openURL) private var openURL
   @State private var snapshot: NativeAnalytics?
   @State private var artist = ""
@@ -17,6 +18,14 @@ struct NativeAnalyticsView: View {
   @State private var loading = false
   @State private var message: String?
   @State private var generation = UUID()
+
+  init(workspace: Workspace, session: NativeSessionController, api: NativeAPI, releaseID: String = "") {
+    self.workspace = workspace
+    self.session = session
+    self.api = api
+    self.releaseID = releaseID
+    _release = State(initialValue: releaseID)
+  }
 
   private struct RequestKey: Hashable { let owner: NativeContactRequestOwner?; let artist: String; let release: String }
   private var owner: NativeContactRequestOwner? {
@@ -32,6 +41,7 @@ struct NativeAnalyticsView: View {
       if let value = snapshot, owner != nil {
         Section("Scope") {
           Text(value.scope.label).font(.headline)
+          if releaseID.isEmpty {
           Picker("Artist", selection: Binding(get: { artist }, set: { artist = $0; release = "" })) {
             Text("All artists").tag("")
             ForEach(value.availableArtists) { Text($0.label).tag($0.id) }
@@ -39,6 +49,7 @@ struct NativeAnalyticsView: View {
           Picker("Release", selection: $release) {
             Text("All releases").tag("")
             ForEach(value.availableReleases) { Text($0.label).tag($0.id) }
+          }
           }
           Picker("Reporting period", selection: $period) { ForEach(value.periods) { Text($0.label).tag($0.key) } }
         }
@@ -76,7 +87,7 @@ struct NativeAnalyticsView: View {
       }
       if loading { ProgressView("Loading analytics…") }
       if let message { Text(message).foregroundStyle(.orange) }
-      if !artist.isEmpty || !release.isEmpty {
+      if releaseID.isEmpty && (!artist.isEmpty || !release.isEmpty) {
         Button("Show whole workspace") { artist = ""; release = "" }.disabled(owner == nil)
       }
       Button("Refresh analytics") { Task { await load() } }.disabled(loading || owner == nil)

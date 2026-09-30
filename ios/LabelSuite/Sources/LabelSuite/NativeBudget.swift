@@ -39,6 +39,8 @@ public struct NativeBudget: Decodable, Sendable {
     let paymentExecution: Bool
   }
   struct Focus: Decodable, Sendable { let line: Line; let varianceId: String?; let variances: [Variance] }
+  var unprojectedLines: [Link]? = nil
+  var unprojectedLinesPartial: Bool? = nil
   let focus: Focus?
   let projects: [Project]; let nextProjectOffset: Int?; let fetchedAt: String; let detail: Detail?; let authority: Authority
 }
@@ -62,7 +64,7 @@ struct NativeBudgetDecision: Encodable, Sendable { let id: String; let expectedR
 struct NativeBudgetMutation<Input: Encodable>: Encodable { let action: String; let input: Input }
 
 struct NativeBudgetRequestKey: Equatable, Hashable {
-  let owner: NativeContactRequestOwner?; let project: String; let projectOffset: Int; let lineOffset: Int; var lineID: String = ""; var varianceID: String = ""; let canEdit: Bool; let canDecide: Bool
+  let owner: NativeContactRequestOwner?; let project: String; let projectOffset: Int; let lineOffset: Int; var lineID: String = ""; var varianceID: String = ""; let canEdit: Bool; let canDecide: Bool; var releaseID: String? = nil
 }
 
 enum NativeBudgetAmount {

@@ -4,6 +4,7 @@ struct NativeBudgetView: View {
   let workspace: Workspace
   @ObservedObject var session: NativeSessionController
   let api: NativeAPI
+  let releaseID: String?
   @State private var snapshot: NativeBudget?
   @State private var loadedKey: NativeBudgetRequestKey?
   @State private var project = ""
@@ -22,8 +23,8 @@ struct NativeBudgetView: View {
   @State private var decision = "approved"
   @State private var reviewNote = ""
 
-  init(workspace: Workspace, session: NativeSessionController, api: NativeAPI, projectID: String = "", lineID: String = "", varianceID: String = "") {
-    self.workspace = workspace; self.session = session; self.api = api; _project = State(initialValue: projectID); _lineID = State(initialValue: lineID); _varianceID = State(initialValue: varianceID)
+  init(workspace: Workspace, session: NativeSessionController, api: NativeAPI, releaseID: String? = nil, projectID: String = "", lineID: String = "", varianceID: String = "") {
+    self.workspace = workspace; self.session = session; self.api = api; self.releaseID = releaseID; _project = State(initialValue: projectID); _lineID = State(initialValue: lineID); _varianceID = State(initialValue: varianceID)
   }
 
   private var liveWorkspace: Workspace? {
@@ -33,7 +34,7 @@ struct NativeBudgetView: View {
   var requestKey: NativeBudgetRequestKey {
     let actor = liveWorkspace == nil ? nil : session.sessionForRequests()
     return .init(owner: actor.map { NativeContactRequestOwner(session: $0, workspaceID: workspace.id) }, project: project, projectOffset: projectOffset, lineOffset: lineOffset, lineID: lineID, varianceID: varianceID,
-      canEdit: liveWorkspace?.capabilities["budgets.mutate"] == true, canDecide: liveWorkspace?.capabilities["variance.decide"] == true)
+      canEdit: liveWorkspace?.capabilities["budgets.mutate"] == true, canDecide: liveWorkspace?.capabilities["variance.decide"] == true, releaseID: releaseID)
   }
   private var value: NativeBudget? { loadedKey == requestKey && liveWorkspace != nil ? snapshot : nil }
   private var canEdit: Bool { requestKey.canEdit && value?.authority.canEdit == true && value?.detail?.project.currency != nil && !stale && !loading && !saving }
@@ -41,6 +42,7 @@ struct NativeBudgetView: View {
 
   var body: some View {
     List {
+      if releaseID != nil { Text("Budget projects linked to this release. Totals cover each whole project.").font(.caption) }
       if let message { Section { Text(message).foregroundStyle(.orange) } }
       if let value, let active = liveWorkspace {
         if let focus = value.focus {
@@ -68,6 +70,15 @@ struct NativeBudgetView: View {
           Button("Browse budget projects") { lineID = ""; varianceID = ""; project = value.detail?.project.id ?? ""; lineOffset = 0 }.disabled(saving)
         }
 
+        if let lines = value.unprojectedLines, !lines.isEmpty {
+          Section("Expenses without a project") {
+            Text("These expenses link directly to this release; project currency and totals are unavailable.").font(.caption)
+            ForEach(lines) { line in
+              Button(line.label) { lineID = line.id; varianceID = ""; project = ""; lineOffset = 0 }.disabled(saving)
+            }
+            if value.unprojectedLinesPartial == true { Text("Showing the first 50 expenses without a project.").font(.caption) }
+          }
+        }
         Section("Budget projects") {
           Picker("Project", selection: Binding(get: { project }, set: { project = $0; lineOffset = 0; lineID = ""; varianceID = "" })) {
             Text("Choose a project").tag("")
@@ -233,7 +244,7 @@ struct NativeBudgetView: View {
     let key = requestKey, token = UUID(); generation = token; loading = true
     defer { if generation == token { loading = false } }
     do {
-      let result = try await api.budget(projectID: project.isEmpty ? nil : project, projectOffset: projectOffset, lineOffset: lineOffset, lineID: lineID.isEmpty ? nil : lineID, varianceID: varianceID.isEmpty ? nil : varianceID, workspace: active, session: actor)
+      let result = try await api.budget(projectID: project.isEmpty ? nil : project, projectOffset: projectOffset, lineOffset: lineOffset, releaseID: releaseID, lineID: lineID.isEmpty ? nil : lineID, varianceID: varianceID.isEmpty ? nil : varianceID, workspace: active, session: actor)
       guard generation == token, key == requestKey else { return }
       snapshot = result; loadedKey = key; stale = false; message = nil
     } catch {
