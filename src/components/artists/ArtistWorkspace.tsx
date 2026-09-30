@@ -465,11 +465,12 @@ export function ArtistWorkspace({
           <Button
             key={tab.key}
             type="button"
+            variant="ghost"
             onClick={() => setActiveTab(tab.key)}
             aria-current={activeTab === tab.key ? "page" : undefined}
-            className={`inline-flex h-10 shrink-0 items-center gap-2 border-b-2 px-3 text-sm font-medium transition ${
+            className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-none border-b-2 px-3 text-sm font-medium transition ${
               activeTab === tab.key
-                ? "border-neutral-900 text-foreground"
+                ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >

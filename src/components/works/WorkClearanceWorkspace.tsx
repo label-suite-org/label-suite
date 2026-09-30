@@ -870,13 +870,14 @@ function NextFixes({
           <Button
             key={fix.id}
             type="button"
+            variant="ghost"
             onClick={() => {
               if (fix.action === "publishing") onCreatePublishing();
               if (fix.action === "master") onCreateMaster();
               if (fix.id === "publishing-balance") onAddPublishingRemaining();
               if (fix.id === "master-balance") onAddMasterRemaining();
             }}
-            className="flex w-full items-center gap-3 border-b border-neutral-200 px-3 py-3 text-left last:border-b-0 hover:bg-neutral-50"
+            className="flex h-auto w-full items-center gap-3 border-b border-neutral-200 rounded-none px-3 py-3 text-left whitespace-normal last:border-b-0 hover:bg-neutral-50"
           >
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${

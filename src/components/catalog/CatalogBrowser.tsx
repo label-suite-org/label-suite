@@ -40,7 +40,7 @@ export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedA
   const trackEditor = release && `/releases/${encodeURIComponent(release.id)}/tracks${track ? `?track=${encodeURIComponent(track.id)}` : ""}`;
   const recordUrl = track ? trackEditor : release ? `/releases/${encodeURIComponent(release.id)}` : artist ? `/artists/${encodeURIComponent(artist.id)}` : null;
   const linkClass = "block min-h-11 rounded-md px-3 py-2.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring break-words";
-  const selectedClass = "bg-blue-50 text-blue-800 font-medium dark:bg-blue-950 dark:text-blue-200";
+  const selectedClass = "bg-accent text-accent-foreground font-medium";
 
   function releaseLink(item: Release) {
     const open = item.id === release?.id;

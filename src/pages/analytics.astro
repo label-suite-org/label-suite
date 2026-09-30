@@ -95,7 +95,7 @@ const [
 <AppLayout>
   <div class="space-y-10">
     <div class="space-y-3">
-      <h1 class="text-3xl font-semibold tracking-tight text-[var(--foreground)]">Analytics workspace</h1>
+      <h1 class="sr-only">Analytics</h1>
       {sandboxState.enabled && <AnalyticsSandboxBanner />}
       <AnalyticsWorkspaceNav activeSection={activeSection} currentUrl={url} />
     </div>

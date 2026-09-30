@@ -538,13 +538,13 @@ export function ReleaseWorkspace({
               aria-current={activeSection === section.key ? "page" : undefined}
               title={section.description}
               onClick={() => selectSection(section.key)}
-              className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm font-medium transition ${section.key === "timeline" || section.key === "campaigns" ? "hidden sm:inline-flex" : ""} ${activeSection === section.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm font-medium transition ${section.key === "timeline" || section.key === "campaigns" ? "hidden sm:inline-flex" : ""} ${activeSection === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {section.label}
             </Button>
           ))}
           <DropdownMenu>
-            <DropdownMenuTrigger render={<Button variant="ghost" type="button" className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm ${activeSection !== "overview" && activeSection !== "tracks" ? "border-foreground text-foreground" : "border-transparent text-muted-foreground"} ${RELEASE_SECTIONS.slice(4).some((section) => section.key === activeSection) ? "sm:border-foreground sm:text-foreground" : "sm:border-transparent sm:text-muted-foreground"}`} aria-label="More release sections" />}>
+            <DropdownMenuTrigger render={<Button variant="ghost" type="button" className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm ${activeSection !== "overview" && activeSection !== "tracks" ? "border-primary text-primary" : "border-transparent text-muted-foreground"} ${RELEASE_SECTIONS.slice(4).some((section) => section.key === activeSection) ? "sm:border-primary sm:text-primary" : "sm:border-transparent sm:text-muted-foreground"}`} aria-label="More release sections" />}>
               <span className="sm:hidden">{RELEASE_SECTIONS.slice(2).find((section) => section.key === activeSection)?.label ?? "More"}</span>
               <span className="hidden sm:inline">{RELEASE_SECTIONS.slice(4).find((section) => section.key === activeSection)?.label ?? "More"}</span>
               <ChevronDown className="size-4" />
