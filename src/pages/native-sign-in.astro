@@ -8,9 +8,11 @@ Astro.response.headers.set("Referrer-Policy", "no-referrer");
 Astro.response.headers.set("X-Robots-Tag", "noindex, nofollow");
 const challenge = Astro.url.searchParams.get("challenge") ?? "";
 const state = Astro.url.searchParams.get("state") ?? "";
+const ssoEnabled = Boolean(process.env.POCKET_ID_OIDC_CLIENT_ID && process.env.POCKET_ID_OIDC_CLIENT_SECRET);
+const complete = Astro.url.searchParams.get("complete") === "1";
 const valid = validBrowserNonce(challenge) && validBrowserNonce(state);
 if (!valid) Astro.response.status = 400;
 ---
 <AuthLayout title="Sign in to Label Suite">
-  {valid ? <NativePasskeySignIn client:load challenge={challenge} state={state} /> : <p>Open passkey sign-in from the Label Suite app to continue.</p>}
+  {valid ? <NativePasskeySignIn client:load challenge={challenge} state={state} ssoEnabled={ssoEnabled} complete={complete} /> : <p>Open passkey sign-in from the Label Suite app to continue.</p>}
 </AuthLayout>
