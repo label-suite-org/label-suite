@@ -55,6 +55,15 @@ final class NativeEventProjectTests: XCTestCase {
     XCTAssertEqual(project as NSDictionary, ["name": "Tour", "status": "active", "end_date": "2026-12-04", "artist_id": "artist-a", "owner_contact_id": "owner-a"])
   }
 
+  func testTimedEventPayloadIncludesAllDayFlagAndConfirmation() throws {
+    let input = NativeEventCreateInput(title: "Show", eventType: "meeting", startDate: "2026-12-04", startsAt: "2026-12-04T19:00:00+01:00", allDay: false, isConfirmed: true)
+    let values = try JSONSerialization.jsonObject(with: JSONEncoder().encode(input)) as! [String: Any]
+    XCTAssertEqual(values["all_day"] as? Bool, false)
+    XCTAssertEqual(values["is_confirmed"] as? Bool, true)
+    let patch = try JSONSerialization.jsonObject(with: JSONEncoder().encode(NativeEventUpdateInput(expectedRevision: "r1", allDay: false, eventType: "show"))) as! [String: Any]
+    XCTAssertEqual(patch as NSDictionary, ["expected_revision": "r1", "all_day": false, "event_type": "show"])
+  }
+
   func testCompositeIdentityPreventsEventProjectCollision() {
     let event = NativeLibraryIdentity(workspaceID: "org-a", recordType: .event, recordID: "same")
     let project = NativeLibraryIdentity(workspaceID: "org-a", recordType: .project, recordID: "same")

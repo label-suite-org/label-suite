@@ -38,8 +38,8 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
   it("returns decodable canonical detail after native create and update", async () => {
     const project = await service.createNativeProject(orgA, { name: "Native created project", description: "Original goal" }, userA);
     expect(project).toMatchObject({ record_type: "project", goal: "Original goal", revision: expect.any(String), relationships: { events: [], tasks: [] } });
-    const event = await service.createNativeEvent(orgA, service.nativeCreateEventSchema.parse({ title: "Native created event", event_type: "meeting", start_date: "2027-01-01", project_id: project.id, starts_at: "2027-01-01T10:00:00+01:00" }), userA);
-    expect(event).toMatchObject({ record_type: "event", revision: expect.any(String), relationships: { project_id: project.id, tasks: [] } });
+    const event = await service.createNativeEvent(orgA, service.nativeCreateEventSchema.parse({ title: "Native created event", event_type: "meeting", start_date: "2027-01-01", project_id: project.id, starts_at: "2027-01-01T10:00:00+01:00", all_day: false, is_confirmed: true }), userA);
+    expect(event).toMatchObject({ record_type: "event", all_day: false, is_confirmed: true, revision: expect.any(String), relationships: { project_id: project.id, tasks: [] } });
     const updatedProject = await service.updateNativeProject(orgA, { id: project.id, description: "Updated goal", notes: "Production notes", location_name: "Studio", expected_revision: project.revision }, userA);
     expect(updatedProject).toMatchObject({ record_type: "project", goal: "Updated goal", relationships: { events: [{ id: event.id }] } });
     const updatedEvent = await service.updateNativeEvent(orgA, { id: event.id, ...service.nativeUpdateEventSchema.parse({ notes: "Updated agenda", venue_name: "Main room", starts_at: "2027-01-01T11:00:00+01:00", expected_revision: event.revision }) }, userA);
