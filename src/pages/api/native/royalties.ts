@@ -18,7 +18,7 @@ export const GET: APIRoute = async ({ request, url }) => {
     }
     if (actor.workspace.role === "payee") throw new HttpError("Insufficient permissions", 403);
     return await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => json({
-      ...await getNativeRoyaltyPage(actor.workspace.org.id, { section: url.searchParams.get("section") ?? undefined, offset: url.searchParams.get("offset") ?? undefined }),
+      ...await getNativeRoyaltyPage(actor.workspace.org.id, { release_id: url.searchParams.get("release") ?? undefined, section: url.searchParams.get("section") ?? undefined, offset: url.searchParams.get("offset") ?? undefined }),
       can_review_payouts: hasCapability(actor.workspace.role, "royalties.mutate"),
     }), { isolationLevel: "repeatable read" });
   } catch (error) { return handleApiError(error); }

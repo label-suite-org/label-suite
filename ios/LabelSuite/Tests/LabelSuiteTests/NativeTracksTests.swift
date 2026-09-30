@@ -78,6 +78,13 @@ final class NativeTracksTests: XCTestCase {
     XCTAssertNil(changes["work_id"])
     XCTAssertNil(changes["release_id"])
   }
+  func testReleaseWorksUseLinkedWorkIdentityAndDeduplicateRepeatedTracks() throws {
+    let track = try track()
+    let list = NativeTrackList(release: .init(id: "release-a", title: "Release"), tracks: [track, track])
+    XCTAssertEqual(list.linkedWorks.map(\.id), ["work-a"])
+    XCTAssertEqual(list.linkedWorks.first?.title, "Distinct Work title")
+    XCTAssertTrue(NativeTrackList(release: list.release, tracks: []).linkedWorks.isEmpty)
+  }
   func testInvalidNumericDraftsRemainUnsavedAndCorrectable() throws {
     var draft = NativeTrackDraft(try track())
     draft.position = "0"; XCTAssertFalse(draft.isValid)

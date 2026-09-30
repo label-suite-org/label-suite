@@ -3,6 +3,18 @@ import XCTest
 @testable import LabelSuite
 
 final class NativeAPIReleaseTests: XCTestCase {
+  func testReleaseScheduleRetainsPlanningContextAndUnavailableRelationships() throws {
+    let data = Data(#"{"today":"2026-09-30","phases":[{"key":"assets_metadata","label":"Assets","startDate":null,"endDate":"2026-11-01","health":"attention","milestones":[],"tasks":[{"id":"task-a","title":"Deliver masters","dueDate":"2026-11-01","status":"todo","priority":"P1","owner":null,"assignees":[{"id":"member-a","name":"Maya"},{"id":"missing-member","name":null}],"labels":["audio"],"dependencies":[{"id":"task-b","title":"Approve mixes","status":"done"},{"id":"missing-task","title":null,"status":null}]}]}],"unphasedTasks":[]}"#.utf8)
+    let schedule = try JSONDecoder().decode(NativeReleaseSchedule.self, from: data)
+    let task = try XCTUnwrap(schedule.phases.first?.tasks.first)
+    XCTAssertEqual(task.dueDate, "2026-11-01")
+    XCTAssertEqual(task.assignees.map(\.id), ["member-a", "missing-member"])
+    XCTAssertNil(task.assignees.last?.name)
+    XCTAssertEqual(task.labels, ["audio"])
+    XCTAssertEqual(task.dependencies.first?.title, "Approve mixes")
+    XCTAssertNil(task.dependencies.last?.title)
+  }
+
   func testReleasePipelineAndDetailUseWorkspaceScopedNativeRoutes() async throws {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [ReleaseURLProtocol.self]

@@ -5,6 +5,7 @@ const database = vi.hoisted(() => ({ runWithDatabaseContext: vi.fn(async (_conte
 const releases = vi.hoisted(() => ({ getReleaseDetail: vi.fn() }));
 const timeline = vi.hoisted(() => ({ getReleaseTimeline: vi.fn() }));
 const campaigns = vi.hoisted(() => ({ listCampaignsForRelease: vi.fn() }));
+const audit = vi.hoisted(() => ({ listAuditEvents: vi.fn() }));
 const providers = vi.hoisted(() => ({ getNativeReleaseProviderContext: vi.fn() }));
 
 vi.mock("../../../../lib/native-workspace", () => native);
@@ -14,6 +15,7 @@ vi.mock("../../../../server/releases", () => releases);
 vi.mock("../../../../server/release-timeline", () => timeline);
 vi.mock("../../../../server/native-release-provider-context", () => providers);
 vi.mock("../../../../server/campaigns", () => campaigns);
+vi.mock("../../../../server/integrations", () => audit);
 
 import { GET as detail } from "./[id]";
 
@@ -28,6 +30,7 @@ describe("native release detail route", () => {
     vi.clearAllMocks();
     native.getNativeSession.mockResolvedValue(null);
     allow("member");
+    audit.listAuditEvents.mockResolvedValue([]);
     providers.getNativeReleaseProviderContext.mockResolvedValue({
       audio: { source: "samply", state: "unavailable", freshness: { state: "unknown", observed_at: null }, access: { state: "unavailable", reason: "No linked Samply project" }, item_count: 0, unresolved_item_count: 0 },
       dsp: { source: "canonical_dsp_pitches", state: "unavailable", freshness: { state: "unknown", observed_at: null }, pitches: [] },
@@ -59,6 +62,13 @@ describe("native release detail route", () => {
     expect(body).toMatchObject({ release: { id: "release-a" }, phase: "assets_metadata", readiness: { blockers: ["cover"] }, provider_context: { audio: { source: "samply", state: "unavailable" } }, freshness: { state: "fresh" } });
     expect(body.campaigns).toEqual([{ id: "campaign-a", name: "Autumn campaign", type: "editorial", status: "active" }]);
     expect(body).not.toHaveProperty("can_mutate");
+  });
+
+  it("returns only release event labels and dates, excluding private audit payloads", async () => {
+    audit.listAuditEvents.mockResolvedValue([{ id: "event-a", event_type: "release.updated", created_at: new Date("2026-09-30T12:00:00Z"), metadata: { secret: "private" }, before: { title: "old" } }]);
+    const response = await detail({ params: { id: "release-a" }, request: requestFor() } as never);
+    expect(audit.listAuditEvents).toHaveBeenCalledWith("org-a", { object_type: "release", object_id: "release-a", limit: 51 });
+    expect((await response.json()).activity).toEqual({ items: [{ id: "event-a", event_type: "release.updated", occurred_at: "2026-09-30T12:00:00.000Z" }], partial: false });
   });
 
   it("returns not found for a foreign release before timeline or provider reads", async () => {

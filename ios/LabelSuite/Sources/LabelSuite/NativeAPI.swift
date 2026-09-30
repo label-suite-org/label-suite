@@ -224,9 +224,10 @@ public struct NativeAPI: NativeAPIClient, Sendable {
     try checkMutationStatus(response)
   }
 
-  func budget(projectID: String?, projectOffset: Int, lineOffset: Int, lineID: String? = nil, varianceID: String? = nil, workspace: Workspace, session: NativeSession) async throws -> NativeBudget {
+  func budget(projectID: String?, projectOffset: Int, lineOffset: Int, releaseID: String? = nil, lineID: String? = nil, varianceID: String? = nil, workspace: Workspace, session: NativeSession) async throws -> NativeBudget {
     var components = URLComponents(url: baseURL.appending(path: "/api/native/budget"), resolvingAgainstBaseURL: false)!
     components.queryItems = [URLQueryItem(name: "workspaceId", value: workspace.id), URLQueryItem(name: "project_offset", value: String(projectOffset)), URLQueryItem(name: "line_offset", value: String(lineOffset))]
+    if let releaseID { components.queryItems?.append(URLQueryItem(name: "release", value: releaseID)) }
     if let projectID { components.queryItems?.append(URLQueryItem(name: "project", value: projectID)) }
     if let lineID { components.queryItems?.append(URLQueryItem(name: "line", value: lineID)) }
     if let varianceID { components.queryItems?.append(URLQueryItem(name: "variance", value: varianceID)) }
@@ -274,9 +275,10 @@ public struct NativeAPI: NativeAPIClient, Sendable {
     return components.url
   }
 
-  public func royalties(section: NativeRoyaltySection, offset: Int = 0, workspace: Workspace, session: NativeSession) async throws -> NativeRoyaltyPage {
+  public func royalties(section: NativeRoyaltySection, offset: Int = 0, releaseID: String? = nil, workspace: Workspace, session: NativeSession) async throws -> NativeRoyaltyPage {
     var components = URLComponents(url: baseURL.appending(path: "/api/native/royalties"), resolvingAgainstBaseURL: false)!
     components.queryItems = [URLQueryItem(name: "workspaceId", value: workspace.id), URLQueryItem(name: "offset", value: String(offset)), URLQueryItem(name: "section", value: section.rawValue)]
+    if let releaseID { components.queryItems?.append(URLQueryItem(name: "release", value: releaseID)) }
     var request = URLRequest(url: components.url!)
     request.cachePolicy = .reloadIgnoringLocalCacheData
     request.setValue("Bearer " + session.token, forHTTPHeaderField: "Authorization")

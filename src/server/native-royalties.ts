@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
 import { artists, contacts, releases, tracks, royalty_calculation_runs, royalty_earnings, royalty_imports, royalty_import_currency_totals, royalty_ledger_entries, royalty_ledger_transactions, royalty_payouts, royalty_split_lines, royalty_split_snapshots, royalty_statement_lines, royalty_statements } from "../db/schema";
@@ -8,8 +8,9 @@ import { addMoney, compareMoney, fromDatabaseString, subtractMoney } from "./roy
 
 export const nativeRoyaltyPageSchema = z.object({
   section: z.enum(["balances", "statements", "earnings", "imports", "payouts"]).default("statements"),
+  release_id: z.string().trim().min(1).optional(),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
-}).strict();
+}).strict().refine((scope) => !scope.release_id || scope.section === "earnings", "Release scope requires earnings");
 const pageSize = 50;
 const postedStatementBalance = sql<string>`(select coalesce(sum(entry.amount),0)::text
   from label_suite.royalty_ledger_entries entry
@@ -27,8 +28,12 @@ function validMoney(amount: string, currency: string): boolean {
 }
 
 export async function getNativeRoyaltyPage(orgId: string, input: unknown) {
-  const { section, offset } = nativeRoyaltyPageSchema.parse(input);
+  const { section, offset, release_id } = nativeRoyaltyPageSchema.parse(input);
   return db.transaction(async tx => {
+    if (release_id) {
+      const [release] = await tx.select({ id: releases.id }).from(releases).where(and(eq(releases.org_id, orgId), eq(releases.id, release_id))).limit(1);
+      if (!release) throw new NotFoundError("Release not found");
+    }
     let rows: Record<string, unknown>[];
     switch (section) {
       case "balances": {
@@ -73,7 +78,7 @@ export async function getNativeRoyaltyPage(orgId: string, input: unknown) {
           .leftJoin(trackRelease, and(eq(trackRelease.id, tracks.release_id), eq(trackRelease.org_id, orgId)))
           .leftJoin(releases, and(eq(releases.id, royalty_earnings.release_id), eq(releases.org_id, orgId)))
           .leftJoin(artists, and(eq(artists.id, royalty_earnings.artist_id), eq(artists.org_id, orgId)))
-          .where(eq(royalty_earnings.org_id, orgId)).orderBy(desc(royalty_earnings.created_at), royalty_earnings.id).limit(pageSize + 1).offset(offset);
+          .where(and(eq(royalty_earnings.org_id, orgId), release_id ? or(eq(releases.id, release_id), eq(trackRelease.id, release_id)) : undefined)).orderBy(desc(royalty_earnings.created_at), royalty_earnings.id).limit(pageSize + 1).offset(offset);
         rows = earnings.map(row => ({ ...row, valid_money: validMoney(row.net_amount, row.currency) }));
         break;
       }

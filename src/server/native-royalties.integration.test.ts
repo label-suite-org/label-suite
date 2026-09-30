@@ -32,6 +32,25 @@ describe.skipIf(!enabled)("native royalty evidence on disposable PostgreSQL", ()
   });
   afterAll(async () => { if (sql) await sql.end(); });
 
+  it("limits release earnings to canonical release or track links and rejects foreign scope", async () => {
+    const release = `${suffix}-release`, track = `${suffix}-track`;
+    await sql`insert into label_suite.releases (id,org_id,title) values (${release},${org},'Royalty release')`;
+    await sql`insert into label_suite.tracks (id,org_id,title,release_id) values (${track},${org},'Royalty track',${release})`;
+    const run = (input: unknown) => scoped({ userId: actor, orgId: org }, () => service.getNativeRoyaltyPage(org, input), { isolationLevel: "repeatable read" });
+    try {
+      await sql`update label_suite.royalty_earnings set release_id=${release} where id=${`${suffix}-USD`}`;
+      expect((await run({ section: "earnings", release_id: release })).rows.map((row) => row.id)).toEqual([`${suffix}-USD`]);
+      await sql`update label_suite.royalty_earnings set track_id=${track} where id=${`${suffix}-EUR`}`;
+      expect((await run({ section: "earnings", release_id: release })).rows).toHaveLength(2);
+      await expect(run({ section: "balances", release_id: release })).rejects.toThrow('requires earnings');
+      await expect(scoped({ userId: actor, orgId: foreign }, () => service.getNativeRoyaltyPage(foreign, { section: "earnings", release_id: release }), { isolationLevel: "repeatable read" })).rejects.toThrow('not found');
+    } finally {
+      await sql`update label_suite.royalty_earnings set release_id=null,track_id=null where org_id=${org}`;
+      await sql`delete from label_suite.tracks where id=${track}`;
+      await sql`delete from label_suite.releases where id=${release}`;
+    }
+  });
+
   it("keeps currencies, exact amounts and unmatched identities distinct without foreign evidence", async () => {
     const result = await scoped({ userId: actor, orgId: org }, () => service.getNativeRoyaltyPage(org, { section: "earnings" }), { isolationLevel: "repeatable read" });
     expect(result.rows).toHaveLength(2);

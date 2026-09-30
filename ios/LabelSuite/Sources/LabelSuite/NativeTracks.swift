@@ -31,6 +31,10 @@ public struct NativeTrack: Codable, Equatable, Identifiable, Sendable {
 public struct NativeTrackList: Codable, Equatable, Sendable {
   public let release: NativeTrackRelease
   public let tracks: [NativeTrack]
+  var linkedWorks: [NativeTrackWork] {
+    var seen = Set<String>()
+    return tracks.compactMap(\.work).filter { seen.insert($0.id).inserted }
+  }
 }
 public struct NativeTrackDetail: Codable, Equatable, Sendable {
   public let release: NativeTrackRelease?
@@ -115,6 +119,7 @@ struct NativeTracksView: View {
   @ObservedObject var session: NativeSessionController
   let api: NativeAPI
   var inline = false
+  var showingWorks = false
   @State private var list: NativeTrackList?
   @State private var loading = false
   @State private var message: String?
@@ -122,12 +127,19 @@ struct NativeTracksView: View {
   var body: some View {
     Group {
       if inline { content }
-      else { List { content }.navigationTitle("Tracks").refreshable { await load() } }
+      else { List { content }.navigationTitle(showingWorks ? "Works" : "Tracks").refreshable { await load() } }
     }.task { await load() }
   }
   @ViewBuilder private var content: some View {
       if let list {
         Section(list.release.title) {
+          if showingWorks {
+            ForEach(list.linkedWorks, id: \.id) { work in
+              NavigationLink(work.title) { NativeWorkDetailView(workID: work.id, workspace: workspace, session: session, api: api) }
+            }
+            if list.linkedWorks.isEmpty { Text("No works linked to this release’s tracks.").foregroundStyle(.secondary) }
+            if list.tracks.contains(where: { $0.work == nil }) { Text("Some tracks have no available linked work.").font(.caption).foregroundStyle(.secondary) }
+          } else {
           ForEach(list.tracks) { track in
             NavigationLink {
               NativeTrackDetailView(releaseID: releaseID, initialTrackID: track.id, workspace: workspace, session: session, api: api)
@@ -139,6 +151,7 @@ struct NativeTracksView: View {
             }
           }
           if list.tracks.isEmpty { Text("No tracks in this release.").foregroundStyle(.secondary) }
+          }
         }
       }
       if loading { ProgressView("Loading tracks…") }
