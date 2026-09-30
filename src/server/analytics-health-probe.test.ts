@@ -42,6 +42,8 @@ describe("public analytics health probe", () => {
     { name: "one failure after a current complete sync", input: { run: completedRun(), failedRuns: 1 }, expected: { status: "ok", freshness: "current", coverage: "complete" } },
     { name: "repeated failures after a current complete sync", input: { run: completedRun(), failedRuns: 2 }, expected: { status: "degraded", freshness: "current", coverage: "complete" } },
     { name: "a malformed completion time", input: { run: completedRun({ completedAt: "not-a-timestamp" }) }, expected: { status: "unknown", freshness: "unknown", coverage: "unknown" } },
+    { name: "old source data downloaded today", input: { run: completedRun({ metadata: { ...completeMetadata(), sourceFreshness: { version: 1, reportingThrough: "2026-07-01T00:00:00Z" } } }) }, expected: { status: "degraded", freshness: "stale", coverage: "complete" } },
+    { name: "a legacy run without source-date evidence", input: { run: completedRun({ metadata: { ...completeMetadata(), sourceFreshness: undefined } }) }, expected: { status: "degraded", freshness: "unknown", coverage: "complete" } },
     { name: "a failed bounded aggregate query", input: { run: completedRun(), failAggregate: true }, expected: { status: "unknown", freshness: "unknown", coverage: "unknown" } },
   ])("returns deterministic enums for $name", async ({ input, expected }) => {
     installProbe(input);
@@ -67,7 +69,7 @@ function completedRun(input: Partial<CompletedRun> = {}): CompletedRun {
 }
 
 function completeMetadata() {
-  return { completeness: { version: 1, state: "complete", expectedWidgetKeys: ["streams"], downloadedWidgetKeys: ["streams"], skippedWidgets: [] } };
+  return { sourceFreshness: { version: 1, reportingThrough: null }, completeness: { version: 1, state: "complete", expectedWidgetKeys: ["streams"], downloadedWidgetKeys: ["streams"], skippedWidgets: [] } };
 }
 
 function partialMetadata() {

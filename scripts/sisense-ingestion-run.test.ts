@@ -29,6 +29,8 @@ it("normalizes deterministic provider acquisition and saved files through the sa
   expect(acquire).toHaveBeenCalledWith(expect.objectContaining({ orgId: "fixture-org", scope: { artistId: null, releaseId: null, trackId: null }, requestedDateRange: "All Dates", requestedAggregation: "Daily" }));
   expect(browser?.stats).toEqual({ filesDownloaded: 1, rowsImported: 1, rowsInserted: 1, rowsUpdated: 0, rowsUnchanged: 0 });
   expect(saved?.stats).toEqual(browser?.stats);
+  expect(browser?.sourceFreshness).toEqual({ version: 1, reportingThrough: "2026-07-28T00:00:00.000Z" });
+  expect(saved?.sourceFreshness).toEqual(browser?.sourceFreshness);
   expect(saved?.acquisition.files).toEqual(browser?.acquisition.files);
 });
 
