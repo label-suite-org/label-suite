@@ -4,6 +4,12 @@
 
 - This repository is `https://github.com/label-suite-org/label-suite`.
   The `origin` remote must point here.
+- Before choosing any checkout or CI workflow, verify `git remote get-url origin`
+  and run `bash scripts/repository-flow-check.sh status`. This public repository
+  is the sole source of truth for new product changes, pull requests and CI.
+  Instructions in old private checkouts can be stale; use this file and
+  `PUBLIC_SOURCE.md` to resolve that conflict, and check live Dokploy metadata
+  before deployment. Never infer authority from a checkout's directory name.
 - Read `PUBLIC_SOURCE.md`. The verified production source moved to this
   repository on 27 September 2026. Only reviewed, verified `origin/main`
   revisions may be deployed through Dokploy.

@@ -81,20 +81,20 @@ export function LoginForm({ ssoEnabled = false }: { ssoEnabled?: boolean }) {
     }
   }
 
-  async function onNextcloudSignIn() {
+  async function onPocketIdSignIn() {
     setLoading(true);
     setError("");
     try {
       const result = await signIn.oauth2({
-        providerId: "nextcloud",
+        providerId: "pocket-id",
         callbackURL: "/dashboard",
       });
       if (result.error) {
-        setError(result.error.message || "Nextcloud sign in failed.");
+        setError(result.error.message || "Pocket ID sign in failed.");
         setLoading(false);
       }
     } catch {
-      setError("Nextcloud sign in failed.");
+      setError("Pocket ID sign in failed.");
       setLoading(false);
     }
   }
@@ -176,10 +176,10 @@ export function LoginForm({ ssoEnabled = false }: { ssoEnabled?: boolean }) {
             type="button"
             variant="outline"
             disabled={loading || !hydrated}
-            onClick={() => void onNextcloudSignIn()}
+            onClick={() => void onPocketIdSignIn()}
             className="mt-3 h-12 w-full gap-3"
           >
-            Continue with True Nature Workspace
+            Continue with Pocket ID
           </Button>
         )}
         <div

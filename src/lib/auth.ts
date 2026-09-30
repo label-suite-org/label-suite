@@ -26,9 +26,10 @@ const trustedOrigins = Array.from(new Set([
   "https://label-suite.truenature.online",
   ...configuredTrustedOrigins,
 ].filter((origin): origin is string => Boolean(origin))));
-const nextcloudClientId = process.env.NEXTCLOUD_OIDC_CLIENT_ID;
-const nextcloudClientSecret = process.env.NEXTCLOUD_OIDC_CLIENT_SECRET;
-const nextcloudOidcEnabled = Boolean(nextcloudClientId && nextcloudClientSecret);
+const pocketIdClientId = process.env.POCKET_ID_OIDC_CLIENT_ID;
+const pocketIdClientSecret = process.env.POCKET_ID_OIDC_CLIENT_SECRET;
+const pocketIdIssuer = process.env.POCKET_ID_OIDC_ISSUER || "https://id.truenature.online";
+const pocketIdOidcEnabled = Boolean(pocketIdClientId && pocketIdClientSecret);
 
 export const auth = betterAuth({
   database: pool,
@@ -48,7 +49,7 @@ export const auth = betterAuth({
   account: {
     modelName: "label_suite.account",
     accountLinking: {
-      trustedProviders: nextcloudOidcEnabled ? ["nextcloud"] : [],
+      trustedProviders: pocketIdOidcEnabled ? ["pocket-id"] : [],
     },
   },
   verification: {
@@ -69,15 +70,15 @@ export const auth = betterAuth({
     },
   },
   plugins: [
-    ...(nextcloudOidcEnabled
+    ...(pocketIdOidcEnabled
       ? [genericOAuth({
           config: [{
-            providerId: "nextcloud",
-            discoveryUrl: "https://cloud.truenature.online/.well-known/openid-configuration",
-            issuer: "https://cloud.truenature.online",
-            clientId: nextcloudClientId!,
-            clientSecret: nextcloudClientSecret!,
-            scopes: ["openid", "profile", "email"],
+            providerId: "pocket-id",
+            discoveryUrl: `${pocketIdIssuer.replace(/\/$/, "")}/.well-known/openid-configuration`,
+            issuer: pocketIdIssuer.replace(/\/$/, ""),
+            clientId: pocketIdClientId!,
+            clientSecret: pocketIdClientSecret!,
+            scopes: ["openid", "profile", "email", "groups"],
             pkce: true,
           }],
         })]

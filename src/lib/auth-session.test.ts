@@ -41,8 +41,8 @@ beforeAll(async () => {
   vi.stubEnv("DATABASE_URL", "postgresql://unused.invalid/unused");
   vi.stubEnv("PUBLIC_SITE_URL", origin);
   vi.stubEnv("BETTER_AUTH_SECRET", "test-only-secret-with-at-least-thirty-two-characters");
-  vi.stubEnv("NEXTCLOUD_OIDC_CLIENT_ID", "");
-  vi.stubEnv("NEXTCLOUD_OIDC_CLIENT_SECRET", "");
+  vi.stubEnv("POCKET_ID_OIDC_CLIENT_ID", "");
+  vi.stubEnv("POCKET_ID_OIDC_CLIENT_SECRET", "");
   auth = (await import("./auth")).auth;
   const response = await post("sign-up/email", { email, password, name: "Session fixture" });
   expect(response.status).toBe(200);

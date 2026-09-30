@@ -6,7 +6,7 @@ import { ResetPasswordForm } from "./ResetPasswordForm";
 describe("account recovery and passkey entry points", () => {
   it("offers password, passkey, and recovery sign-in paths", () => {
     const html = renderToStaticMarkup(<LoginForm ssoEnabled />);
-    expect(html).toContain("Continue with True Nature Workspace");
+    expect(html).toContain("Continue with Pocket ID");
     expect(html).toContain("Use a passkey");
     expect(html).toContain("Forgot password?");
     expect(html).toContain('autoComplete="username webauthn"');
@@ -15,7 +15,7 @@ describe("account recovery and passkey entry points", () => {
 
   it("renders the compact landing form without unavailable SSO or repeated sign-in copy", () => {
     const html = renderToStaticMarkup(<LoginForm />);
-    expect(html).not.toContain("Continue with True Nature Workspace");
+    expect(html).not.toContain("Continue with Pocket ID");
     expect(html).not.toContain("Sign in to continue");
     expect(html).toContain(">Suite</h1>");
     expect(html.match(/>Sign in</g)).toHaveLength(1);
