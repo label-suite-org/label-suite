@@ -124,12 +124,16 @@ export const ReleaseRows: Story = {
             Upcoming releases · fictional catalog
           </p>
         </div>
-        <div className="divide-y divide-border">
+        <div role="list">
           {[
             { title: "Low Tide", type: "EP", status: "Needs review" },
             { title: "A Long Way Home", type: "Single", status: "Approved" },
           ].map((release) => (
-            <Item key={release.title} className="px-0 py-4">
+            <Item
+              key={release.title}
+              role="listitem"
+              className="rounded-none border-b-border px-0 py-4 last:border-b-transparent"
+            >
               <ItemMedia
                 className="grid size-14 place-items-center rounded-md bg-muted text-sm text-muted-foreground"
                 aria-label="Artwork unavailable"
