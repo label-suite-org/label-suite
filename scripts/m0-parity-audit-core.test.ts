@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   M0_DISPOSITIONS,
+  compareRecordEvidence,
+  scopedParityTable,
   buildKeyRecordEvidence,
   assertM0AuditTargetHealth,
   buildM0Audit,
@@ -11,6 +13,7 @@ import {
 function parity(overrides: Partial<ParityReport> = {}): ParityReport {
   return {
     generatedAt: "2026-08-16T04:15:11.616Z",
+    orgId: "fixture-org",
     baseId: "app-test",
     schema: "label_suite",
     metadataAvailable: true,
@@ -237,6 +240,8 @@ describe("M0 parity audit", () => {
     expect(report.sections.map((section) => section.issue)).toEqual([25, 84, 85, 86]);
     const markdown = renderM0Markdown(report);
     expect(markdown).toContain("# Immutable M0 Parity Audit");
+    expect(markdown).toContain("Organization scope: `fixture-org`");
+    expect(markdown).toContain("| Comparison field | Evidence |");
     expect(markdown).toContain("No Airtable or Postgres mutation");
     expect(markdown).toContain("| #84 | Artist relationship cleanup/control consistency |");
   });
@@ -284,5 +289,61 @@ describe("M0 parity audit", () => {
     expect(serialized).not.toContain("private.example");
     expect(serialized).not.toContain("pat_secret_value_1234567890");
     expect(serialized).toMatch(/\[redacted:[a-f0-9]{12}\]/);
+  });
+});
+
+
+describe("record-level parity evidence", () => {
+  it("scopes every canonical table and rejects partial source coverage", () => {
+    expect(() => buildM0Audit(parity({ orgId: undefined }))).toThrow("explicit organization scope");
+    expect(scopedParityTable("label_suite", "contacts", "owner's-org")).toBe('(select * from "label_suite"."contacts" where org_id = \'owner\'\'s-org\')');
+    const report = parity();
+    report.tableResults[0].truncated = true;
+    expect(() => buildM0Audit(report)).toThrow("complete source evidence");
+    report.tableResults[0].truncated = false;
+    report.tableResults[0].error = "source unavailable";
+    expect(() => buildM0Audit(report)).toThrow("complete source evidence");
+  });
+  it("retains canonical-only evidence and compares split directory counts", () => {
+    const canonical = compareRecordEvidence({ table: "Contacts", canonicalTable: "contacts", field: "name", sourceRecordId: null, sourceValue: null, canonicalRecordIds: ["native-contact"], canonicalValues: ["Native contact"] });
+    const report = buildM0Audit(parity({ recordChecks: [canonical], tableResults: [{ spec: { airtable: "Contacts", postgres: "contacts", status: "mapped" }, airtableCount: 3, postgresCount: 1 }], directoryCounts: [
+      { spec: { airtable: "Contacts", postgres: "contacts", status: "mapped" }, airtableCount: 1, postgresCount: 1 },
+      { spec: { airtable: "Contacts", postgres: "organizations", status: "mapped" }, airtableCount: 2, postgresCount: 2 },
+    ] }));
+    expect(report.scope.countDeltas).toBe(0);
+    expect(report.checks.tableCounts).toHaveLength(2);
+    expect(report.checks.records[0].status).toBe("canonical-only");
+    expect(report.mismatches[0].sourceRecordIds).toEqual([]);
+    expect(report.mismatches[0].canonicalRecordIds).toEqual(["native-contact"]);
+    expect(report.mismatches[0].proposedDisposition).toBe("Human review required");
+    const split = buildM0Audit(parity({ keyChecks: ["contacts", "organizations"].map(canonicalTable => ({ table: "Contacts", canonicalTable, label: "name", airtableField: "Name", airtableKeyCount: 1, postgresKeyCount: 0, missingInPostgres: ["Same name"], extraInPostgres: [] })), sourceIdChecks: ["contacts", "organizations"].map(postgres => ({ airtable: "Contacts", postgres, preservedIds: 0, importedRecords: 1, airtableRecords: 1 })) }));
+    expect(new Set(split.mismatches.map(row => row.id)).size).toBe(split.mismatches.length);
+    expect(split.mismatches.filter(row => row.kind === "key_missing").map(row => row.canonicalTable).sort()).toEqual(["contacts", "organizations"]);
+  });
+  it("retains matched coverage and reports different, unmapped, ambiguous and unavailable identities without guessing", () => {
+    const base = { table: "Rights Lines (Roles)", canonicalTable: "roles", field: "ownership_type", sourceRecordId: "rec-role", sourceValue: "Rights", canonicalRecordIds: ["role-1"], canonicalValues: ["Rights"] };
+    expect(compareRecordEvidence(base).status).toBe("matched");
+    expect(compareRecordEvidence({ ...base, sourceValue: null, canonicalValues: ["Rights"] }).status).toBe("different");
+    expect(compareRecordEvidence({ ...base, sourceValue: null }, false).status).toBe("unavailable");
+    expect(compareRecordEvidence({ ...base, canonicalValues: ["Credit"] }).status).toBe("different");
+    expect(compareRecordEvidence({ ...base, canonicalRecordIds: [], canonicalValues: [] }).status).toBe("unmapped");
+    expect(compareRecordEvidence({ ...base, canonicalRecordIds: ["role-1", "role-2"], canonicalValues: ["Rights", "Rights"] }).status).toBe("ambiguous");
+    expect(compareRecordEvidence(base, false).status).toBe("unavailable");
+    const matched = compareRecordEvidence(base);
+    const different = compareRecordEvidence({ ...base, sourceRecordId: "rec-other", canonicalValues: ["Credit"] });
+    const report = buildM0Audit(parity({ recordChecks: [different, matched] }));
+    const reverse = buildM0Audit(parity({ recordChecks: [matched, different] }));
+    expect(report).toEqual(reverse);
+    expect(report.checks.records).toHaveLength(2);
+    const mismatch = report.mismatches.find(row => row.kind === "record_value")!;
+    expect(mismatch.sourceValue).toBe("Rights");
+    expect(mismatch.canonicalValue).toBe('["Credit"]');
+    expect(mismatch.sourceRecordIds).toEqual(["rec-other"]);
+    expect(mismatch.canonicalRecordIds).toEqual(["role-1"]);
+    expect(mismatch.proposedDisposition).toBe("Human review required");
+    const privateReport = buildM0Audit(parity({ recordChecks: [compareRecordEvidence({ ...base, sourceValue: "owner@example.com", sourceRawValue: "owner@example.com", sourceField: "Role", canonicalValues: ["other@example.com"] })] }));
+    expect(JSON.stringify(privateReport)).not.toContain("@example.com");
+    expect(privateReport.checks.records[0].sourceValue).toMatch(/^\[email:/);
+    expect(report.safety.noMutation).toBe(true);
   });
 });

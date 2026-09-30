@@ -39,11 +39,16 @@ function audit(): M0AuditReport {
     mismatches: [mismatch("count", "count_delta"), mismatch("extra", "key_extra"), mismatch("missing", "key_missing"), mismatch("source", "source_id"), mismatch("integrity", "integrity")],
     proposedGroups: [],
     individualReviewMismatchIds: [],
-    checks: { tableCounts: [], integrity: [], readiness: [] },
+    checks: { tableCounts: [], integrity: [], readiness: [], records: [] },
   };
 }
 
 describe("approved M0 dispositions", () => {
+  it("does not apply historical approval to new record-field findings", () => {
+    const report = audit();
+    report.mismatches.push(mismatch("record", "record_value"));
+    expect(() => approveM0Dispositions(report, "2026-09-30T00:00:00Z")).toThrow("require explicit review");
+  });
   it("locks every mismatch under the approved conservative policy", () => {
     const ledger = approveM0Dispositions(audit(), "2026-08-26T17:00:00.000Z");
     expect(ledger.dispositions).toHaveLength(5);

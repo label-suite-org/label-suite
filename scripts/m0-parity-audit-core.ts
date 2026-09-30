@@ -28,6 +28,11 @@ export function assertM0AuditTargetHealth(
 
 export type M0Disposition = (typeof M0_DISPOSITIONS)[number];
 
+export function scopedParityTable(schema: string, table: string, orgId: string): string {
+  const ident = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  return `(select * from ${ident(schema)}.${ident(table)} where org_id = '${orgId.replace(/'/g, "''")}')`;
+}
+
 export interface ParityTableResult {
   spec: { airtable: string; postgres?: string; status: string };
   airtableCount: number | null;
@@ -40,6 +45,7 @@ export interface ParityTableResult {
 
 export interface ParityKeyCheck {
   table: string;
+  canonicalTable?: string;
   label: string;
   airtableField: string | null;
   airtableKeyCount: number;
@@ -110,6 +116,27 @@ export interface ParitySqlCheck {
   samples: string[];
 }
 
+export interface ParityRecordCheck {
+  table: string;
+  canonicalTable: string;
+  field: string;
+  sourceRecordId: string | null;
+  canonicalRecordIds: string[];
+  sourceValue: string | null;
+  sourceField?: string | null;
+  sourceRawValue?: string | null;
+  canonicalValues: Array<string | null>;
+  status: "matched" | "different" | "unmapped" | "ambiguous" | "unavailable" | "canonical-only";
+}
+
+// Compare only explicit source-ID matches; names are never identity evidence.
+export function compareRecordEvidence(check: Omit<ParityRecordCheck, "status">, available = true): ParityRecordCheck {
+  const status = check.sourceRecordId === null ? "canonical-only" : !available ? "unavailable" : check.canonicalRecordIds.length === 0 ? "unmapped"
+    : check.canonicalRecordIds.length !== 1 ? "ambiguous"
+    : check.sourceValue === check.canonicalValues[0] ? "matched" : "different";
+  return { ...check, status };
+}
+
 export interface ParityReport {
   generatedAt: string;
   sourceRevision?: string;
@@ -124,12 +151,15 @@ export interface ParityReport {
   readinessChecks: ParitySqlCheck[];
   auditCommands?: string[];
   groupExceptions?: Record<string, string[]>;
+  recordChecks?: ParityRecordCheck[];
+  orgId?: string;
+  directoryCounts?: ParityTableResult[];
 }
 
 export interface M0Mismatch {
   id: string;
   domain: "release-ops" | "artist-relationships" | "release-rights" | "directory-boundary";
-  kind: "count_delta" | "key_missing" | "key_extra" | "source_id" | "integrity" | "readiness";
+  kind: "count_delta" | "key_missing" | "key_extra" | "source_id" | "integrity" | "readiness" | "record_value";
   sourceTable: string;
   canonicalTable: string | null;
   sourceValue: string | null;
@@ -169,6 +199,7 @@ export interface M0AuditReport {
     readMode: "Airtable GET + Postgres SELECT";
     sourceRevision: string;
     targetRevision: string;
+    orgId?: string;
   };
   safety: {
     noMutation: true;
@@ -199,6 +230,7 @@ export interface M0AuditReport {
     }>;
     integrity: ParitySqlCheck[];
     readiness: ParitySqlCheck[];
+    records: ParityRecordCheck[];
   };
 }
 
@@ -257,7 +289,7 @@ function addCountMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
     if (result.spec.status !== "mapped" || sourceCount === null || canonicalCount === null || sourceCount === canonicalCount) continue;
     const table = result.spec.airtable;
     mismatches.push(mismatchBase({
-      id: `count:${slug(table)}`,
+      id: `count:${slug(table)}${table === "Contacts" ? `:${slug(result.spec.postgres ?? "directory")}` : ""}`,
       domain: domainForTable(table),
       kind: "count_delta",
       sourceTable: table,
@@ -274,7 +306,7 @@ function addCountMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
 
 function addKeyMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
   for (const check of input.keyChecks) {
-    const canonicalTable = canonicalTableFor(check.table, input.tableResults);
+    const canonicalTable = check.canonicalTable ?? canonicalTableFor(check.table, input.tableResults);
     const missingRecords = check.missingInPostgresRecords ?? check.missingInPostgres.map((value) => ({
       identity: redactValue(value), recordIds: [], value,
     }));
@@ -282,7 +314,7 @@ function addKeyMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
       const value = record.value;
       const safe = redactValue(value);
       mismatches.push(mismatchBase({
-        id: `key:${slug(check.table)}:${slug(check.label)}:missing:${slug(record.identity)}`,
+        id: `key:${slug(check.table)}:${slug(check.label)}:missing:${slug(record.identity)}${check.table === "Contacts" && canonicalTable === "organizations" ? ":organizations" : ""}`,
         domain: domainForTable(check.table),
         kind: "key_missing",
         sourceTable: check.table,
@@ -302,7 +334,7 @@ function addKeyMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
       const value = record.value;
       const safe = redactValue(value);
       mismatches.push(mismatchBase({
-        id: `key:${slug(check.table)}:${slug(check.label)}:extra:${slug(record.identity)}`,
+        id: `key:${slug(check.table)}:${slug(check.label)}:extra:${slug(record.identity)}${check.table === "Contacts" && canonicalTable === "organizations" ? ":organizations" : ""}`,
         domain: domainForTable(check.table),
         kind: "key_extra",
         sourceTable: check.table,
@@ -322,7 +354,7 @@ function addSourceIdMismatches(input: ParityReport, mismatches: M0Mismatch[]) {
   for (const check of input.sourceIdChecks) {
     if (check.preservedIds === check.importedRecords) continue;
     mismatches.push(mismatchBase({
-      id: `source-id:${slug(check.airtable)}`,
+      id: `source-id:${slug(check.airtable)}${check.airtable === "Contacts" && check.postgres === "organizations" ? ":organizations" : ""}`,
       domain: domainForTable(check.airtable),
       kind: "source_id",
       sourceTable: check.airtable,
@@ -385,12 +417,35 @@ function sectionFor(issue: M0Section["issue"], mismatches: M0Mismatch[]): M0Sect
 }
 
 export function buildM0Audit(input: ParityReport): M0AuditReport {
+  if (!input.orgId?.trim()) throw new Error("M0 audit requires an explicit organization scope");
+  if (input.directoryCounts?.length) input = { ...input, tableResults: [...input.tableResults.filter(result => result.spec.airtable !== "Contacts"), ...input.directoryCounts] };
+  if (input.tableResults.some(result => result.truncated || result.error)) {
+    throw new Error("M0 audit requires complete source evidence; truncated or failed tables cannot certify coverage.");
+  }
   const mismatches: M0Mismatch[] = [];
   addCountMismatches(input, mismatches);
   addKeyMismatches(input, mismatches);
   addSourceIdMismatches(input, mismatches);
   addSqlMismatches(input, mismatches, "integrity");
   addSqlMismatches(input, mismatches, "readiness");
+  const recordChecks = (input.recordChecks ?? []).map(check => ({
+    ...check,
+    sourceValue: check.sourceValue === null ? null : redactValue(check.sourceValue),
+    sourceRawValue: check.sourceRawValue == null ? check.sourceRawValue : redactValue(check.sourceRawValue),
+    canonicalValues: check.canonicalValues.map(value => value === null ? null : redactValue(value)),
+  })).sort((a, b) =>
+    `${a.table}/${a.sourceRecordId ?? a.canonicalRecordIds.join(",")}/${a.field}`.localeCompare(`${b.table}/${b.sourceRecordId ?? b.canonicalRecordIds.join(",")}/${b.field}`));
+  for (const check of recordChecks) {
+    if (check.status === "matched") continue;
+    mismatches.push(mismatchBase({
+      id: `record:${slug(check.table)}:${check.sourceRecordId ?? `canonical:${check.canonicalTable}:${check.canonicalRecordIds.join(",")}`}:${slug(check.field)}`,
+      domain: domainForTable(check.table), kind: "record_value",
+      sourceTable: check.table, canonicalTable: check.canonicalTable,
+      sourceValue: check.sourceValue, canonicalValue: JSON.stringify(check.canonicalValues),
+      sourceRecordIds: check.sourceRecordId === null ? [] : [check.sourceRecordId], canonicalRecordIds: check.canonicalRecordIds,
+      comparisonField: check.field, evidence: `Source-ID record comparison: ${check.status}. No business-data correction is inferred.`,
+    }));
+  }
 
   const orderedMismatches = mismatches.sort((a, b) => a.id.localeCompare(b.id));
   const tableCounts = input.tableResults.map((result) => ({
@@ -413,6 +468,7 @@ export function buildM0Audit(input: ParityReport): M0AuditReport {
       readMode: "Airtable GET + Postgres SELECT",
       sourceRevision: input.sourceRevision ?? `airtable:${input.baseId}@${input.generatedAt}`,
       targetRevision: input.targetRevision ?? "not-supplied",
+      orgId: input.orgId ?? "not-supplied",
     },
     safety: {
       noMutation: true,
@@ -429,7 +485,7 @@ export function buildM0Audit(input: ParityReport): M0AuditReport {
       countDeltas: input.tableResults.filter((result) => result.spec.status === "mapped" && result.airtableCount !== null && result.postgresCount !== null && result.airtableCount !== result.postgresCount).length,
       keyChecks: input.keyChecks.length,
       sourceIdChecks: input.sourceIdChecks.length,
-      deepChecks: input.integrityChecks.length + input.readinessChecks.length,
+      deepChecks: input.integrityChecks.length + input.readinessChecks.length + recordChecks.length,
     },
     sections: [25, 84, 85, 86].map((issue) => sectionFor(issue as M0Section["issue"], orderedMismatches)),
     mismatches: orderedMismatches,
@@ -439,6 +495,7 @@ export function buildM0Audit(input: ParityReport): M0AuditReport {
       tableCounts,
       integrity: input.integrityChecks,
       readiness: input.readinessChecks,
+      records: recordChecks,
     },
   };
 }
@@ -493,6 +550,7 @@ export function renderM0Markdown(report: M0AuditReport): string {
     "",
     `Generated: ${report.generatedAt}`,
     `Report version: \`${report.reportVersion}\``,
+    `Organization scope: \`${cell(report.source.orgId)}\``,
     `Airtable base: \`${report.source.airtableBaseId}\``,
     `Source revision: \`${report.source.sourceRevision}\``,
     `Postgres schema: \`${report.source.postgresSchema}\``,
@@ -511,7 +569,7 @@ export function renderM0Markdown(report: M0AuditReport): string {
     "",
     `- ${report.scope.tablesChecked} tables checked; ${report.scope.mappedTables} mapped tables.`,
     `- ${report.scope.countDeltas} mapped count deltas; ${report.scope.keyChecks} key checks; ${report.scope.sourceIdChecks} source-ID checks.`,
-    `- ${report.mismatches.length} deterministic mismatch records; ${report.scope.deepChecks} integrity/readiness checks.`,
+    `- ${report.mismatches.length} deterministic mismatch records; ${report.scope.deepChecks} integrity, readiness and record-field checks.`,
     "",
     "## M0 sections",
     "",
@@ -540,9 +598,9 @@ export function renderM0Markdown(report: M0AuditReport): string {
     "",
     "## Mismatch ledger",
     "",
-    "| ID | Domain | Kind | Source record IDs | Canonical record IDs | Source value | Canonical value | Proposed disposition | Owner | Next action |",
-    "|---|---|---|---|---|---|---|---|---|---|",
-    ...report.mismatches.map((mismatch) => `| ${cell(mismatch.id)} | ${cell(mismatch.domain)} | ${cell(mismatch.kind)} | ${cell(mismatch.sourceRecordIds.join(", "))} | ${cell(mismatch.canonicalRecordIds.join(", "))} | ${cell(mismatch.sourceValue)} | ${cell(mismatch.canonicalValue)} | ${cell(mismatch.proposedDisposition)} | ${cell(mismatch.owner)} | ${cell(mismatch.nextAction)} |`),
+    "| ID | Domain | Kind | Comparison field | Evidence | Source record IDs | Canonical record IDs | Source value | Canonical value | Proposed disposition | Owner | Next action |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|",
+    ...report.mismatches.map((mismatch) => `| ${cell(mismatch.id)} | ${cell(mismatch.domain)} | ${cell(mismatch.kind)} | ${cell(mismatch.comparisonField)} | ${cell(mismatch.evidence)} | ${cell(mismatch.sourceRecordIds.join(", "))} | ${cell(mismatch.canonicalRecordIds.join(", "))} | ${cell(mismatch.sourceValue)} | ${cell(mismatch.canonicalValue)} | ${cell(mismatch.proposedDisposition)} | ${cell(mismatch.owner)} | ${cell(mismatch.nextAction)} |`),
     "",
   ];
   return lines.join("\n");
