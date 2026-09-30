@@ -74,7 +74,7 @@ async function handleRequest(
   const isPublic = publicPaths.includes(path);
   const isPublicPressRoute = /^\/press\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path);
   const isAuthApi = path.startsWith("/api/auth");
-  const isNativeSignIn = path === "/api/native/sign-in";
+  const isNativeSignIn = path === "/api/native/sign-in" || path === "/api/native/browser-sign-in" || path === "/native-sign-in";
   const isInvitationPath = path === "/invite" || path.startsWith("/invite/");
   const isInvitationAcceptance = [
     "/api/invitations/accept",

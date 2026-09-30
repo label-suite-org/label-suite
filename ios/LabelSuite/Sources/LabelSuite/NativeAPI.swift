@@ -1,4 +1,35 @@
 import Foundation
+import CryptoKit
+import Security
+
+struct NativeBrowserSignIn {
+  let verifier: String
+  let state: String
+  var challenge: String { Self.encode(Data(SHA256.hash(data: Data(verifier.utf8)))) }
+  init() throws {
+    func nonce() throws -> String {
+      var bytes = [UInt8](repeating: 0, count: 32)
+      guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { throw NativeAPIError.authenticationFailed }
+      return Self.encode(Data(bytes))
+    }
+    verifier = try nonce(); state = try nonce()
+  }
+  private static func encode(_ data: Data) -> String { data.base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }
+  func url(base: URL) -> URL {
+    var url = URLComponents(url: base.appending(path: "/native-sign-in"), resolvingAgainstBaseURL: false)!
+    url.queryItems = [URLQueryItem(name: "challenge", value: challenge), URLQueryItem(name: "state", value: state)]
+    return url.url!
+  }
+  func code(from callback: URL) throws -> String {
+    guard let parts = URLComponents(url: callback, resolvingAgainstBaseURL: false), parts.scheme == "online.truenature.labelsuite", parts.host == "sign-in", parts.path.isEmpty, parts.user == nil, parts.password == nil, parts.port == nil, parts.fragment == nil,
+      parts.queryItems?.count == 2,
+      parts.queryItems?.filter({ $0.name == "state" }).map({ $0.value }) == [state],
+      let code = parts.queryItems?.first(where: { $0.name == "code" })?.value,
+      code.range(of: "^[A-Za-z0-9_-]{43}$", options: .regularExpression) != nil
+    else { throw NativeAPIError.authenticationFailed }
+    return code
+  }
+}
 
 public struct NativeSessionResponse: Decodable, Sendable {
   public let user: NativeUser
@@ -390,6 +421,18 @@ public struct NativeAPI: NativeAPIClient, Sendable {
   private func checkDiscoveryReadStatus(_ response: URLResponse) throws {
     let status = (response as? HTTPURLResponse)?.statusCode ?? 0
     guard status == 200 else { throw status == 401 ? NativeAPIError.reauthenticationRequired : status == 403 ? NativeAPIError.insufficientPermissions : status == 404 ? NativeAPIError.notFound : NativeAPIError.transientFailure }
+  }
+
+  func exchangeBrowserSignIn(code: String, verifier: String) async throws -> (NativeSession, [Workspace]) {
+    var request = URLRequest(url: baseURL.appending(path: "/api/native/browser-sign-in"))
+    request.httpMethod = "POST"; request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(["action": "exchange", "code": code, "verifier": verifier])
+    let (data, response) = try await data(for: request)
+    guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw NativeAPIError.authenticationFailed }
+    let decoded = try JSONDecoder().decode(NativeSessionResponse.self, from: data)
+    let session = NativeSession(token: decoded.token, userID: decoded.user.id)
+    do { return (session, try await workspaces(for: session)) }
+    catch { try? await revoke(session); throw error }
   }
 
   public func signIn(email: String, password: String) async throws -> (NativeSession, [Workspace]) {
