@@ -59,7 +59,7 @@ function WeeklyStreamsCard({ data }: { data: NonNullable<ReleaseSisenseSection["
     >
       <div aria-hidden="true" className="h-64 w-full" style={{ minWidth: 1, minHeight: 1 }}>
         <ResponsiveContainer width="100%" height="100%" debounce={50}>
-          <LineChart data={data.points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+          <LineChart accessibilityLayer={false} data={data.points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
             <XAxis
               dataKey="weekStart"
@@ -118,7 +118,7 @@ function TopCountriesCard({ data }: { data: NonNullable<ReleaseSisenseSection["t
     >
       <div aria-hidden="true" className="h-56 w-full" style={{ minWidth: 1, minHeight: 1 }}>
         <ResponsiveContainer width="100%" height="100%" debounce={50}>
-          <BarChart data={data.rows} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }}>
+          <BarChart accessibilityLayer={false} data={data.rows} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }}>
             <XAxis type="number" hide />
             <YAxis
               type="category"
