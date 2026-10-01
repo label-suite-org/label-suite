@@ -7,10 +7,10 @@ import {
   ArrowUpRight,
   BarChart3,
   CalendarDays,
+  ChevronDown,
   Disc3,
   FileAudio,
   Image as ImageIcon,
-  ListChecks,
   MessageCircle,
   Music2,
   Pause,
@@ -35,6 +35,9 @@ import { buildReleaseOperationsBrief, type ReleaseBriefActionKey } from "../../s
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 interface ReleaseDetail extends Release {
   release_ready?: boolean | null;
   updated_at?: string | Date | null;
@@ -161,15 +164,6 @@ type ParsedReleaseRoute = {
   focus: ReleaseOverviewFixFocus | null;
 };
 
-interface FixItem {
-  key: FixKey;
-  label: string;
-  detail: string;
-  done: boolean;
-  action: string;
-  tone?: "warn" | "neutral";
-}
-
 interface ReviewSelection {
   track: TrackRow;
   version: SamplyReviewState["inventory"][number];
@@ -188,7 +182,7 @@ interface SamplyReviewComment {
 const WAVEFORM_BAR_COUNT = 220;
 const COVER_FORM_FOCUS_ID = "release-cover-input";
 
-type ReleaseSection = "overview" | "tracks" | "timeline" | "campaigns" | "budget" | "assets" | "analytics";
+type ReleaseSection = "overview" | "tracks" | "timeline" | "campaigns" | "budget" | "assets" | "analytics" | "details";
 
 const RELEASE_SECTIONS: Array<{ key: ReleaseSection; label: string; description: string }> = [
   { key: "overview", label: "Overview", description: "Readiness and next actions" },
@@ -198,6 +192,7 @@ const RELEASE_SECTIONS: Array<{ key: ReleaseSection; label: string; description:
   { key: "budget", label: "Budget", description: "Spend plan and DSP pitches" },
   { key: "assets", label: "Assets & delivery", description: "Release-linked files and manual delivery" },
   { key: "analytics", label: "Analytics", description: "Scoped performance data" },
+  { key: "details", label: "Details", description: "Checks, evidence, and release administration" },
 ];
 
 export function ReleaseWorkspace({
@@ -234,7 +229,6 @@ export function ReleaseWorkspace({
   const [activeSection, setActiveSection] = useState<ReleaseSection>("overview");
   const [pendingSectionFocus, setPendingSectionFocus] = useState<ReleaseOverviewFixFocus | null>(null);
   const [pitchOpen, setPitchOpen] = useState(false);
-  const [artworkPreviewFailed, setArtworkPreviewFailed] = useState(false);
   const [samplyReview, setSamplyReview] = useState<SamplyReviewState | null>(initialSamplyReview);
   const [reviewSelection, setReviewSelection] = useState<ReviewSelection | null>(null);
   const [reviewComments, setReviewComments] = useState<SamplyReviewComment[]>([]);
@@ -249,10 +243,6 @@ export function ReleaseWorkspace({
   const [reviewCurrentTime, setReviewCurrentTime] = useState(0);
   const [reviewDuration, setReviewDuration] = useState(0);
   const reviewAudioRef = useRef<HTMLAudioElement | null>(null);
-
-  useEffect(() => {
-    setArtworkPreviewFailed(false);
-  }, [release.cover_art_url]);
 
   useEffect(() => {
     currentLocation.current = window.location.href;
@@ -392,8 +382,6 @@ export function ReleaseWorkspace({
     return () => cancelAnimationFrame(frame);
   }, [reviewPlaying, reviewSelection?.version.remoteBoxId]);
 
-  const hasCoverArt = Boolean(release.cover_art_url) && !artworkPreviewFailed;
-
   const hasScopedAnalytics = Boolean(
     cockpit?.dataQuality === "current" &&
       (
@@ -405,74 +393,6 @@ export function ReleaseWorkspace({
       ),
   );
 
-  const fixItems = useMemo<FixItem[]>(() => {
-    const hasTrackReadinessIssue = tracks.some((track) => !track.track_ready);
-    return [
-      {
-        key: "cover",
-        label: "Cover art",
-        detail: hasCoverArt ? "Artwork preview is linked" : release.cover_art_url ? "Saved artwork link needs review" : "Upload or link final cover art",
-        done: hasCoverArt,
-        action: release.cover_art_url ? "Replace cover" : "Add cover",
-        tone: hasCoverArt ? "neutral" : "warn",
-      },
-      {
-        key: "upc",
-        label: "UPC/EAN",
-        detail: release.upc_ean ? release.upc_ean : "Add distributor barcode",
-        done: Boolean(release.upc_ean),
-        action: "Add UPC/EAN",
-      },
-      {
-        key: "date",
-        label: "Release date",
-        detail: release.release_date ? formatDate(release.release_date) : "Set a release date",
-        done: Boolean(release.release_date),
-        action: "Set date",
-      },
-      {
-        key: "format",
-        label: "Format",
-        detail: release.format || "Single, EP, album, video...",
-        done: Boolean(release.format),
-        action: "Set format",
-      },
-      {
-        key: "tracks",
-        label: "Tracklist",
-        detail: tracks.length ? `${tracks.length} track${tracks.length === 1 ? "" : "s"} linked` : "Add tracks to this release",
-        done: tracks.length > 0,
-        action: "Manage tracks",
-      },
-      {
-        key: "track-readiness",
-        label: "Track readiness",
-        detail: hasTrackReadinessIssue ? `${tracks.filter((track) => !track.track_ready).length} track${tracks.filter((track) => !track.track_ready).length === 1 ? "" : "s"} need work` : "All tracks pass readiness",
-        done: tracks.length > 0 && !hasTrackReadinessIssue,
-        action: "Review tracks",
-      },
-      {
-        key: "pitch",
-        label: "DSP pitch",
-        detail: pitches.length ? `${pitches.length} pitch${pitches.length === 1 ? "" : "es"} logged` : "Create the first DSP pitch",
-        done: pitches.length > 0,
-        action: "Add pitch",
-      },
-      {
-        key: "analytics",
-        label: "Scoped analytics",
-        detail: hasScopedAnalytics ? "Release analytics are linked" : "No matched stream data yet",
-        done: hasScopedAnalytics,
-        action: "Check data",
-        tone: hasScopedAnalytics ? "neutral" : "warn",
-      },
-    ];
-  }, [cockpit, hasCoverArt, hasScopedAnalytics, pitches.length, release, tracks]);
-
-  const completed = fixItems.filter((item) => item.done).length;
-  const progress = Math.round((completed / fixItems.length) * 100);
-  const priorityItems = [...fixItems].sort((a, b) => priorityRank(a, release.release_date ?? null) - priorityRank(b, release.release_date ?? null));
-  const nextFix = priorityItems.find((item) => !item.done) ?? null;
   const operationsBrief = useMemo(() => buildReleaseOperationsBrief({
     today: timeline?.today ?? new Date().toISOString().slice(0, 10),
     release: {
@@ -585,90 +505,102 @@ export function ReleaseWorkspace({
 
   return (
     <div className="space-y-5">
-      <header className="rounded-[1.5rem] border border-border bg-card p-4 shadow-[0_20px_70px_rgba(0,0,0,0.04)] sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+      <header className="border-b border-border pb-6">
+        <div className="grid grid-cols-[96px_minmax(0,1fr)] items-start gap-4 sm:flex sm:items-center">
           <CoverWorkbench
             release={release}
             active={activeFix === "cover"}
-              onOpen={() => selectSection("overview", "cover")}
-            onPreviewFailed={() => setArtworkPreviewFailed(true)}
+            onOpen={() => selectSection("overview", "cover")}
           />
 
-          <div className="min-w-0 flex-1 space-y-3">
+          <div className="min-w-0 flex-1">
             <div>
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <StatusPill ready={Boolean(release.release_ready)} />
-                {release.catalog_number && <span className="rounded-md border border-border bg-muted/40 px-2 py-1 font-mono text-xs font-medium text-muted-foreground">{release.catalog_number}</span>}
-                {release.status && <span className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs font-medium capitalize text-muted-foreground">{release.status.replace(/_/g, " ")}</span>}
-              </div>
-              <h1 className="truncate text-2xl font-semibold tracking-tight">{release.title}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {release.artist_name || "No artist"} · {release.format || "No format"} · {release.release_date ? formatDate(release.release_date) : "No date"}
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{release.title}</h1>
+              <p className="mt-1 text-base text-foreground/75">{release.artist_name || "No artist"}</p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                {[release.status?.replace(/_/g, " "), release.format, release.release_date ? formatDate(release.release_date) : null, release.catalog_number].filter(Boolean).join(" · ") || "Release details pending"}
               </p>
               {release.parent_release_id && <a href={`/releases/${release.parent_release_id}`} className="mt-1 inline-block text-xs font-medium text-muted-foreground underline underline-offset-4 hover:text-foreground">Part of an EP rollout</a>}
             </div>
-
-            <div className="flex flex-wrap gap-2">
-              <ReleaseEditButton release={release} artists={artists} parentReleases={parentReleases} />
-              <ReleaseDeleteButton release={release} />
-              <a
-                href={`/releases/${release.id}/tracks`}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                Manage tracks
-              </a>
-            </div>
           </div>
-
-          <aside className="w-full rounded-2xl border border-border bg-card p-3 lg:w-64">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Setup checklist</p>
-                <p className="mt-1 text-xl font-semibold tracking-tight">{progress}%</p>
-              </div>
-              <ListChecks className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="mt-2 h-1.5 rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {nextFix ? `Next: ${nextFix.label}` : "Checklist complete."}<br />Includes optional pitch and analytics setup.
-            </p>
-          </aside>
+          <div className="col-start-2 flex shrink-0 items-center gap-3 sm:col-auto">
+            <StatusPill ready={Boolean(release.release_ready)} />
+            <ReleaseEditButton release={release} artists={artists} parentReleases={parentReleases} />
+          </div>
         </div>
       </header>
 
-      <nav className="sticky top-2 z-20 overflow-x-auto rounded-xl border border-border bg-background/95 p-1 shadow-sm backdrop-blur" aria-label="Release sections" role="tablist">
-        <div className="flex min-w-max gap-1">
-          {RELEASE_SECTIONS.map((section) => (
+      <nav className="sticky top-0 z-20 flex items-center gap-1 overflow-x-auto border-b border-border bg-background py-1" aria-label="Release sections">
+          {RELEASE_SECTIONS.slice(0, 4).map((section) => (
             <Button
               key={section.key}
               id={`release-tab-${section.key}`}
               variant="ghost"
               type="button"
-              role="tab"
-              aria-selected={activeSection === section.key}
+              aria-current={activeSection === section.key ? "page" : undefined}
               title={section.description}
               onClick={() => selectSection(section.key)}
-              className={`rounded-lg px-3 py-2 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${activeSection === section.key ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+              className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm font-medium transition ${section.key === "timeline" || section.key === "campaigns" ? "hidden sm:inline-flex" : ""} ${activeSection === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {section.label}
             </Button>
           ))}
-        </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" type="button" className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm ${activeSection !== "overview" && activeSection !== "tracks" ? "border-primary text-primary" : "border-transparent text-muted-foreground"} ${RELEASE_SECTIONS.slice(4).some((section) => section.key === activeSection) ? "sm:border-primary sm:text-primary" : "sm:border-transparent sm:text-muted-foreground"}`} aria-label="More release sections" />}>
+              <span className="sm:hidden">{RELEASE_SECTIONS.slice(2).find((section) => section.key === activeSection)?.label ?? "More"}</span>
+              <span className="hidden sm:inline">{RELEASE_SECTIONS.slice(4).find((section) => section.key === activeSection)?.label ?? "More"}</span>
+              <ChevronDown className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {RELEASE_SECTIONS.slice(2, 4).map((section) => (
+                <DropdownMenuItem key={section.key} className="sm:hidden" onClick={() => selectSection(section.key)}>{section.label}</DropdownMenuItem>
+              ))}
+              {RELEASE_SECTIONS.slice(4).map((section) => (
+                <DropdownMenuItem key={section.key} onClick={() => selectSection(section.key)}>{section.label}</DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
       </nav>
 
-      {activeSection === "overview" && <ReleaseDeliveryPanel compact releaseId={release.id} canManage={canManage} onOpen={()=>selectSection("assets")} onInspect={tracks=>tracks?selectSection("tracks"):selectSection("overview","upc")} />}
-
-      {activeSection === "overview" && <ReleaseOperationsBrief brief={operationsBrief} onAction={handleBriefAction} />}
-
       {activeSection === "overview" && (
-        <ReleaseAuthorityPanel release={release} tracks={tracks} works={works} />
+        <section id="release-overview" aria-label="Release tracklist" className="scroll-mt-16 space-y-5">
+          {readiness && !readiness.readiness.isReady && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/60 px-4 py-3">
+              <p className="text-sm text-foreground"><span className="font-medium">Needs attention</span> · {readiness.readiness.missing[0] || "Required checks need review"}</p>
+              <Button variant="outline" type="button" onClick={() => selectSection("details")}>Review checks</Button>
+            </div>
+          )}
+          {!readiness && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/60 px-4 py-3"><p className="text-sm text-muted-foreground">Required checks are unavailable.</p><Button variant="outline" type="button" onClick={() => selectSection("details")}>View details</Button></div>}
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">Tracks <span className="ml-1 text-sm font-normal text-muted-foreground">{tracks.length}</span></h2>
+            <Button variant="ghost" nativeButton={false} render={<a href={`/releases/${release.id}/tracks`} />} className="text-sm">Manage tracks</Button>
+          </div>
+          {tracks.length ? (
+            <ol className="divide-y divide-border border-y border-border">
+              {tracks.map((track, index) => (
+                <li key={track.id}>
+                  <a href={`/releases/${release.id}/tracks?track=${encodeURIComponent(track.id)}`} className="group flex min-h-14 items-center gap-4 px-2 py-2 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <span className="w-6 shrink-0 text-right text-sm tabular-nums text-muted-foreground">{track.position ?? index + 1}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{track.title}</span>
+                    <span className={`shrink-0 text-xs ${track.track_ready ? "text-muted-foreground" : "text-amber-700 dark:text-amber-300"}`}>{track.track_ready ? "Ready" : "Needs work"}</span>
+                    <ArrowUpRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+                  </a>
+                </li>
+              ))}
+            </ol>
+          ) : <div className="border-y border-border py-8 text-sm text-muted-foreground">No tracks yet. Add the first track to build this release.</div>}
+        </section>
       )}
 
-      {activeSection === "overview" && <section id="release-readiness" aria-label="Required release checks" className="rounded-xl border border-border bg-card p-4 space-y-3">
+      {activeSection === "details" && <div id="release-details" className="scroll-mt-16"><ReleaseOperationsBrief brief={operationsBrief} onAction={handleBriefAction} /></div>}
+
+      {activeSection === "details" && (
+        <Accordion><AccordionItem value="evidence" className="border-y border-border"><AccordionTrigger>Record evidence</AccordionTrigger><AccordionContent><ReleaseAuthorityPanel release={release} tracks={tracks} works={works} /></AccordionContent></AccordionItem></Accordion>
+      )}
+
+      {activeSection === "details" && <section id="release-readiness" aria-label="Required release checks" className="rounded-xl border border-border bg-card p-4 space-y-3">
         <h2 className="font-semibold">{readiness ? readiness.readiness.isReady ? "Required release checks pass" : "Release needs attention" : "Required checks have not been refreshed"}</h2>
-        <p className="text-sm text-muted-foreground">Required metadata, track audio and rights checks are separate from the optional setup checklist.</p>
+        <p className="text-sm text-muted-foreground">Required metadata, track audio, and rights checks.</p>
         {readiness && <ul className="list-disc pl-5 text-sm">{readiness.readiness.missing.map((missing, index) => <li key={`${index}-${missing}`}>{missing}</li>)}</ul>}
         <div className="flex flex-wrap gap-2">
           {(["cover", "upc", "date", "format"] as const).map(key => <Button id={`release-correct-${key}`} key={key} type="button" variant="outline" onClick={() => selectSection("overview", key)}>{canManage ? "Correct" : "Inspect"} {key === "upc" ? "UPC/EAN" : key === "cover" ? "cover art" : key}</Button>)}
@@ -684,39 +616,29 @@ export function ReleaseWorkspace({
             fallbackValue={({ cover: release.cover_art_url, upc: release.upc_ean, date: release.release_date, format: release.format })[activeFix as ReleaseOverviewFixFocus]}
             inputId={releaseFocusId(activeFix as ReleaseOverviewFixFocus)} initial={readiness} canManage={canManage}
             onSnapshot={acceptReadiness} onDirtyChange={onCorrectionDirty}
-            onClose={() => { if (selectSection("overview")) requestAnimationFrame(() => (correctionTrigger.current ?? document.getElementById("release-tab-overview"))?.focus()); }} />
+            onClose={() => { if (selectSection("overview")) requestAnimationFrame(() => (correctionTrigger.current?.isConnected ? correctionTrigger.current : document.getElementById("release-tab-overview"))?.focus()); }} />
         </section>
       )}
 
       <section className="space-y-4" aria-label="Release workspace content">
-        {activeSection === "overview" && (
-          <Panel title="Release workspace map">
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {RELEASE_SECTIONS.filter((section) => section.key !== "overview").map((section) => (
-                <Button key={section.key} variant="outline" type="button" onClick={() => selectSection(section.key)} className="block h-auto min-w-0 whitespace-normal rounded-lg border border-border p-3 text-left transition hover:border-foreground/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                  <p className="text-sm font-medium">{section.label}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{section.description}</p>
-                </Button>
-              ))}
-            </div>
-          </Panel>
-        )}
+        {activeSection === "details" && <div className="flex justify-end"><ReleaseDeleteButton release={release} /></div>}
 
         {activeSection === "timeline" && <div id="release-timeline" className="scroll-mt-4">
           <ReleaseTimeline releaseId={release.id} canManage={canManage} timeline={timeline} />
         </div>}
 
-        {activeSection === "tracks" && <Panel
+        {activeSection === "tracks" && <div id="release-tracks" className="scroll-mt-16"><Panel
           title="Tracklist"
           action={<a href={`/releases/${release.id}/tracks`} className="text-xs font-medium text-muted-foreground hover:text-foreground">Manage tracks</a>}
         >
           <div className="space-y-3">
-            <SamplyReviewPanel
+            <Accordion><AccordionItem value="audio-review" className="border-y border-border"><AccordionTrigger>Audio review & Samply setup</AccordionTrigger><AccordionContent>            <SamplyReviewPanel
               releaseId={release.id}
               canManage={canManage}
               review={samplyReview}
               onUpdate={setSamplyReview}
             />
+</AccordionContent></AccordionItem></Accordion>
             <TrackTable
               tracks={tracks}
               works={works}
@@ -725,22 +647,22 @@ export function ReleaseWorkspace({
               onReviewSelect={handleReviewSelect}
             />
           </div>
-        </Panel>}
+        </Panel></div>}
 
-        {activeSection === "campaigns" && <ReleaseCampaignsPanel campaigns={campaigns} />}
+        {activeSection === "campaigns" && <div id="release-campaigns" className="scroll-mt-16"><ReleaseCampaignsPanel campaigns={campaigns} /></div>}
 
-        {activeSection === "budget" && <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Panel title="Budget">
+        {activeSection === "budget" && <div id="release-budget" className="grid scroll-mt-16 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Panel title="Budget" action={<a href="/budget" className="text-xs font-medium text-muted-foreground hover:text-foreground">Open budgets</a>}>
             <BudgetBucketSummary items={budgetItems} />
           </Panel>
           <div id="dsp-pitches" className="scroll-mt-4">
-            <Panel title="DSP pitches" action={<Button type="button" onClick={() => setPitchOpen(true)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Add pitch</Button>}>
+            <Panel title="DSP pitches" action={<Button variant="outline" type="button" onClick={() => setPitchOpen(true)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Add pitch</Button>}>
               <PitchList pitches={pitches} />
             </Panel>
           </div>
         </div>}
 
-        {activeSection === "assets" && <div className="space-y-5"><ReleaseDeliveryPanel releaseId={release.id} canManage={canManage} onOpen={()=>selectSection("assets")} onInspect={tracks=>tracks?selectSection("tracks"):selectSection("overview","upc")} /><ReleaseAssetsPanel documents={documents} mediaAssets={mediaAssets} /></div>}
+        {activeSection === "assets" && <div id="release-assets" className="scroll-mt-16 space-y-5"><ReleaseDeliveryPanel releaseId={release.id} canManage={canManage} onOpen={()=>selectSection("assets")} onInspect={tracks=>tracks?selectSection("tracks"):selectSection("overview","upc")} /><ReleaseAssetsPanel documents={documents} mediaAssets={mediaAssets} /></div>}
 
         {activeSection === "analytics" && <div id="performance-data" className="scroll-mt-4">
           <Panel title="Performance data" action={<span className="text-xs text-muted-foreground">{cockpit?.dataWindow.from ? `${formatDate(cockpit.dataWindow.from)} to ${cockpit.dataWindow.to ? formatDate(cockpit.dataWindow.to) : "now"}` : "No scoped window"}</span>}>
@@ -1156,12 +1078,10 @@ function CoverWorkbench({
   release,
   active,
   onOpen,
-  onPreviewFailed,
 }: {
   release: ReleaseDetail;
   active: boolean;
   onOpen: () => void;
-  onPreviewFailed: () => void;
 }) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -1184,7 +1104,6 @@ function CoverWorkbench({
       .catch(() => {
         if (!cancelled) {
           setSrc(null);
-          onPreviewFailed();
         }
       });
     return () => {
@@ -1212,7 +1131,6 @@ function CoverWorkbench({
             className="h-full w-full object-cover"
             onError={() => {
               setFailed(true);
-              onPreviewFailed();
             }}
           />
         ) : (
@@ -1227,38 +1145,6 @@ function CoverWorkbench({
       </Button>
     </div>
   );
-}
-
-function priorityRank(item: FixItem, releaseDate: string | null): number {
-  if (item.done) return 100 + basePriority(item.key);
-  const days = daysUntilRelease(releaseDate);
-  const urgencyBoost = days != null && days >= 0 && days <= 30 ? -10 : 0;
-  return basePriority(item.key) + urgencyBoost;
-}
-
-function basePriority(key: FixKey): number {
-  switch (key) {
-    case "date":
-    case "format":
-    case "cover":
-    case "upc":
-      return 10;
-    case "tracks":
-    case "track-readiness":
-      return 20;
-    case "pitch":
-      return 40;
-    case "analytics":
-      return 60;
-  }
-}
-
-function daysUntilRelease(value: string | null): number | null {
-  if (!value) return null;
-  const target = new Date(`${value}T00:00:00`).getTime();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.ceil((target - today.getTime()) / 86_400_000);
 }
 
 function TrackTable({
@@ -1668,6 +1554,7 @@ export function ReleaseDataPanel({ cockpit, hasScopedAnalytics }: { cockpit: Rel
                 : "This release has no matched nonzero analytics rows yet."}
             </p>
             {cockpit?.dataWindow.to && <p className="mt-2 text-sm text-muted-foreground">Reporting period: {cockpit.dataWindow.from} – {cockpit.dataWindow.to}</p>}
+            <a href="/analytics?section=data-health" className="mt-3 inline-block text-sm font-medium text-foreground underline underline-offset-4 hover:text-foreground/70">Open Data Health</a>
           </div>
         </div>
       </div>
@@ -1814,7 +1701,7 @@ function ReleaseAssetsPanel({
 
 function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-border bg-background p-3">
+    <section className="space-y-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         {action}
@@ -1835,7 +1722,6 @@ function sectionFromHash(hash: string): ReleaseSection {
 
 function sectionHash(section: ReleaseSection): string {
   if (section === "timeline") return "release-timeline";
-  if (section === "budget") return "dsp-pitches";
   if (section === "analytics") return "performance-data";
   return `release-${section}`;
 }
@@ -1901,17 +1787,12 @@ function StatusPill({ ready }: { ready: boolean }) {
 }
 
 function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-card p-6 shadow-xl" onClick={(event) => event.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <Button variant="ghost" type="button" onClick={onClose} className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted">Close</Button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
+  return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
+    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" aria-describedby={undefined}>
+      <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+      {children}
+    </DialogContent>
+  </Dialog>;
 }
 
 function formatNumber(value: number): string {

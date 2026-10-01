@@ -62,6 +62,21 @@ afterEach(async () => {
 });
 
 describe("ArtistWorkspace readiness destinations", () => {
+  it("keeps the overview concise while retaining the complete linked catalog", async () => {
+    const releases = Array.from({ length: 6 }, (_, index) => ({ id: `release-${index}`, title: `Release ${index}` }));
+    await act(async () => {
+      root.render(<ArtistWorkspace artist={baseArtist} releases={releases} assets={[]} campaigns={[]} documents={[]} rights={[]} tasks={[]} primaryContact={null} contactOptions={[]} canMutate={false} />);
+    });
+    expect(container.querySelectorAll('a[href^="/releases/"]')).toHaveLength(4);
+    await act(async () => {
+      const viewAll = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "View all 6 releases");
+      expect(viewAll).toBeTruthy();
+      viewAll?.click();
+    });
+    expect(container.querySelectorAll('a[href^="/releases/"]')).toHaveLength(6);
+    expect(container.querySelector('a[href="/releases/release-5"]')?.textContent).toContain("Release 5");
+  });
+
   it("maps image and rights actions to exact workspace panels", () => {
     expect(readinessDestinationTarget("tab:visuals")).toEqual({
       tab: "visuals",
@@ -82,7 +97,7 @@ describe("ArtistWorkspace readiness destinations", () => {
       tab: "overview",
       targetId: null,
     });
-    expect(readinessDestinationTarget("overview:spotify_popularity")).toEqual({
+    expect(readinessDestinationTarget("overview:spotify_id")).toEqual({
       tab: "overview",
       targetId: null,
     });
@@ -152,6 +167,9 @@ describe("ArtistWorkspace readiness destinations", () => {
     expect(payload).not.toHaveProperty("bio");
     expect(payload).not.toHaveProperty("bio_document");
     expect(payload.pro).toBe("KODA");
+    expect(payload).not.toHaveProperty("spotify_followers");
+    expect(payload).not.toHaveProperty("spotify_popularity");
+    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain("Spotify Followers");
   });
 
   it("renders reviewed rich biography output without executable markup or narrow-screen overflow", async () => {
@@ -189,6 +207,11 @@ describe("ArtistWorkspace readiness destinations", () => {
       );
     });
 
+    expect(container.querySelector('[data-testid="artist-bio-rendered"]')).toBeNull();
+    await act(async () => {
+      const disclosure = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.includes("Profile details and checks"));
+      disclosure?.click();
+    });
     const rendered = container.querySelector('[data-testid="artist-bio-rendered"]');
     expect(rendered?.textContent).toBe(unsafeLookingText);
     expect(rendered?.querySelector("script")).toBeNull();

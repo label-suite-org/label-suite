@@ -417,7 +417,8 @@ test("release workspace fits before hydration", async ({ page }) => {
   await page.route("**/*", (route) => route.request().resourceType() === "script" ? route.abort() : route.continue());
   const releaseId = requiredFixture("E2E_RELEASE_ID", "Release layout requires a seeded release.");
   await page.goto(`/releases/${releaseId}?section=timeline`, { waitUntil: "load" });
-  await expect(page.getByText("Release workspace map", { exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Release sections" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expectNoHorizontalPageOverflow(page);
 });
 

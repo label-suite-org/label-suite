@@ -6,7 +6,7 @@ import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import { AppSidebar } from "./AppSidebar";
 import { BottomNav } from "./BottomNav";
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { ClientAccessContext, type ClientCapabilityMap } from "../lib/client-capabilities";
 import type { MembershipRole } from "../server/tenant";
 
@@ -60,8 +60,8 @@ export function AppShell({ children, orgName, membershipRole, capabilities, isPa
 
   return (
     <ClientAccessContext.Provider value={{ role: membershipRole, capabilities }}>
-      <div className="[--sidebar-width:14rem]" data-membership-role={membershipRole}>
-        <SidebarProvider defaultOpen>
+      <div data-membership-role={membershipRole}>
+        <SidebarProvider defaultOpen style={{ "--sidebar-width": "12.5rem" } as CSSProperties}>
           <TooltipProvider delay={120}>
             {isPayee ? null : (
               /* Desktop sidebar — hidden on mobile */

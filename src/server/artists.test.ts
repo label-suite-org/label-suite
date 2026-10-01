@@ -46,6 +46,7 @@ vi.mock("./integrations", () => audit);
 import {
   createArtist,
   createArtistSchema,
+  nativeCreateArtistSchema,
   reviewArtistBio,
   nativeUpdateArtistSchema,
   updateArtistForNative,
@@ -266,5 +267,17 @@ describe("artist relationship validation", () => {
       name: "Guest Artist",
       relationship: "label",
     })).toThrow();
+  });
+});
+
+// Provider-owned metrics must never be changed through manual artist writes.
+describe("artist provider metrics", () => {
+  it("rejects metrics on web and native writes while accepting profile fields", () => {
+    for (const schema of [createArtistSchema, updateArtistSchema, nativeCreateArtistSchema, nativeUpdateArtistSchema]) {
+      const input = { id: "artist-1", name: "Artist", expected_updated_at: "2026-09-30T00:00:00.000Z" };
+      expect(schema.safeParse({ ...input, spotify_followers: 100 }).success).toBe(false);
+      expect(schema.safeParse({ ...input, spotify_popularity: 50 }).success).toBe(false);
+    }
+    expect(updateArtistSchema.safeParse({ id: "artist-1", spotify_id: "provider-id" }).success).toBe(true);
   });
 });

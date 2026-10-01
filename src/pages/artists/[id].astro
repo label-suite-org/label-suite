@@ -32,10 +32,10 @@ const destinationParam = Astro.url.searchParams.get("destination");
 const initialTab = tabParam && ["overview", "visuals", "releases", "team", "rights", "campaigns", "analytics"].includes(tabParam)
   ? tabParam as "overview" | "visuals" | "releases" | "team" | "rights" | "campaigns" | "analytics"
   : undefined;
-const initialFocusField = canMutate && focusParam && ["bio", "pro", "ipi", "spotify_id", "spotify_followers", "spotify_popularity", "instagram", "tiktok"].includes(focusParam)
+const initialFocusField = canMutate && focusParam && ["bio", "pro", "ipi", "spotify_id", "instagram", "tiktok"].includes(focusParam)
   ? focusParam as ArtistFocusField
   : undefined;
-const initialReadinessDestination = destinationParam && ["overview:bio", "overview:pro", "overview:ipi", "overview:spotify_id", "overview:spotify_followers", "overview:spotify_popularity", "overview:instagram", "overview:tiktok", "tab:visuals", "tab:documents", "tab:rights"].includes(destinationParam)
+const initialReadinessDestination = destinationParam && ["overview:bio", "overview:pro", "overview:ipi", "overview:spotify_id", "overview:instagram", "overview:tiktok", "tab:visuals", "tab:documents", "tab:rights"].includes(destinationParam)
   ? destinationParam as ReadinessDestination
   : undefined;
 const analytics = artist
@@ -47,7 +47,6 @@ const sisense = artist ? await getArtistSisenseSection(orgId, id) : null;
 <AppLayout>
   {!artist ? <p class="text-muted-foreground">Artist not found.</p> : (
     <div class="space-y-8">
-      {canMutate && <div class="flex justify-end"><a href={`/artists/${encodeURIComponent(id)}/portal`} class="inline-flex min-h-11 items-center rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-muted">Artist archive & form</a></div>}
       <ArtistWorkspace
         client:load
         artist={artist}
@@ -63,11 +62,10 @@ const sisense = artist ? await getArtistSisenseSection(orgId, id) : null;
         initialTab={initialTab}
         initialFocusField={initialFocusField}
         initialReadinessDestination={initialReadinessDestination}
-      />
-
-      <AnalyticsPanel analytics={analytics} />
-
-      {sisense && <ArtistSisensePanel client:load section={sisense} />}
+      >
+        <AnalyticsPanel analytics={analytics} />
+        {sisense && <ArtistSisensePanel client:load section={sisense} />}
+      </ArtistWorkspace>
     </div>
   )}
 </AppLayout>

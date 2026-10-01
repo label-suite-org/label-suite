@@ -24,8 +24,6 @@ describe("buildArtistProfileReadiness", () => {
       "PRO",
       "IPI",
       "Spotify ID",
-      "Followers",
-      "Popularity",
       "Instagram",
       "TikTok",
     ]);
@@ -54,16 +52,7 @@ describe("buildArtistProfileReadiness", () => {
       ok: false,
       action: { kind: "edit", focusField: "spotify_id", destination: "overview:spotify_id" },
     });
-    expect(readiness.rows.find((row) => row.label === "Followers")).toMatchObject({
-      label: "Followers",
-      ok: false,
-      action: { kind: "edit", focusField: "spotify_followers", destination: "overview:spotify_followers" },
-    });
-    expect(readiness.rows.find((row) => row.label === "Popularity")).toMatchObject({
-      label: "Popularity",
-      ok: false,
-      action: { kind: "edit", focusField: "spotify_popularity", destination: "overview:spotify_popularity" },
-    });
+    expect(readiness.rows.some(row => ["Followers", "Popularity"].includes(row.label))).toBe(false);
     expect(readiness.rows.find((row) => row.label === "Instagram")).toMatchObject({
       label: "Instagram",
       ok: false,
@@ -96,8 +85,6 @@ describe("buildArtistProfileReadiness", () => {
       "overview:pro",
       "overview:ipi",
       "overview:spotify_id",
-      "overview:spotify_followers",
-      "overview:spotify_popularity",
       "overview:instagram",
       "overview:tiktok",
     ]);
@@ -138,7 +125,7 @@ describe("buildArtistProfileReadiness", () => {
     });
   });
 
-  it("keeps zero numeric values as complete readiness signals", () => {
+  it("does not require provider metrics to complete a profile", () => {
     const readiness = buildArtistProfileReadiness({
       image_url: "https://example.com/image.jpg",
       hasPrimaryImage: true,
@@ -146,15 +133,15 @@ describe("buildArtistProfileReadiness", () => {
       pro: "KODA",
       ipi: "12345",
       spotify_id: "abc-123",
-      spotify_followers: 0,
-      spotify_popularity: 0,
+      spotify_followers: null,
+      spotify_popularity: null,
       instagram: "@artist",
       tiktok: "artist",
     });
 
     expect(readiness.complete).toBe(100);
     expect(readiness.missing).toEqual([]);
-    expect(readiness.rows.filter((row) => row.ok)).toHaveLength(9);
+    expect(readiness.rows.filter((row) => row.ok)).toHaveLength(7);
     expect(readiness.rows.every((row) => !row.action || row.action.kind === "edit" || row.action.kind === "open_tab")).toBe(true);
     expect(readiness.rows.every((row) => row.action && "destination" in row.action)).toBe(true);
   });

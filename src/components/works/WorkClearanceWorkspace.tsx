@@ -32,6 +32,9 @@ import { WorkDeleteButton, WorkEditButton } from "./WorkActionButtons";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 type Work = {
   id: string;
   title: string;
@@ -103,7 +106,7 @@ const weightMap: Record<string, number> = {
 };
 
 const inputClass =
-  "h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm text-neutral-900 outline-none transition-colors hover:border-neutral-200 hover:bg-white focus:border-neutral-300 focus:bg-white focus:ring-2 focus:ring-neutral-900/10";
+  "h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm text-neutral-900 outline-none transition-colors hover:border-border hover:bg-background focus:border-neutral-300 focus:bg-background focus:ring-2 focus:ring-neutral-900/10";
 
 export function WorkClearanceWorkspace({
   work,
@@ -118,6 +121,7 @@ export function WorkClearanceWorkspace({
   tracks: TrackRow[];
   canMutate?: boolean;
 }) {
+  const [activeScope, setActiveScope] = useState<WorkClearanceFocus | "recordings" | "activity">("publishing");
   const [roleRows, setRoleRows] = useState<RoleRow[]>(roles);
   const [modal, setModal] = useState<ModalState>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -140,6 +144,7 @@ export function WorkClearanceWorkspace({
   useEffect(() => {
     const applyRoute = () => {
       const route = parseWorkClearanceRoute(window.location.search);
+      setActiveScope(route.scope ?? "publishing");
       setPendingWorkFocus(route.scope);
     };
     applyRoute();
@@ -158,14 +163,15 @@ export function WorkClearanceWorkspace({
       if (!element) return;
       element.scrollIntoView({ behavior: "smooth", block: "start" });
       element.focus();
+      setPendingWorkFocus(null);
     }, 0);
-    setPendingWorkFocus(null);
     return () => window.clearTimeout(timeout);
   }, [pendingWorkFocus, roleRows, credits.length]);
 
   function openCreate(scope: "Publishing" | "Master" | "Mechanical" | "Credit") {
     const isCredit = scope === "Credit";
     if (!isCredit) {
+      setActiveScope(scope === "Master" ? "master" : "publishing");
       addDraftRole(scope);
       return;
     }
@@ -198,6 +204,7 @@ export function WorkClearanceWorkspace({
     const summary = scope === "Master" ? master : publishing;
     const remaining = roundShare(100 - summary.entered);
     if (remaining <= 0) return;
+    setActiveScope(scope === "Master" ? "master" : "publishing");
     addDraftRole(scope, remaining);
   }
 
@@ -343,19 +350,18 @@ export function WorkClearanceWorkspace({
 
   return (
     <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-2 pb-12 sm:px-0">
-      {!canMutate && <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600">Read-only for fundraiser</p>}
-      <fieldset disabled={!canMutate} className="contents">
-      <header className="flex flex-col gap-4 border-b border-neutral-200 pb-5 lg:flex-row lg:items-end lg:justify-between">
+      {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
+      <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <a
             href="/works"
-            className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-neutral-500 transition-colors hover:text-neutral-950"
+            className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back to Works
           </a>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="break-words text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl">
+            <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               {work.title}
             </h1>
             <span
@@ -376,114 +382,108 @@ export function WorkClearanceWorkspace({
             {work.duration ? <InfoChip label={formatDuration(work.duration)} /> : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <fieldset disabled={!canMutate} className="flex shrink-0 items-center gap-2">
           <WorkEditButton work={work} />
           <WorkDeleteButton work={work} />
-        </div>
+        </fieldset>
       </header>
 
-      <section className="grid gap-4 min-[1180px]:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="grid gap-4 min-[1180px]:grid-cols-2">
-          <ClearanceBoard
-            summary={publishing}
-            contacts={contacts}
-            accent="blue"
-            sectionId="work-publishing"
-            icon={<BookOpen className="h-5 w-5" />}
-            dirtyIds={dirtyIds}
-            savingId={savingId}
-            deletingId={deletingId}
-            saveStates={saveStates}
-            requestSentIds={requestSentIds}
-            onAdd={() => openCreate("Publishing")}
-            onAddRemaining={() => addRemainingSplit("Publishing")}
-            onApplyTemplate={(template) => applyTemplate("Publishing", template)}
-            onPatch={patchRole}
-            onSave={saveRole}
-            onDelete={deleteRole}
-            onRequest={requestClearance}
-          />
-          <ClearanceBoard
-            summary={master}
-            contacts={contacts}
-            accent="amber"
-            sectionId="work-master"
-            icon={<Disc3 className="h-5 w-5" />}
-            dirtyIds={dirtyIds}
-            savingId={savingId}
-            deletingId={deletingId}
-            saveStates={saveStates}
-            requestSentIds={requestSentIds}
-            onAdd={() => openCreate("Master")}
-            onAddRemaining={() => addRemainingSplit("Master")}
-            onApplyTemplate={(template) => applyTemplate("Master", template)}
-            onPatch={patchRole}
-            onSave={saveRole}
-            onDelete={deleteRole}
-            onRequest={requestClearance}
-          />
+      <Tabs value={activeScope} onValueChange={value => { setActiveScope(value as typeof activeScope); setPendingWorkFocus(null); }} className="min-w-0 gap-5">
+        <div className="overflow-x-auto border-b border-border">
+          <TabsList variant="line" aria-label="Work sections" className="h-11">
+            <TabsTrigger value="publishing">Publishing</TabsTrigger>
+            <TabsTrigger value="master">Master</TabsTrigger>
+            <TabsTrigger value="credits">Credits</TabsTrigger>
+            <TabsTrigger value="recordings">Recordings</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
+          </TabsList>
         </div>
-
-        <div className="grid gap-4">
-          <NextFixes
-            fixes={nextFixes}
-            onCreatePublishing={() => openCreate("Publishing")}
-            onCreateMaster={() => openCreate("Master")}
-            onAddPublishingRemaining={() => addRemainingSplit("Publishing")}
-            onAddMasterRemaining={() => addRemainingSplit("Master")}
-          />
-          <ActivityTrail activity={activity} />
-        </div>
-      </section>
-
-      <TracksPanel tracks={tracks} publishing={publishing} master={master} />
-
-      <CreditsPanel
-        sectionId="work-credits"
-        credits={credits}
-        contacts={contacts}
-        dirtyIds={dirtyIds}
-        savingId={savingId}
-        deletingId={deletingId}
-        saveStates={saveStates}
-        requestSentIds={requestSentIds}
-        onAdd={() => openCreate("Credit")}
-        onPatch={patchRole}
-        onSave={saveRole}
-        onDelete={deleteRole}
-        onRequest={requestClearance}
-      />
-
-      {modal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={() => setModal(null)}>
-          <div
-            className="w-full max-w-xl rounded-lg bg-white p-6 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-semibold text-neutral-950">{modal.title}</h2>
-                <p className="mt-1 text-sm text-neutral-500">Add the person, points, and clearance state for this work.</p>
-              </div>
-              <Button
-                type="button"
-                onClick={() => setModal(null)}
-                className="rounded-md px-2 py-1 text-sm font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-950"
-              >
-                Close
-              </Button>
-            </div>
-            <RoleForm
-              workId={work.id}
+        <fieldset disabled={!canMutate} className="min-w-0">
+          <TabsContent value="publishing">
+            <ClearanceBoard
+              summary={publishing}
               contacts={contacts}
-              role={modal.defaults}
-              filterRightsContacts={modal.defaults.ownership_type !== "Credit"}
-              onClose={() => setModal(null)}
+              accent="blue"
+              sectionId="work-publishing"
+              icon={<BookOpen className="h-5 w-5" />}
+              dirtyIds={dirtyIds}
+              savingId={savingId}
+              deletingId={deletingId}
+              saveStates={saveStates}
+              requestSentIds={requestSentIds}
+              onAdd={() => openCreate("Publishing")}
+              onAddRemaining={() => addRemainingSplit("Publishing")}
+              onApplyTemplate={(template) => applyTemplate("Publishing", template)}
+              onPatch={patchRole}
+              onSave={saveRole}
+              onDelete={deleteRole}
+              onRequest={requestClearance}
             />
-          </div>
-        </div>
-      ) : null}
-      </fieldset>
+          </TabsContent>
+          <TabsContent value="master">
+            <ClearanceBoard
+              summary={master}
+              contacts={contacts}
+              accent="amber"
+              sectionId="work-master"
+              icon={<Disc3 className="h-5 w-5" />}
+              dirtyIds={dirtyIds}
+              savingId={savingId}
+              deletingId={deletingId}
+              saveStates={saveStates}
+              requestSentIds={requestSentIds}
+              onAdd={() => openCreate("Master")}
+              onAddRemaining={() => addRemainingSplit("Master")}
+              onApplyTemplate={(template) => applyTemplate("Master", template)}
+              onPatch={patchRole}
+              onSave={saveRole}
+              onDelete={deleteRole}
+              onRequest={requestClearance}
+            />
+          </TabsContent>
+          <TabsContent value="credits">
+            <CreditsPanel
+              sectionId="work-credits"
+              credits={credits}
+              contacts={contacts}
+              dirtyIds={dirtyIds}
+              savingId={savingId}
+              deletingId={deletingId}
+              saveStates={saveStates}
+              requestSentIds={requestSentIds}
+              onAdd={() => openCreate("Credit")}
+              onPatch={patchRole}
+              onSave={saveRole}
+              onDelete={deleteRole}
+              onRequest={requestClearance}
+            />
+          </TabsContent>
+          <TabsContent value="recordings">
+            <TracksPanel tracks={tracks} publishing={publishing} master={master} />
+          </TabsContent>
+          <TabsContent value="activity" className="space-y-7">
+            <NextFixes
+              fixes={nextFixes}
+              onCreatePublishing={() => openCreate("Publishing")}
+              onCreateMaster={() => openCreate("Master")}
+              onAddPublishingRemaining={() => addRemainingSplit("Publishing")}
+              onAddMasterRemaining={() => addRemainingSplit("Master")}
+            />
+            <ActivityTrail activity={activity} />
+          </TabsContent>
+
+        </fieldset>
+      </Tabs>
+
+      <Dialog open={Boolean(modal)} onOpenChange={open => { if (!open) setModal(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{modal?.title}</DialogTitle>
+            <DialogDescription>Add the person, points, and clearance state for this work.</DialogDescription>
+          </DialogHeader>
+          {modal && <RoleForm workId={work.id} contacts={contacts} role={modal.defaults} filterRightsContacts={modal.defaults.ownership_type !== "Credit"} onClose={() => setModal(null)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -525,49 +525,50 @@ function ClearanceBoard({
   onDelete: (role: RoleRow) => void;
   onRequest: (role: RoleRow) => void;
 }) {
-  const accentBg = accent === "blue" ? "bg-blue-600" : "bg-amber-500";
-  const accentSoft = accent === "blue" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700";
+  const accentSoft = accent === "blue" ? "bg-accent text-accent-foreground" : "bg-amber-50 text-amber-700";
   const addLabel = summary.label === "Publishing" ? "Add publishing split" : "Add master split";
   const remaining = roundShare(100 - summary.entered);
   const templateOptions = getTemplateOptions(summary.label);
 
   return (
-    <section id={sectionId} className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
-      <div className="border-b border-neutral-200 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+    <section id={sectionId} className="min-w-0 space-y-4">
+      <div className="border-b border-border p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 sm:flex-nowrap">
+          <div className="flex min-w-0 basis-full items-center gap-3 sm:flex-1 sm:basis-0">
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${accentSoft}`}>
               {icon}
             </span>
             <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold text-neutral-950">{summary.label} clearance</h2>
-              <p className="mt-0.5 text-xs text-neutral-500">
+              <h2 className="break-words text-base font-semibold text-foreground">{summary.label} clearance</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {formatShare(summary.entered)} entered / {formatShare(summary.weighted)} weighted
               </p>
             </div>
           </div>
+          <Button
+            type="button"
+            id={`${sectionId}-add`}
+            variant="outline"
+            onClick={onAdd}
+            className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
+              accent === "blue"
+                ? "border-blue-200 text-blue-700 hover:bg-blue-50"
+                : "border-amber-200 text-amber-700 hover:bg-amber-50"
+            }`}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {addLabel}
+          </Button>
           <span className={`rounded-full px-3 py-1 text-sm font-semibold ${summary.cleared ? "bg-emerald-50 text-emerald-700" : accentSoft}`}>
             {summary.applicable ? summary.cleared ? "Cleared" : `${summary.pct}%` : "Not applicable"}
           </span>
         </div>
 
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-neutral-100">
-          <div className={`h-full rounded-full ${summary.cleared ? "bg-emerald-600" : accentBg}`} style={{ width: `${summary.pct}%` }} />
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 divide-x divide-neutral-200 border-y border-neutral-100 py-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Entered</p>
-            <p className="mt-1 text-xl font-semibold text-neutral-950">{formatShare(summary.entered)}</p>
-          </div>
-          <div className="pl-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Confirmed</p>
-            <p className="mt-1 text-xl font-semibold text-neutral-950">{formatShare(summary.weighted)}</p>
-          </div>
-        </div>
       </div>
 
-      <div className="grid grid-cols-[minmax(150px,1fr)_54px_82px_56px_60px] gap-2 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+      <p className="text-xs text-muted-foreground sm:hidden">Scroll across to review all split fields.</p>
+      <div className="overflow-x-auto" role="region" aria-label={`${summary.label} split fields`} tabIndex={0}><div className="min-w-[32rem]">
+      <div className="grid grid-cols-[minmax(150px,1fr)_54px_82px_56px_60px] gap-2 border-b border-border bg-muted/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         <span>Role / contact</span>
         <span>Points</span>
         <span>Status</span>
@@ -575,7 +576,7 @@ function ClearanceBoard({
         <span className="text-right">Save</span>
       </div>
 
-      <div className="divide-y divide-neutral-100">
+      <div className="divide-y divide-border">
         {summary.rows.length ? (
           summary.rows.map((role, index) => (
             <InlineRoleRow
@@ -598,23 +599,25 @@ function ClearanceBoard({
         ) : (
           <div className="flex flex-col items-start gap-3 p-4">
             <div>
-              <p className="text-sm font-medium text-neutral-950">No {summary.label.toLowerCase()} splits yet</p>
-              <p className="mt-1 text-sm text-neutral-500">Start with the person or company that owns points on this side.</p>
+              <p className="text-sm font-medium text-foreground">No {summary.label.toLowerCase()} splits yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">Start with the person or company that owns points on this side.</p>
             </div>
           </div>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-100 bg-neutral-50 px-4 py-3">
+      </div></div>
+
+      <Accordion><AccordionItem value="split-tools" className="border-y border-border"><AccordionTrigger>Split tools & templates</AccordionTrigger><AccordionContent>      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/30 px-4 py-3">
         <div>
-          <p className="text-xs text-neutral-500">
-            Total entered <strong className="text-neutral-950">{formatShare(summary.entered)}</strong>
+          <p className="text-xs text-muted-foreground">
+            Total entered <strong className="text-foreground">{formatShare(summary.entered)}</strong>
           </p>
           {remaining > 0.01 ? (
-            <Button variant="ghost"
+            <Button variant="outline"
               type="button"
               onClick={onAddRemaining}
-              className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-neutral-950 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-neutral-800"
+              className="mt-2 gap-1.5 text-xs"
             >
               <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
               Add remaining {formatShare(remaining)}
@@ -625,36 +628,26 @@ function ClearanceBoard({
           {templateOptions.map((template) => (
             <Button
               key={template.kind}
+              variant="outline"
               type="button"
               onClick={() => onApplyTemplate(template.kind)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-100"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-2 text-xs font-semibold text-foreground hover:bg-muted"
             >
               <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
               {template.label}
             </Button>
           ))}
-          <Button
-            type="button"
-            id={`${sectionId}-add`}
-            onClick={onAdd}
-            className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
-              accent === "blue"
-                ? "border-blue-200 text-blue-700 hover:bg-blue-50"
-                : "border-amber-200 text-amber-700 hover:bg-amber-50"
-            }`}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {addLabel}
-          </Button>
+
         </div>
       </div>
+</AccordionContent></AccordionItem></Accordion>
 
       {summary.applicable && !summary.cleared ? (
-        <div className="border-t border-neutral-100 px-4 py-2 text-xs text-amber-700">
+        <div className="border-t border-border px-4 py-2 text-xs text-amber-700">
           {summary.entered < 100 ? (
             <span>{`Add ${formatShare(100 - summary.entered)} to reach 100%.`}</span>
           ) : summary.pendingRows.length ? (
-            <span>{summary.pendingRows.length} line{summary.pendingRows.length === 1 ? "" : "s"} still pending or unknown.</span>
+            <span>{summary.pendingRows.length} line{summary.pendingRows.length === 1 ? "" : "s"} still need full clearance.</span>
           ) : null}
         </div>
       ) : null}
@@ -705,7 +698,7 @@ function InlineRoleRow({
   return (
     <div className={`grid grid-cols-[minmax(150px,1fr)_54px_82px_56px_60px] gap-2 px-4 py-3 ${role.isDraft ? "bg-amber-50/50" : ""}`}>
       <div className="flex min-w-0 gap-2">
-        <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+        <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <UserRound className="h-4 w-4" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1 space-y-1">
@@ -740,7 +733,7 @@ function InlineRoleRow({
           {selectedContact ? (
             <div className="flex flex-wrap gap-1 px-2">
               {capabilityTags.length ? capabilityTags.map((tag) => (
-                <span key={tag} className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-semibold text-neutral-600">
+                <span key={tag} className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                   {tag}
                 </span>
               )) : null}
@@ -748,14 +741,14 @@ function InlineRoleRow({
                 {selectedContact.email ? "Email ready" : "No email"}
               </span>
             </div>
-          ) : filterRightsContacts ? <p className="px-2 text-[11px] leading-4 text-neutral-400">{contactHint}</p> : null}
+          ) : filterRightsContacts ? <p className="px-2 text-[11px] leading-4 text-muted-foreground">{contactHint}</p> : null}
           <Input
             value={role.role ?? ""}
             onChange={(event) => onPatch(role.id, { role: event.target.value })}
             onKeyDown={(event) => {
               if (event.key === "Enter") onSave(role);
             }}
-            className={`${inputClass} truncate text-xs text-neutral-500`}
+            className={`${inputClass} truncate text-xs text-muted-foreground`}
             aria-label="Role"
             placeholder="Role"
           />
@@ -796,13 +789,14 @@ function InlineRoleRow({
 
       <div className="flex items-start justify-start pt-1">
         <Button
+          variant="ghost"
           type="button"
           onClick={() => onRequest(role)}
           disabled={!role.contact_id || role.clearance_status === "Signed" || role.clearance_status === "Confirmed"}
           className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
             requestSent
               ? "bg-emerald-50 text-emerald-700"
-              : "text-neutral-400 hover:bg-blue-50 hover:text-blue-700"
+              : "text-muted-foreground hover:bg-blue-50 hover:text-blue-700"
           } disabled:cursor-not-allowed disabled:opacity-35`}
           aria-label="Queue clearance request"
           title={requestSent ? "Request queued" : selectedContact?.email ? "Queue clearance request" : "Add contact email before sending"}
@@ -819,7 +813,7 @@ function InlineRoleRow({
           className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
             dirty
               ? "bg-neutral-950 text-white hover:bg-neutral-800"
-              : "text-neutral-300 hover:bg-neutral-100"
+              : "text-neutral-300 hover:bg-muted"
           } disabled:opacity-50`}
           aria-label="Save split"
           title={saveButtonTitle(dirty, role.isDraft, saveState)}
@@ -830,7 +824,7 @@ function InlineRoleRow({
           type="button"
           onClick={() => onDelete(role)}
           disabled={deleting}
-          className="inline-flex h-8 w-6 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          className="inline-flex h-8 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
           aria-label="Delete split"
           title={role.isDraft ? "Discard split" : "Delete split"}
         >
@@ -860,34 +854,35 @@ function NextFixes({
   onAddMasterRemaining: () => void;
 }) {
   return (
-    <aside className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+    <aside className="rounded-lg border border-border bg-background p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-neutral-950">Next fixes</h2>
-        <FileSignature className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+        <h2 className="text-base font-semibold text-foreground">Next fixes</h2>
+        <FileSignature className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
       </div>
-      <div className="mt-4 overflow-hidden rounded-lg border border-neutral-200">
+      <div className="mt-4 overflow-hidden rounded-lg border border-border">
         {fixes.map((fix) => (
           <Button
             key={fix.id}
             type="button"
+            variant="ghost"
             onClick={() => {
               if (fix.action === "publishing") onCreatePublishing();
               if (fix.action === "master") onCreateMaster();
               if (fix.id === "publishing-balance") onAddPublishingRemaining();
               if (fix.id === "master-balance") onAddMasterRemaining();
             }}
-            className="flex w-full items-center gap-3 border-b border-neutral-200 px-3 py-3 text-left last:border-b-0 hover:bg-neutral-50"
+            className="flex h-auto w-full items-center gap-3 border-b border-border rounded-none px-3 py-3 text-left whitespace-normal last:border-b-0 hover:bg-muted/30"
           >
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                fix.done ? "bg-emerald-100 text-emerald-700" : fix.optional ? "bg-neutral-100 text-neutral-600" : "bg-amber-100 text-amber-700"
+                fix.done ? "bg-emerald-100 text-emerald-700" : fix.optional ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-700"
               }`}
             >
               {fix.done ? <CheckCircle2 className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-neutral-950">{fix.optional ? `Optional: ${fix.title}` : fix.title}</span>
-              <span className="mt-0.5 block text-xs text-neutral-500">{fix.detail}</span>
+              <span className="block text-sm font-medium text-foreground">{fix.optional ? `Optional: ${fix.title}` : fix.title}</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">{fix.detail}</span>
             </span>
           </Button>
         ))}
@@ -898,10 +893,10 @@ function NextFixes({
 
 function ActivityTrail({ activity }: { activity: ActivityItem[] }) {
   return (
-    <aside className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+    <aside className="rounded-lg border border-border bg-background p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-neutral-950">Activity</h2>
-        <Clock3 className="h-5 w-5 text-neutral-400" aria-hidden="true" />
+        <h2 className="text-base font-semibold text-foreground">Activity</h2>
+        <Clock3 className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
       </div>
       <div className="mt-4 space-y-3">
         {activity.map((item) => (
@@ -909,10 +904,10 @@ function ActivityTrail({ activity }: { activity: ActivityItem[] }) {
             <span className={`mt-1 h-2 w-2 rounded-full ${activityDotClass(item.tone)}`} />
             <span className="min-w-0">
               <span className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-medium text-neutral-950">{item.title}</span>
-                <span className="shrink-0 text-[11px] text-neutral-400">{item.time}</span>
+                <span className="truncate text-sm font-medium text-foreground">{item.title}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">{item.time}</span>
               </span>
-              <span className="mt-0.5 block text-xs leading-5 text-neutral-500">{item.detail}</span>
+              <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{item.detail}</span>
             </span>
           </div>
         ))}
@@ -923,19 +918,20 @@ function ActivityTrail({ activity }: { activity: ActivityItem[] }) {
 
 function TracksPanel({ tracks, publishing, master }: { tracks: TrackRow[]; publishing: ScopeSummary; master: ScopeSummary }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-4">
-        <Link2 className="h-4 w-4 text-neutral-500" aria-hidden="true" />
-        <h2 className="text-base font-semibold text-neutral-950">Linked tracks & releases</h2>
+    <section className="min-w-0 space-y-4">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-4">
+        <Link2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        <h2 className="text-base font-semibold text-foreground">Linked tracks & releases</h2>
       </div>
-      <div className="grid grid-cols-[minmax(0,1.4fr)_130px_210px_210px_140px] gap-3 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+      <div className="overflow-x-auto"><div className="min-w-[56rem]">
+      <div className="grid grid-cols-[minmax(0,1.4fr)_130px_210px_210px_140px] gap-3 border-b border-border bg-muted/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         <span>Release / track</span>
         <span>ISRC</span>
         <span>Publishing readiness</span>
         <span>Master readiness</span>
         <span>Status</span>
       </div>
-      <div className="divide-y divide-neutral-100">
+      <div className="divide-y divide-border">
         {tracks.length ? (
           tracks.map((track) => {
             const progress = Math.round((track.clearance_progress ?? 0) * 100);
@@ -943,13 +939,13 @@ function TracksPanel({ tracks, publishing, master }: { tracks: TrackRow[]; publi
               <a
                 key={track.id}
                 href={track.release_id ? `/releases/${track.release_id}/tracks` : "/tracks"}
-                className="grid grid-cols-[minmax(0,1.4fr)_130px_210px_210px_140px] gap-3 px-4 py-3 text-sm transition-colors hover:bg-neutral-50"
+                className="grid grid-cols-[minmax(0,1.4fr)_130px_210px_210px_140px] gap-3 px-4 py-3 text-sm transition-colors hover:bg-muted/30"
               >
                 <span className="min-w-0">
-                  <span className="block truncate font-semibold text-neutral-950">{track.title}</span>
-                  <span className="block truncate text-xs text-neutral-500">{track.position ? `Track ${track.position}` : "Linked recording"}</span>
+                  <span className="block truncate font-semibold text-foreground">{track.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{track.position ? `Track ${track.position}` : "Linked recording"}</span>
                 </span>
-                <span className="truncate font-mono text-xs text-neutral-500">{track.isrc || "No ISRC"}</span>
+                <span className="truncate font-mono text-xs text-muted-foreground">{track.isrc || "No ISRC"}</span>
                 <ReadinessCell entered={publishing.entered} confirmed={publishing.weighted} tone="blue" />
                 <ReadinessCell entered={master.entered} confirmed={master.weighted} tone="amber" />
                 <span
@@ -963,9 +959,10 @@ function TracksPanel({ tracks, publishing, master }: { tracks: TrackRow[]; publi
             );
           })
         ) : (
-          <p className="p-4 text-sm text-neutral-500">No tracks are linked to this work yet.</p>
+          <p className="p-4 text-sm text-muted-foreground">No tracks are linked to this work yet.</p>
         )}
       </div>
+      </div></div>
     </section>
   );
 }
@@ -1000,24 +997,24 @@ function CreditsPanel({
   onRequest: (role: RoleRow) => void;
 }) {
   return (
-    <section id={sectionId} className="rounded-lg border border-neutral-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3">
+    <section id={sectionId} className="min-w-0 space-y-4">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
         <div>
-          <h2 className="text-base font-semibold text-neutral-950">Credits</h2>
-          <p className="mt-0.5 text-xs text-neutral-500">Name-only credits do not count toward clearance math.</p>
+          <h2 className="text-base font-semibold text-foreground">Credits</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Name-only credits do not count toward clearance math.</p>
         </div>
         <Button variant="outline"
           type="button"
           id={`${sectionId}-add`}
           onClick={onAdd}
-          className="inline-flex items-center gap-2 rounded-md border border-neutral-200 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+          className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/30"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add credit
         </Button>
       </div>
       {credits.length ? (
-        <div className="divide-y divide-neutral-100">
+        <div className="overflow-x-auto"><div className="min-w-[32rem] divide-y divide-border">
           {credits.map((role, index) => (
             <InlineRoleRow
               key={role.id}
@@ -1035,9 +1032,9 @@ function CreditsPanel({
               onRequest={onRequest}
             />
           ))}
-        </div>
+        </div></div>
       ) : (
-        <p className="p-4 text-sm text-neutral-500">No non-rights credits have been added yet.</p>
+        <p className="p-4 text-sm text-muted-foreground">No non-rights credits have been added yet.</p>
       )}
     </section>
   );
@@ -1047,11 +1044,11 @@ function ReadinessCell({ entered, confirmed, tone }: { entered: number; confirme
   return (
     <span className="grid grid-cols-2 gap-3">
       <span>
-        <span className="block text-[11px] uppercase tracking-[0.08em] text-neutral-400">Entered</span>
-        <span className="font-semibold text-neutral-950">{formatShare(entered)}</span>
+        <span className="block text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Entered</span>
+        <span className="font-semibold text-foreground">{formatShare(entered)}</span>
       </span>
       <span>
-        <span className="block text-[11px] uppercase tracking-[0.08em] text-neutral-400">Confirmed</span>
+        <span className="block text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Weighted</span>
         <span className={`font-semibold ${tone === "blue" ? "text-blue-700" : "text-amber-700"}`}>{formatShare(confirmed)}</span>
       </span>
     </span>
@@ -1060,7 +1057,7 @@ function ReadinessCell({ entered, confirmed, tone }: { entered: number; confirme
 
 function InfoChip({ label, mono = false }: { label: string; mono?: boolean }) {
   return (
-    <span className={`rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-neutral-600 ${mono ? "font-mono" : ""}`}>
+    <span className={`rounded-md border border-border bg-muted/30 px-2.5 py-1 text-muted-foreground ${mono ? "font-mono" : ""}`}>
       {label}
     </span>
   );
@@ -1277,7 +1274,7 @@ function statusSelectClass(status: string) {
   if (status === "Signed") return "font-semibold text-emerald-700";
   if (status === "Confirmed") return "font-semibold text-sky-700";
   if (status === "Pending") return "font-semibold text-amber-700";
-  return "font-semibold text-neutral-500";
+  return "font-semibold text-muted-foreground";
 }
 
 function formatShare(value: number) {

@@ -71,7 +71,10 @@
     "plane-sync:build": "tsc -p ops/plane-sync/tsconfig.json",
     "plane-sync:delivery-contract": "node scripts/verify-plane-sync-delivery.mjs",
     "plane-sync:reconcile": "node ops/plane-sync/dist/cli.js reconcile --dry-run",
-    "plane-sync:bootstrap": "node ops/plane-sync/dist/cli.js bootstrap --dry-run"
+    "plane-sync:bootstrap": "node ops/plane-sync/dist/cli.js bootstrap --dry-run",
+    "storybook": "storybook dev -p 6006 --host 0.0.0.0 --no-open",
+    "storybook:build": "storybook build",
+    "storybook:test": "LABEL_SUITE_STORYBOOK_TEST=1 vitest run --maxWorkers=1"
   },
   "dependencies": {
     "@astrojs/node": "^11.0.0",
@@ -125,9 +128,15 @@
     "@astrojs/check": "^0.9.9",
     "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "^1.55.0",
+    "@storybook/addon-docs": "10.6.1",
+    "@storybook/addon-mcp": "10.6.1",
+    "@storybook/addon-vitest": "10.6.1",
+    "@storybook/react-vite": "10.6.1",
     "@types/node": "^26.0.0",
+    "@vitest/browser-playwright": "4.1.9",
     "drizzle-kit": "^0.31.10",
     "jsdom": "^27.4.0",
+    "storybook": "10.6.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.0.0",
