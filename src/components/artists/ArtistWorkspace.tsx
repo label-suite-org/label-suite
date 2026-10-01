@@ -180,26 +180,20 @@ function normalizeStatus(value?: string | null): string {
   return (value || "draft").replace(/_/g, " ");
 }
 
-function relationshipMeta(relationship?: Artist["relationship"]): { label: string; className: string; detail: string } {
+function relationshipMeta(relationship?: Artist["relationship"]): { detail: string } {
   if (relationship === "roster") {
     return {
-      label: "Roster",
-      className: "border-cyan-200 bg-cyan-50 text-cyan-800",
       detail: "Signed to the label",
     };
   }
 
   if (relationship === "collaborator") {
     return {
-      label: "Collaborator",
-      className: "border-stone-200 bg-stone-50 text-stone-700",
       detail: "Project collaborator",
     };
   }
 
   return {
-    label: "Unclassified",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
     detail: "Relationship not set",
   };
 }

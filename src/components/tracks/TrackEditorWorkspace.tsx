@@ -147,7 +147,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
             </div>
           )}
         </div>
-        {isrcAssignmentError && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{isrcAssignmentError}</p>}
+        {isrcAssignmentError && <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{isrcAssignmentError}</p>}
 
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">
@@ -334,7 +334,7 @@ function TrackInspector({
             <AccordionContent className="space-y-3">
               {readinessChecks.map((check) => (
                 <div key={check.label} className="flex items-start gap-3">
-                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${check.state === "complete" ? "bg-emerald-600 text-white" : check.state === "not-applicable" ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-800"}`}>
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${check.state === "complete" ? "bg-success-foreground text-background" : check.state === "not-applicable" ? "bg-muted text-muted-foreground" : "bg-warning text-warning-foreground"}`}>
                     {check.state === "complete" ? <CheckCircle2 className="h-3.5 w-3.5" /> : check.state === "not-applicable" ? <span className="text-xs font-semibold">—</span> : <CircleAlert className="h-3.5 w-3.5" />}
                   </span>
                   <span>
@@ -406,7 +406,7 @@ function TrackInspector({
           </NativeSelect>
         </Field>
 
-        {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">

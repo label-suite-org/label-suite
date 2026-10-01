@@ -23,7 +23,7 @@ layout pass and visual acceptance.
 - [x] Use shared selection tokens in Catalog and line-tab controls.
 - [x] Fix action-button styling used as Artist/Grants navigation and rights fix rows.
 - [x] Remove the repeated visible Analytics workspace title.
-- [ ] Make light the initial presentation while preserving explicit theme choice.
+- [x] Make light the initial presentation while preserving explicit light/dark/system choice.
 - [ ] Audit all remaining hardcoded palettes, radii and action variants.
 - [ ] Visually accept the shared foundation across populated and empty workflows.
 

@@ -540,7 +540,7 @@ function ArtistCoverArt({
   }
 
   return (
-    <div className="grid h-full w-full place-items-center bg-muted text-sm font-medium text-foreground">
+    <div className="grid h-full w-full place-items-center bg-muted text-sm font-medium text-muted-foreground">
       {initials(artist.name)}
     </div>
   );

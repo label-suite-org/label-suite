@@ -1,5 +1,7 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+
 import { ReleaseDeliveryPanel } from "./ReleaseDeliveryPanel";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
@@ -540,7 +542,7 @@ export function ReleaseWorkspace({
               aria-current={activeSection === section.key ? "page" : undefined}
               title={section.description}
               onClick={() => selectSection(section.key)}
-              className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm font-medium transition ${section.key === "timeline" || section.key === "campaigns" ? "hidden sm:inline-flex" : ""} ${activeSection === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm font-medium transition ${(section.key === "timeline" || section.key === "campaigns") && activeSection !== section.key ? "hidden sm:inline-flex" : ""} ${activeSection === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {section.label}
             </Button>
@@ -582,7 +584,7 @@ export function ReleaseWorkspace({
                   <a href={`/releases/${release.id}/tracks?track=${encodeURIComponent(track.id)}`} className="group flex min-h-14 items-center gap-4 px-2 py-2 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <span className="w-6 shrink-0 text-right text-sm tabular-nums text-muted-foreground">{track.position ?? index + 1}</span>
                     <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{track.title}</span>
-                    <span className={`shrink-0 text-xs ${track.track_ready ? "text-muted-foreground" : "text-amber-700 dark:text-amber-300"}`}>{track.track_ready ? "Ready" : "Needs work"}</span>
+                    <span className={`shrink-0 text-xs ${track.track_ready ? "text-muted-foreground" : "text-warning-foreground dark:text-warning-foreground"}`}>{track.track_ready ? "Ready" : "Needs work"}</span>
                     <ArrowUpRight className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
                   </a>
                 </li>
@@ -761,7 +763,7 @@ function EvidenceCell({
   return (
     <div className="rounded-lg border border-border bg-muted/15 p-3">
       <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
-      <p className={`mt-1 text-sm font-semibold ${tone === "ready" ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{value}</p>
+      <p className={`mt-1 text-sm font-semibold ${tone === "ready" ? "text-success-foreground dark:text-success-foreground" : "text-warning-foreground dark:text-warning-foreground"}`}>{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
     </div>
   );
@@ -886,7 +888,7 @@ function SamplyReviewPanel({
             Create a Samply project for this release, or link an existing Samply project that should act as the authoritative home for artwork, tracklist, audio, versions, and review activity.
           </p>
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
         {canManage ? (
           <div className="flex flex-wrap gap-2">
             <Button
@@ -966,12 +968,12 @@ function SamplyReviewPanel({
 
   return (
     <div className="space-y-2 rounded-lg border border-border bg-muted/15 px-3 py-2.5">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-md border border-emerald-500/35 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">Source: Samply</span>
+            <Badge variant="success">Source: Samply</Badge>
             <p className="truncate text-sm font-medium text-foreground">{project?.remoteProjectName || "Samply project"}</p>
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -1022,7 +1024,7 @@ function SamplyReviewPanel({
       </div>
 
       {!audioVersionCount && (
-        <p className="rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+        <p className="rounded-md border border-warning-foreground/25 bg-warning0/10 p-3 text-sm text-warning-foreground dark:text-warning-foreground">
           The project is linked, but Label Suite has not pulled the Samply file inventory yet. Run sync to ingest cover art, tracklist, and stable audio links.
         </p>
       )}
@@ -1216,9 +1218,9 @@ function TrackTable({
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-semibold text-foreground">{track.title}</p>
                     {track.track_ready ? (
-                      <span className="rounded-md border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">Ready</span>
+                      <Badge variant="success">Ready</Badge>
                     ) : (
-                      <span className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">Needs work</span>
+                      <Badge variant="warning">Needs work</Badge>
                     )}
                   </div>
                   {track.track_missing && <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{track.track_missing}</p>}
@@ -1771,7 +1773,7 @@ function Metric({ label, value, detail, icon }: { label: string; value: string; 
 
 function Signal({ ok, icon, label }: { ok: boolean; icon: ReactNode; label: string }) {
   return (
-    <div className={`inline-flex items-center gap-1.5 text-sm ${ok ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}>
+    <div className={`inline-flex items-center gap-1.5 text-sm ${ok ? "text-success-foreground dark:text-success-foreground" : "text-muted-foreground"}`}>
       {icon}
       <span className="truncate">{label}</span>
     </div>
@@ -1780,9 +1782,9 @@ function Signal({ ok, icon, label }: { ok: boolean; icon: ReactNode; label: stri
 
 function StatusPill({ ready }: { ready: boolean }) {
   return ready ? (
-    <span className="rounded-md border border-emerald-500/35 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">Ready</span>
+    <Badge variant="success">Ready</Badge>
   ) : (
-    <span className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">Needs finishing</span>
+    <Badge variant="warning">Needs finishing</Badge>
   );
 }
 

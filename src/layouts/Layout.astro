@@ -17,7 +17,7 @@ import "../styles/global.css";
         const stored = localStorage.getItem("dark-mode");
         const dark =
           stored === "true" ||
-          (stored === null && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          (stored === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
         document.documentElement.classList.toggle("dark", dark);
       })();

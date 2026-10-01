@@ -16,11 +16,7 @@ function useDarkMode() {
 
   useEffect(() => {
     const stored = localStorage.getItem("dark-mode");
-    if (stored !== null) {
-      setDark(stored === "true");
-    } else {
-      setDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
-    }
+    setDark(stored === "true" || (stored === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches));
     setReady(true);
   }, []);
 
@@ -49,10 +45,12 @@ function useDarkMode() {
     } else {
       root.classList.remove("dark");
     }
-    localStorage.setItem("dark-mode", String(dark));
   }, [dark, ready]);
 
-  return { dark, toggle: () => setDark((d) => !d) };
+  return { dark, toggle: () => setDark((d) => {
+    localStorage.setItem("dark-mode", String(!d));
+    return !d;
+  }) };
 }
 
 export function AppShell({ children, orgName, membershipRole, capabilities, isPayee = false }: { children: ReactNode; orgName: string; membershipRole: MembershipRole; capabilities: ClientCapabilityMap; isPayee?: boolean }) {

@@ -29,6 +29,7 @@ import { RoleForm, type RoleData } from "../roles/RoleForm";
 import { CLEARANCE_STATUS_WEIGHTS, computeClearanceFromRoleRows, type ClearanceRoleRow } from "../../lib/readiness-core";
 import { WorkDeleteButton, WorkEditButton } from "./WorkActionButtons";
 
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,7 @@ const weightMap: Record<string, number> = {
 };
 
 const inputClass =
-  "h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm text-neutral-900 outline-none transition-colors hover:border-border hover:bg-background focus:border-neutral-300 focus:bg-background focus:ring-2 focus:ring-neutral-900/10";
+  "h-8 w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 text-sm text-foreground outline-none transition-colors hover:border-border hover:bg-background focus:border-input focus:bg-background focus:ring-2 focus:ring-ring/10";
 
 export function WorkClearanceWorkspace({
   work,
@@ -364,16 +365,10 @@ export function WorkClearanceWorkspace({
             <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               {work.title}
             </h1>
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
-                ready
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-amber-200 bg-amber-50 text-amber-700"
-              }`}
-            >
+            <Badge variant={ready ? "success" : "warning"}>
               {ready ? <BadgeCheck className="h-3.5 w-3.5" /> : <CircleAlert className="h-3.5 w-3.5" />}
               {ready ? "Cleared" : `${totalProgress}% clear`}
-            </span>
+            </Badge>
           </div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             {work.iswc ? <InfoChip label={`ISWC ${work.iswc}`} mono /> : <InfoChip label="No ISWC" />}
@@ -525,9 +520,9 @@ function ClearanceBoard({
   onDelete: (role: RoleRow) => void;
   onRequest: (role: RoleRow) => void;
 }) {
-  const accentSoft = accent === "blue" ? "bg-accent text-accent-foreground" : "bg-amber-50 text-amber-700";
   const addLabel = summary.label === "Publishing" ? "Add publishing split" : "Add master split";
   const remaining = roundShare(100 - summary.entered);
+  const accentSoft = accent === "blue" ? "bg-accent text-accent-foreground" : "bg-warning text-warning-foreground";
   const templateOptions = getTemplateOptions(summary.label);
 
   return (
@@ -552,16 +547,16 @@ function ClearanceBoard({
             onClick={onAdd}
             className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition-colors ${
               accent === "blue"
-                ? "border-blue-200 text-blue-700 hover:bg-blue-50"
-                : "border-amber-200 text-amber-700 hover:bg-amber-50"
+                ? "border-primary/25 text-accent-foreground hover:bg-accent"
+                : "border-warning-foreground/25 text-warning-foreground hover:bg-warning"
             }`}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             {addLabel}
           </Button>
-          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${summary.cleared ? "bg-emerald-50 text-emerald-700" : accentSoft}`}>
+          <Badge variant={summary.cleared ? "success" : summary.applicable ? "warning" : "secondary"}>
             {summary.applicable ? summary.cleared ? "Cleared" : `${summary.pct}%` : "Not applicable"}
-          </span>
+          </Badge>
         </div>
 
       </div>
@@ -643,7 +638,7 @@ function ClearanceBoard({
 </AccordionContent></AccordionItem></Accordion>
 
       {summary.applicable && !summary.cleared ? (
-        <div className="border-t border-border px-4 py-2 text-xs text-amber-700">
+        <div className="border-t border-border px-4 py-2 text-xs text-warning-foreground">
           {summary.entered < 100 ? (
             <span>{`Add ${formatShare(100 - summary.entered)} to reach 100%.`}</span>
           ) : summary.pendingRows.length ? (
@@ -696,14 +691,14 @@ function InlineRoleRow({
     : "";
 
   return (
-    <div className={`grid grid-cols-[minmax(150px,1fr)_54px_82px_56px_60px] gap-2 px-4 py-3 ${role.isDraft ? "bg-amber-50/50" : ""}`}>
+    <div className={`grid grid-cols-[minmax(150px,1fr)_54px_82px_56px_60px] gap-2 px-4 py-3 ${role.isDraft ? "bg-warning/50" : ""}`}>
       <div className="flex min-w-0 gap-2">
         <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <UserRound className="h-4 w-4" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1 space-y-1">
           {role.isDraft ? (
-            <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">
+            <span className="ml-2 inline-flex rounded-full bg-warning px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-warning-foreground">
               New split
             </span>
           ) : null}
@@ -737,7 +732,7 @@ function InlineRoleRow({
                   {tag}
                 </span>
               )) : null}
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${selectedContact.email ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${selectedContact.email ? "bg-success text-success-foreground" : "bg-warning text-warning-foreground"}`}>
                 {selectedContact.email ? "Email ready" : "No email"}
               </span>
             </div>
@@ -795,8 +790,8 @@ function InlineRoleRow({
           disabled={!role.contact_id || role.clearance_status === "Signed" || role.clearance_status === "Confirmed"}
           className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
             requestSent
-              ? "bg-emerald-50 text-emerald-700"
-              : "text-muted-foreground hover:bg-blue-50 hover:text-blue-700"
+              ? "bg-success text-success-foreground"
+              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
           } disabled:cursor-not-allowed disabled:opacity-35`}
           aria-label="Queue clearance request"
           title={requestSent ? "Request queued" : selectedContact?.email ? "Queue clearance request" : "Add contact email before sending"}
@@ -812,8 +807,8 @@ function InlineRoleRow({
           disabled={!dirty || saving}
           className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
             dirty
-              ? "bg-neutral-950 text-white hover:bg-neutral-800"
-              : "text-neutral-300 hover:bg-muted"
+              ? "bg-foreground text-background hover:bg-foreground/90"
+              : "text-muted-foreground hover:bg-muted"
           } disabled:opacity-50`}
           aria-label="Save split"
           title={saveButtonTitle(dirty, role.isDraft, saveState)}
@@ -824,7 +819,7 @@ function InlineRoleRow({
           type="button"
           onClick={() => onDelete(role)}
           disabled={deleting}
-          className="inline-flex h-8 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+          className="inline-flex h-8 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
           aria-label="Delete split"
           title={role.isDraft ? "Discard split" : "Delete split"}
         >
@@ -832,7 +827,7 @@ function InlineRoleRow({
         </Button>
       </div>
       {saveState === "saved" || saveState === "failed" ? (
-        <p className={`col-span-5 -mt-2 pl-10 text-[11px] ${saveState === "failed" ? "text-red-600" : "text-emerald-700"}`}>
+        <p className={`col-span-5 -mt-2 pl-10 text-[11px] ${saveState === "failed" ? "text-destructive" : "text-success-foreground"}`}>
           {saveState === "failed" ? "Save failed. Changes are still editable." : "Saved."}
         </p>
       ) : null}
@@ -875,7 +870,7 @@ function NextFixes({
           >
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                fix.done ? "bg-emerald-100 text-emerald-700" : fix.optional ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-700"
+                fix.done ? "bg-success text-success-foreground" : fix.optional ? "bg-muted text-muted-foreground" : "bg-warning text-warning-foreground"
               }`}
             >
               {fix.done ? <CheckCircle2 className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}
@@ -950,7 +945,7 @@ function TracksPanel({ tracks, publishing, master }: { tracks: TrackRow[]; publi
                 <ReadinessCell entered={master.entered} confirmed={master.weighted} tone="amber" />
                 <span
                   className={`h-fit w-fit rounded-full px-2 py-1 text-xs font-semibold ${
-                    track.track_ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                    track.track_ready ? "bg-success text-success-foreground" : "bg-warning text-warning-foreground"
                   }`}
                 >
                   {track.track_ready ? "Ready" : `${progress}%`}
@@ -1049,7 +1044,7 @@ function ReadinessCell({ entered, confirmed, tone }: { entered: number; confirme
       </span>
       <span>
         <span className="block text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Weighted</span>
-        <span className={`font-semibold ${tone === "blue" ? "text-blue-700" : "text-amber-700"}`}>{formatShare(confirmed)}</span>
+        <span className={`font-semibold ${tone === "blue" ? "text-accent-foreground" : "text-warning-foreground"}`}>{formatShare(confirmed)}</span>
       </span>
     </span>
   );
@@ -1170,9 +1165,9 @@ function saveButtonTitle(dirty: boolean, isDraft?: boolean, saveState?: SaveStat
 }
 
 function activityDotClass(tone: ActivityItem["tone"]) {
-  if (tone === "green") return "bg-emerald-500";
-  if (tone === "amber") return "bg-amber-500";
-  return "bg-neutral-300";
+  if (tone === "green") return "bg-success0";
+  if (tone === "amber") return "bg-warning0";
+  return "bg-muted-foreground";
 }
 
 export function summarizeScope(label: "Publishing" | "Master", scopes: string[], roles: RoleRow[]): ScopeSummary {
@@ -1271,9 +1266,9 @@ function addOptionalScopeAction(fixes: NextFix[], summary: ScopeSummary, action:
 }
 
 function statusSelectClass(status: string) {
-  if (status === "Signed") return "font-semibold text-emerald-700";
+  if (status === "Signed") return "font-semibold text-success-foreground";
   if (status === "Confirmed") return "font-semibold text-sky-700";
-  if (status === "Pending") return "font-semibold text-amber-700";
+  if (status === "Pending") return "font-semibold text-warning-foreground";
   return "font-semibold text-muted-foreground";
 }
 

@@ -336,7 +336,7 @@ async function scanSurface(page: Page, testInfo: TestInfo, path: string) {
   // Do not wait for network idle: the authenticated shell has health/worker activity by design.
   await expect(page.getByRole("main").first()).toBeVisible({ timeout: 30_000 });
   if (path.endsWith("?section=timeline")) {
-    await expect(page.getByRole("tab", { name: "Timeline", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("link", { name: "Timeline", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("region", { name: "Release schedule", exact: true })).toBeVisible();
   }
   await expectNoHorizontalPageOverflow(page);
@@ -418,8 +418,25 @@ test("release workspace fits before hydration", async ({ page }) => {
   const releaseId = requiredFixture("E2E_RELEASE_ID", "Release layout requires a seeded release.");
   await page.goto(`/releases/${releaseId}?section=timeline`, { waitUntil: "load" });
   await expect(page.getByRole("navigation", { name: "Release sections" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Release Gate Single", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Timeline", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("region", { name: "Release schedule", exact: true })).toBeVisible();
   await expectNoHorizontalPageOverflow(page);
+});
+
+test("light initial theme preserves explicit system preference", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await login(page);
+  await page.evaluate(() => localStorage.removeItem("dark-mode"));
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await page.evaluate(() => localStorage.setItem("dark-mode", "system"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("dark-mode"))).toBe("system");
+  await page.evaluate(() => localStorage.setItem("dark-mode", "false"));
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
 });
 
 test("core-surfaces-light-dark-a11y", async ({ page }, testInfo) => {

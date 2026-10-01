@@ -213,7 +213,7 @@ function ReleaseRows({
               </a>
               <Accordion>
                 <AccordionItem value="details">
-                  <AccordionTrigger className="py-1.5">Details <span className="sr-only">for {release.title}</span></AccordionTrigger>
+                  <AccordionTrigger headingLevel={2} className="py-1.5">Details <span className="sr-only">for {release.title}</span></AccordionTrigger>
                   <AccordionContent className="space-y-3">
                     <Signal icon={<CalendarDays className="size-3.5" />} label={`${dateLabel(release.release_date)} · ${releaseTimingLabel(release.release_date)}`} />
                     <p className="text-xs text-muted-foreground">{readiness(release)}% metadata complete · {release.ready_track_count} of {release.track_count} tracks ready{release.catalog_number ? ` · ${release.catalog_number}` : ""}</p>
