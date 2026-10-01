@@ -1382,6 +1382,18 @@ test("campaign-radio-delivery-preview-is-deduplicated-versioned-and-no-send", as
   });
 
   await login(page);
+  const [editorResponse, communicatorResponse] = await Promise.all([
+    page.request.get(`/api/campaigns/${campaignId}/public-page`),
+    page.request.get(`/api/campaigns/${campaignId}/communicator-prompt`),
+  ]);
+  expect(editorResponse.ok()).toBe(true);
+  expect(communicatorResponse.ok()).toBe(true);
+  const editor = await editorResponse.json();
+  const reviewedPage = editor.revisions.find((revision: { id: string }) => revision.id === editor.page.current_draft_revision_id);
+  expect(reviewedPage.review_status).toBe("reviewed");
+  const communicator = await communicatorResponse.json();
+  const reviewedEmail = communicator.radio_drafts.find((draft: { status: string; context_snapshot: { page_revision_id?: string } }) => draft.status === "approved" && draft.context_snapshot.page_revision_id === reviewedPage.id);
+  expect(reviewedEmail).toBeDefined();
   await page.goto(`/campaigns/${campaignId}?tab=channels`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("main").first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "Saved audience targeting", exact: true })).toBeVisible();
@@ -1421,8 +1433,8 @@ test("campaign-radio-delivery-preview-is-deduplicated-versioned-and-no-send", as
     ready_count: 1,
     skipped_count: 2,
     deduped_count: 1,
-    reviewed_email: { version: 1 },
-    reviewed_page: { version: 1, status: "reviewed" },
+    reviewed_email: { id: reviewedEmail.id, version: reviewedEmail.version, approval_hash: reviewedEmail.approval_hash },
+    reviewed_page: { id: reviewedPage.id, version: reviewedPage.version, content_hash: reviewedPage.content_hash, status: "reviewed" },
     audience_counts: { included_stations: 2, excluded_stations: 1 },
   });
   expect(previewPayload.reviewed_email.approval_hash).toMatch(/^[0-9a-f]{64}$/);
@@ -1431,8 +1443,8 @@ test("campaign-radio-delivery-preview-is-deduplicated-versioned-and-no-send", as
   expect(previewPayload.excluded_stations).toContainEqual(expect.objectContaining({ name: "Release Gate FM", reason: "Focused outreach" }));
   expect(previewPayload.blockers).toContainEqual(expect.objectContaining({ code: "batch_compliance_unavailable" }));
 
-  await expect(page.getByText("Reviewed email:", { exact: true }).locator("..")).toContainText("version 1");
-  await expect(page.getByText("Reviewed page:", { exact: true }).locator("..")).toContainText("v1 · reviewed");
+  await expect(page.getByText("Reviewed email:", { exact: true }).locator("..")).toContainText(`version ${reviewedEmail.version}`);
+  await expect(page.getByText("Reviewed page:", { exact: true }).locator("..")).toContainText(`v${reviewedPage.version} · reviewed`);
   await expect(page.getByText("Audience counts:", { exact: true }).locator("..")).toContainText("2 included · 1 excluded");
   await expect(page.getByText("Preview hash:", { exact: true }).locator("..")).toContainText(previewPayload.preview_hash);
   await expect(page.getByText("Deduplicated:", { exact: true }).locator("..")).toContainText("1");
