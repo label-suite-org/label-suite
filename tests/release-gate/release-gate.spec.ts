@@ -474,6 +474,7 @@ test("release-blocker-to-exact-field", async ({ page }) => {
   await login(page);
   await page.goto(`/releases/${releaseId}`);
   await expect(page.getByRole("main")).toBeVisible();
+  await page.getByRole("button", { name: "Review checks", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Operations brief" })).toBeVisible({ timeout: 8_000 });
 
   const hasTrackBlocker = page.getByRole("button", { name: "Review tracks" }).first();
