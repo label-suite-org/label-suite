@@ -234,6 +234,8 @@ public struct NativeReleasePipelineResponse: Codable, Equatable, Sendable {
 public struct NativeCatalogRelease: Codable, Equatable, Identifiable, Sendable {
   public let id: String
   public let title: String
+  public let coverArtURL: URL?
+  enum CodingKeys: String, CodingKey { case id, title, coverArtURL = "cover_art_url" }
 }
 
 public struct NativeCatalogItem: Codable, Equatable, Identifiable, Sendable {

@@ -251,7 +251,7 @@ private struct CleanupLockedView: View {
 }
 
 private enum AppTab: String, CaseIterable {
-  case artists = "Library"
+  case artists = "Catalog"
   case releases = "Releases"
   case campaigns = "Campaigns"
   case today = "Today"
@@ -558,7 +558,7 @@ private struct NativeLibraryView: View {
     .scrollPosition(id: $libraryPosition)
     .navigationTitle(section.rawValue)
 #if os(iOS)
-    .toolbar(.hidden, for: .navigationBar)
+    .toolbar(.visible, for: .navigationBar)
 #endif
     .refreshable { await load() }
     .task { if overview == nil { await load() } }
@@ -909,20 +909,40 @@ private struct NativeCatalogView: View {
   var body: some View {
     List {
       Section {
-        Text("Catalog").font(.largeTitle.bold())
-        Text("Chronological index for \(workspace.name)").font(.caption).textCase(.uppercase).tracking(1.2).foregroundStyle(.secondary)
-        TextField("Search catalog", text: $state.search)
+        HStack(alignment: .firstTextBaseline) {
+          VStack(alignment: .leading, spacing: 4) {
+            Text(workspace.name).font(.subheadline).foregroundStyle(.secondary)
+            Text("Catalog").font(.title2.bold())
+          }
+          Spacer()
+          NavigationLink {
+            NativeLibraryView(section: .artists, workspace: workspace, session: session, api: api)
+          } label: {
+            Label("Artists", systemImage: "person.2").font(.subheadline).frame(minHeight: 44)
+          }
+          .accessibilityHint("Browse artists and their releases")
+        }
+        HStack {
+          Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+          TextField("Search catalog", text: $state.search)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
       }
-      Section("Workspace library") {
-        if case let .authenticated(active) = session.state, active.id == workspace.id, active.capabilities["royalties.read"] == true {
-          NavigationLink { NativeRoyaltiesView(workspace: workspace, session: session, api: api) } label: { Label("Royalties", systemImage: "banknote").frame(minHeight: 44) }
-        }
-        if case let .authenticated(active) = session.state, active.id == workspace.id, active.capabilities["analytics.read"] == true {
-          NavigationLink { NativeAnalyticsView(workspace: workspace, session: session, api: api) } label: { Label("Analytics & Forecast", systemImage: "chart.xyaxis.line").frame(minHeight: 44) }
-        }
+      Section {
+        DisclosureGroup("Workspace tools") {
+          if case let .authenticated(active) = session.state, active.id == workspace.id, active.capabilities["royalties.read"] == true {
+            NavigationLink { NativeRoyaltiesView(workspace: workspace, session: session, api: api) } label: { Label("Royalties", systemImage: "banknote").frame(minHeight: 44) }
+          }
+          if case let .authenticated(active) = session.state, active.id == workspace.id, active.capabilities["analytics.read"] == true {
+            NavigationLink { NativeAnalyticsView(workspace: workspace, session: session, api: api) } label: { Label("Analytics & Forecast", systemImage: "chart.xyaxis.line").frame(minHeight: 44) }
+          }
 
-        NavigationLink { NativeEventLibraryEntry(workspace: workspace, session: session, api: api) } label: { Label("Events", systemImage: "calendar") }
-        NavigationLink { NativeProjectLibraryEntry(workspace: workspace, session: session, api: api) } label: { Label("Projects", systemImage: "folder") }
+          NavigationLink { NativeEventLibraryEntry(workspace: workspace, session: session, api: api) } label: { Label("Events", systemImage: "calendar") }
+          NavigationLink { NativeProjectLibraryEntry(workspace: workspace, session: session, api: api) } label: { Label("Projects", systemImage: "folder") }
+      }
       }
       if state.stale { Section { Label("Read-only · protected snapshot", systemImage: "clock.arrow.circlepath").font(.caption).foregroundStyle(.secondary); if let cachedAt = state.cachedAt { Text(protectedSnapshotAge(cachedAt)).font(.caption2).foregroundStyle(.secondary) }; Text("Refresh to confirm current data.").font(.caption).foregroundStyle(.secondary) } }
       if let error = state.errorMessage { Section { Label(error, systemImage: "wifi.exclamationmark").foregroundStyle(.orange); Button(loading ? "Refreshing…" : NativeCopy.retry) { Task { await refresh() } }.disabled(loading || loadingMore) } }
@@ -955,14 +975,30 @@ private struct NativeCatalogView: View {
   }
 
   @ViewBuilder private func catalogRow(_ item: NativeCatalogItem, release: NativeCatalogRelease?) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
-      Text(item.catalogNumber ?? "Catalog number not assigned").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-      Text(item.title).font(.headline)
-      if let release { Text("Release · \(release.title)").font(.caption).foregroundStyle(.secondary) }
-      else { Text(item.relationshipState == "invalid" ? "Linked release is unavailable in this workspace." : "No release linked.").font(.caption).foregroundStyle(.orange) }
-      Text([item.releaseDate, item.status, item.entryType].compactMap { $0 }.joined(separator: " · ")).font(.caption2).foregroundStyle(.secondary)
-      if item.relationshipState == "duplicate" { Label("Duplicate catalog relationship", systemImage: "exclamationmark.triangle").font(.caption2).foregroundStyle(.orange) }
-    }.padding(.vertical, 5).id("catalog:\(item.id)")
+    HStack(alignment: .top, spacing: 14) {
+      AsyncImage(url: release?.coverArtURL) { image in
+        image.resizable().scaledToFill()
+      } placeholder: {
+        Image(systemName: "opticaldisc").foregroundStyle(.secondary)
+      }
+      .frame(width: 64, height: 64)
+      .background(.quaternary)
+      .clipShape(RoundedRectangle(cornerRadius: 6))
+      .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 5) {
+        Text(item.title).font(.headline)
+        Text(item.catalogNumber ?? "Catalog number not assigned").font(.subheadline).foregroundStyle(.secondary)
+        if let release {
+          if release.title != item.title { Text("Release · \(release.title)").font(.subheadline).foregroundStyle(.secondary) }
+        } else {
+          Text(item.relationshipState == "invalid" ? "Linked release is unavailable in this workspace." : "No release linked.").font(.subheadline).foregroundStyle(.orange)
+        }
+        Text([item.releaseDate, item.status, item.entryType].compactMap { $0 }.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary)
+        if item.relationshipState == "duplicate" { Label("Duplicate catalog relationship", systemImage: "exclamationmark.triangle").font(.subheadline).foregroundStyle(.orange) }
+      }
+    }
+    .padding(.vertical, 10)
+    .id("catalog:\(item.id)")
   }
 
   private func refresh() async { await load(query: normalizedSearch, cursor: nil, replacing: true) }
