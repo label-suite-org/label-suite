@@ -820,6 +820,13 @@ final class NativeAPIIntegrationTests: XCTestCase {
     }
   }
 
+  func testNativeAPISearchKeepsPermissionDenialDistinctFromWorkspaceLoss() async {
+    NativeAPIURLProtocol.install { request in
+      (try XCTUnwrap(HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: nil)), Data(#"{"code":"insufficient_permissions"}"#.utf8))
+    }
+    await assertNativeError(.insufficientPermissions) { try await client().search(query: "Aurora", workspace: Workspace(id: "org-a", name: "A", capabilities: [:]), session: NativeSession(token: "token-a", userID: "user-a")) }
+  }
+
   private func assertNativeError<T>(_ expected: NativeAPIError, operation: () async throws -> T, file: StaticString = #filePath, line: UInt = #line) async {
     do {
       _ = try await operation()

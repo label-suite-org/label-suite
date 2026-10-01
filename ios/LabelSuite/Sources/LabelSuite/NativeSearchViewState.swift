@@ -55,8 +55,9 @@ public struct NativeSearchViewState: Equatable {
     errorMessage = nil
   }
 
-  public mutating func fail(for request: NativeSearchRequest, message: String) {
+  public mutating func fail(for request: NativeSearchRequest, message: String, clearResults: Bool = false) {
     guard isCurrent(request) else { return }
+    if clearResults { response = nil; position = nil }
     isLoading = false
     errorMessage = message
   }

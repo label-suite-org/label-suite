@@ -581,6 +581,7 @@ public struct NativeAPI: NativeAPIClient, Sendable {
     components.queryItems = [URLQueryItem(name: "workspaceId", value: workspace.id), URLQueryItem(name: "q", value: query)]
     var request = URLRequest(url: components.url!); request.setValue("Bearer " + session.token, forHTTPHeaderField: "Authorization")
     let (data, response) = try await data(for: request)
+    if (response as? HTTPURLResponse)?.statusCode == 403, apiErrorCode(data) == "insufficient_permissions" { throw NativeAPIError.insufficientPermissions }
     try checkReadStatus(response)
     return try JSONDecoder().decode(NativeSearchResponse.self, from: data)
   }

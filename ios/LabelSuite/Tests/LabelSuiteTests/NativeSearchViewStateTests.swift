@@ -63,6 +63,21 @@ final class NativeSearchViewStateTests: XCTestCase {
     XCTAssertFalse(state.isLoading)
   }
 
+  func testPermissionDenialClearsProtectedResultsAndScrollButKeepsQuery() {
+    var state = NativeSearchViewState()
+    state.updateQuery("Aurora")
+    let initial = try! XCTUnwrap(state.beginSearch())
+    state.receive(searchResponse(), for: initial)
+    state.updatePosition("search:artist:artist-a")
+    let request = try! XCTUnwrap(state.beginSearch())
+    state.fail(for: request, message: "Search is unavailable with your workspace role.", clearResults: true)
+    XCTAssertEqual(state.query, "Aurora")
+    XCTAssertNil(state.response)
+    XCTAssertNil(state.position)
+    XCTAssertFalse(state.isLoading)
+    XCTAssertEqual(state.errorMessage, "Search is unavailable with your workspace role.")
+  }
+
   private func searchResponse(title: String = "Aurora") -> NativeSearchResponse {
     NativeSearchResponse(groups: [NativeSearchGroup(kind: "artist", title: "Artists", items: [NativeSearchItem(id: "artist-a", kind: "artist", title: title, subtitle: nil, destination: "native", nativeRoute: "/artists/artist-a", webHref: nil, handoffMessage: nil)])], total: 1)
   }
