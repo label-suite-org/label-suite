@@ -219,7 +219,8 @@ export function ReleaseWorkspace({
   const [release, setRelease] = useState<ReleaseDetail>({ ...initialRelease, ...initialReadiness?.release,
     release_ready: initialReadiness?.readiness.isReady ?? initialRelease.release_ready });
   const [readiness, setReadiness] = useState(initialReadiness);
-  const [fromToday, setFromToday] = useState(false);
+  const [routeSearch, setRouteSearch] = useState(initialSearch);
+  const [fromToday, setFromToday] = useState(() => new URLSearchParams(initialSearch).get("returnTo") === "today");
   const correctionDirty = useRef(false);
   const correctionTrigger = useRef<HTMLElement | null>(null);
   const currentLocation = useRef("");
@@ -256,6 +257,7 @@ export function ReleaseWorkspace({
         return;
       }
       currentLocation.current = window.location.href;
+      setRouteSearch(window.location.search);
       setFromToday(new URLSearchParams(window.location.search).get("returnTo") === "today");
       const route = routeFromLocation(window.location.search, window.location.hash);
       setActiveSection(route.section);
@@ -455,6 +457,7 @@ export function ReleaseWorkspace({
       if (focus) search.set("focus", focus); else search.delete("focus");
     }
     const nextSearch = search.toString();
+    setRouteSearch(nextSearch);
     const hash = `#${sectionHash(section)}`;
     window.history.replaceState(null, "", `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${hash}`);
     currentLocation.current = window.location.href;
@@ -535,11 +538,15 @@ export function ReleaseWorkspace({
       </header>
 
       <nav className="sticky top-0 z-20 flex items-center gap-1 overflow-x-auto border-b border-border bg-background py-1" aria-label="Release sections">
-          {RELEASE_SECTIONS.slice(0, 4).map((section) => (
+          {RELEASE_SECTIONS.slice(0, 4).map((section) => {
+            const search = new URLSearchParams(routeSearch);
+            search.set("section", section.key);
+            search.delete("focus");
+            return (
             <a
               key={section.key}
               id={`release-tab-${section.key}`}
-              href={`/releases/${release.id}?section=${section.key}#${sectionHash(section.key)}`}
+              href={`/releases/${release.id}?${search.toString()}#${sectionHash(section.key)}`}
               aria-current={activeSection === section.key ? "page" : undefined}
               title={section.description}
               onClick={(event) => {
@@ -551,7 +558,8 @@ export function ReleaseWorkspace({
             >
               {section.label}
             </a>
-          ))}
+            );
+          })}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" type="button" className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm ${activeSection !== "overview" && activeSection !== "tracks" ? "border-primary text-primary" : "border-transparent text-muted-foreground"} ${RELEASE_SECTIONS.slice(4).some((section) => section.key === activeSection) ? "sm:border-primary sm:text-primary" : "sm:border-transparent sm:text-muted-foreground"}`} aria-label="More release sections" />}>
               <span className="sm:hidden">{RELEASE_SECTIONS.slice(2).find((section) => section.key === activeSection)?.label ?? "More"}</span>

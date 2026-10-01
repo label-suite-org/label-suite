@@ -97,13 +97,13 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   useEffect(() => {
     if (!selectedTrack || !pendingTrackFocus) return;
     const timeout = window.setTimeout(() => {
+      setPendingTrackFocus(null);
       const fieldId = trackFocusId(pendingTrackFocus);
       const element = document.getElementById(fieldId);
       if (!element || !(element instanceof HTMLElement)) return;
       element.scrollIntoView({ behavior: "smooth", block: "start" });
       element.focus();
     }, 0);
-    setPendingTrackFocus(null);
     return () => window.clearTimeout(timeout);
   }, [selectedTrack?.id, pendingTrackFocus]);
 

@@ -9,11 +9,13 @@ import { buildReleaseCockpit } from "../../server/analytics-command-center-core"
 describe("ReleaseWorkspace", () => {
   it("renders section deep links before hydration", () => {
     const html = renderToStaticMarkup(<ReleaseWorkspace
-      initialSearch="?section=timeline"
+      initialSearch="?section=timeline&returnTo=today&focus=upc"
       release={{ id: "release-1", title: "Fixture" }}
       tracks={[]} budgetItems={[]} pitches={[]} works={[]} artists={[]} cockpit={null} samplyReview={null} canManage={true} timeline={null} parentReleases={[]} campaigns={[]} documents={[]} mediaAssets={[]}
     />);
     expect(html).toMatch(/<a[^>]*href="[^"]*section=timeline[^"]*"[^>]*aria-current="page"/);
+    expect(html).toContain("section=tracks&amp;returnTo=today#release-tracks");
+    expect(html).not.toMatch(/href="[^"]*focus=upc/);
     expect(html).not.toContain("Review checks");
   });
   it("names the actual imported period and withholds stale release totals", () => {
