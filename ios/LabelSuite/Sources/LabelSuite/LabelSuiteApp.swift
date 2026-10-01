@@ -508,6 +508,10 @@ private struct NativeSearchView: View {
       resetForScopeChange()
       recentRecords = NativeSearchRecents.erasing(userID: requestSession.userID, workspaceID: workspace.id, in: recentRecords)
       await session.workspaceAccessRemoved(workspaceID: workspace.id, userID: requestSession.userID, api: api)
+    } catch NativeAPIError.insufficientPermissions {
+      guard !Task.isCancelled, state.isCurrent(request), session.acceptsResponse(for: requestSession, workspaceID: workspace.id) else { return }
+      recentRecords = NativeSearchRecents.erasing(userID: requestSession.userID, workspaceID: workspace.id, in: recentRecords)
+      state.fail(for: request, message: "Search is unavailable with your workspace role.", clearResults: true)
     } catch is CancellationError {
       state.cancel(request)
     } catch {

@@ -44,4 +44,14 @@ describe("native search route", () => {
     expect(response.status).toBe(401);
     expect(records.searchRecords).not.toHaveBeenCalled();
   });
+
+  it("denies payee access before reading workspace records", async () => {
+    native.resolveNativeActor.mockResolvedValueOnce({ userId: "user-a", workspace: { org: { id: "org-a" }, role: "payee" } });
+    const url = new URL("https://suite.test/api/native/search?workspaceId=org-a&q=Same");
+    const response = await GET({ request: new Request(url), url } as never);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "insufficient_permissions" });
+    expect(records.searchRecords).not.toHaveBeenCalled();
+    expect(database.runWithDatabaseContext).not.toHaveBeenCalled();
+  });
 });
