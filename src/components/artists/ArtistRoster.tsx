@@ -1,16 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
-  ArrowUpDown,
-  CalendarDays,
-  Disc3,
-  LayoutGrid,
   List,
   Search,
-  SlidersHorizontal,
-  Users,
 } from "lucide-react";
 import { resolveFileUrl } from "../../lib/storage-client";
 import type { ArtistRosterRow } from "../../server/artists";
@@ -20,12 +13,16 @@ import { ArtistCreateDialog } from "./ArtistCreateDialog";
 import type { Artist, ContactOption } from "./ArtistForm";
 
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Table, TableHeader, TableHead, TableRow, TableBody, TableCell } from "@/components/ui/table";
+import { Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@/components/ui/item";
 import { Button } from "@/components/ui/button";
 type FilterMode = "all" | "active" | "attention" | "quiet";
 type RelationshipMode = "all" | "roster" | "collaborator" | "unclassified";
 type SortMode = "name" | "followers" | "releases" | "attention";
-type ViewMode = "gallery" | "ops";
+type ViewMode = "browse" | "ops";
 
 function formatNumber(value: number | null | undefined): string {
   if (value == null) return "-";
@@ -65,17 +62,17 @@ function attentionScore(row: ArtistRosterRow): number {
   return missing.length + (row.release_count === 0 ? 2 : 0) + (row.open_task_count > 0 ? 1 : 0);
 }
 
-function statusLabel(row: ArtistRosterRow): { label: string; className: string } {
+function statusLabel(row: ArtistRosterRow): { label: string; variant: React.ComponentProps<typeof Badge>["variant"] } {
   if (row.next_release_id) {
-    return { label: "Upcoming", className: "border-emerald-200 bg-emerald-50/95 text-emerald-700" };
+    return { label: "Upcoming", variant: "secondary" };
   }
   if (row.campaign_count || row.open_task_count) {
-    return { label: "Active", className: "border-sky-200 bg-sky-50/95 text-sky-700" };
+    return { label: "Active", variant: "secondary" };
   }
   if (row.release_count) {
-    return { label: "Catalog", className: "border-white/25 bg-black/45 text-white backdrop-blur-sm" };
+    return { label: "Catalog", variant: "secondary" };
   }
-  return { label: "Needs setup", className: "border-amber-200 bg-amber-50/95 text-amber-800" };
+  return { label: "Needs setup", variant: "warning" };
 }
 
 function initials(name: string): string {
@@ -99,13 +96,6 @@ function linkedReleaseHref(row: ArtistRosterRow): string | null {
 
 function coverArtLink(row: ArtistRosterRow): string | null {
   return row.image_url || row.next_release_cover_art_url || row.latest_release_cover_art_url || null;
-}
-
-function attentionLabel(row: ArtistRosterRow): string | null {
-  if (row.release_count === 0) return "No catalog yet";
-  const missing = missingProfileItems(row);
-  if (missing.length > 0) return `${missing.length} profile gap${missing.length === 1 ? "" : "s"}`;
-  return null;
 }
 
 function primaryReadinessHref(row: ArtistRosterRow): string {
@@ -136,7 +126,7 @@ function primaryReadinessHref(row: ArtistRosterRow): string {
   return `/artists/${row.id}?${params.toString()}`;
 }
 
-function gallerySummary(row: ArtistRosterRow): string {
+function readinessSummary(row: ArtistRosterRow): string {
   if (row.bio?.trim()) return row.bio;
 
   const missing = missingProfileItems(row);
@@ -157,11 +147,11 @@ function artistRelationship(row: ArtistRosterRow): Exclude<RelationshipMode, "al
   return "unclassified";
 }
 
-function relationshipLabel(row: ArtistRosterRow): { label: string; className: string; detail: string } {
+function relationshipLabel(row: ArtistRosterRow): { label: string; variant: React.ComponentProps<typeof Badge>["variant"]; detail: string } {
   if (artistRelationship(row) === "roster") {
     return {
       label: "Roster",
-      className: "border-cyan-200 bg-cyan-50/95 text-cyan-800",
+      variant: "secondary",
       detail: "Signed to the label",
     };
   }
@@ -169,14 +159,14 @@ function relationshipLabel(row: ArtistRosterRow): { label: string; className: st
   if (artistRelationship(row) === "collaborator") {
     return {
       label: "Collaborator",
-      className: "border-stone-200 bg-stone-50/95 text-stone-700",
+      variant: "secondary",
       detail: "Project collaborator",
     };
   }
 
   return {
     label: "Unclassified",
-    className: "border-amber-200 bg-amber-50/95 text-amber-800",
+    variant: "warning",
     detail: "Relationship not set",
   };
 }
@@ -201,19 +191,17 @@ export function ArtistRoster({
   const [filter, setFilter] = useState<FilterMode>("all");
   const [relationship, setRelationship] = useState<RelationshipMode>("all");
   const [sort, setSort] = useState<SortMode>("name");
-  const [view, setView] = useState<ViewMode>("gallery");
+  const [view, setView] = useState<ViewMode>("browse");
 
   const stats = useMemo(() => {
     const roster = artists.filter((artist) => artistRelationship(artist) === "roster").length;
     const collaborators = artists.filter((artist) => artistRelationship(artist) === "collaborator").length;
     const unclassified = artists.filter((artist) => artistRelationship(artist) === "unclassified").length;
-    const active = artists.filter((artist) => artist.next_release_id || artist.campaign_count || artist.open_task_count).length;
-    const attention = artists.filter((artist) => missingProfileItems(artist).length || artist.release_count === 0).length;
     const releases = artists.reduce((sum, artist) => sum + artist.release_count, 0);
     const avgCompleteness = artists.length
       ? Math.round(artists.reduce((sum, artist) => sum + completeness(artist), 0) / artists.length)
       : 0;
-    return { active, attention, collaborators, roster, unclassified, releases, avgCompleteness };
+    return { collaborators, roster, unclassified, releases, avgCompleteness };
   }, [artists]);
 
   const visible = useMemo(() => {
@@ -257,14 +245,21 @@ export function ArtistRoster({
 
   return (
     <div className="space-y-5">
-      {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <RosterStat label="Roster" value={artists.length.toString()} detail="artists in workspace" />
-        <RosterStat label="Roster artists" value={stats.roster.toString()} detail="signed to the label" />
-        <RosterStat label="Collaborators" value={stats.collaborators.toString()} detail="project contributors" />
-        <RosterStat label="Unclassified" value={stats.unclassified.toString()} detail="needs a relationship" />
-        <RosterStat label="Catalog" value={stats.releases.toString()} detail="linked releases" />
-      </div>
+      {!canMutate && <p className="text-sm text-muted-foreground">Read-only for your role</p>}
+      <Accordion>
+        <AccordionItem value="summary">
+          <AccordionTrigger headingLevel={2}>{visible.length} of {artists.length} profiles · workspace summary</AccordionTrigger>
+          <AccordionContent>
+            <dl className="grid gap-4 sm:grid-cols-3 xl:grid-cols-5">
+              <RosterStat label="Roster" value={stats.roster.toString()} detail="signed to the label" />
+              <RosterStat label="Collaborators" value={stats.collaborators.toString()} detail="project contributors" />
+              <RosterStat label="Unclassified" value={stats.unclassified.toString()} detail="relationship to confirm" />
+              <RosterStat label="Linked releases" value={stats.releases.toString()} detail="across this workspace" />
+              <RosterStat label="Profile readiness" value={`${stats.avgCompleteness}%`} detail="workspace average" />
+            </dl>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <div className="flex flex-col gap-3 border-y border-border py-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
@@ -275,92 +270,43 @@ export function ArtistRoster({
               onChange={(event) => setQuery(event.target.value)}
               aria-label="Search artists"
               placeholder="Search roster, PRO, release..."
-              className="h-10 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-neutral-400 focus:ring-2 focus:ring-neutral-200"
+              className="w-full pl-9"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <NativeSelect
-                value={relationship}
-                onChange={(event) => setRelationship(event.target.value as RelationshipMode)}
-                aria-label="Filter artists by relationship"
-                className="bg-transparent text-foreground outline-none"
-              >
-                <option value="all">All relationships</option>
-                <option value="roster">Roster artists</option>
-                <option value="collaborator">Collaborators</option>
-                <option value="unclassified">Unclassified</option>
-              </NativeSelect>
-            </label>
-            <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-muted-foreground">
-              <SlidersHorizontal className="h-4 w-4" />
-              <NativeSelect
-                value={filter}
-                onChange={(event) => setFilter(event.target.value as FilterMode)}
-                aria-label="Filter artists by activity state"
-                className="bg-transparent text-foreground outline-none"
-              >
-                <option value="all">All artists</option>
-                <option value="active">Active work</option>
-                <option value="attention">Needs attention</option>
-                <option value="quiet">Quiet roster</option>
-              </NativeSelect>
-            </label>
-            <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-muted-foreground">
-              <ArrowUpDown className="h-4 w-4" />
-              <NativeSelect
-                value={sort}
-                onChange={(event) => setSort(event.target.value as SortMode)}
-                aria-label="Sort artists"
-                className="bg-transparent text-foreground outline-none"
-              >
-                <option value="name">Name</option>
-                <option value="followers">Followers</option>
-                <option value="releases">Releases</option>
-                <option value="attention">Attention</option>
-              </NativeSelect>
-            </label>
+            <Select value={relationship} onValueChange={value => setRelationship((value ?? "all") as RelationshipMode)} aria-label="Filter artists by relationship" className="max-sm:w-full" options={[{ value: "all", label: "All relationships" }, { value: "roster", label: "Roster artists" }, { value: "collaborator", label: "Collaborators" }, { value: "unclassified", label: "Unclassified" }]} />
+            <Select value={filter} onValueChange={value => setFilter((value ?? "all") as FilterMode)} aria-label="Filter artists by activity state" className="max-sm:w-full" options={[{ value: "all", label: "All artists" }, { value: "active", label: "Active work" }, { value: "attention", label: "Needs attention" }, { value: "quiet", label: "Quiet roster" }]} />
+            <Select value={sort} onValueChange={value => setSort((value ?? "name") as SortMode)} aria-label="Sort artists" className="max-sm:w-full" options={[{ value: "name", label: "Name" }, { value: "followers", label: "Followers" }, { value: "releases", label: "Releases" }, { value: "attention", label: "Attention" }]} />
             {canMutate && <ArtistCreateDialog contactOptions={contactOptions} />}
           </div>
         </div>
 
         <div className="flex justify-end">
-          <div className="inline-flex rounded-lg border border-border bg-muted/30 p-1" role="group" aria-label="Artist roster view">
+          <div className="inline-flex gap-2" role="group" aria-label="Artist roster view">
             <Button
               type="button"
-              variant="ghost"
-              onClick={() => setView("gallery")}
-              aria-pressed={view === "gallery"}
-              className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition ${
-                view === "gallery"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+              variant={view === "browse" ? "secondary" : "ghost"}
+              onClick={() => setView("browse")}
+              aria-pressed={view === "browse"}
             >
-              <LayoutGrid className="h-4 w-4" />
-              Gallery
+              <List className="h-4 w-4" />
+              Browse
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant={view === "ops" ? "secondary" : "ghost"}
               onClick={() => setView("ops")}
               aria-pressed={view === "ops"}
-              className={`inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium transition ${
-                view === "ops"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
             >
               <List className="h-4 w-4" />
-              Ops
+              Compare
             </Button>
           </div>
         </div>
       </div>
 
-      {visible.length ? view === "gallery" ? (
+      {visible.length ? view === "browse" ? (
         <div className="space-y-6">
           {groupedVisible.roster.length ? (
             <RosterGroup
@@ -387,7 +333,7 @@ export function ArtistRoster({
       ) : (
         <ArtistOpsTable artists={visible} contactOptions={contactOptions} canMutate={canMutate} />
       ) : (
-        <div className="rounded-lg border border-dashed border-border py-14 text-center">
+        <div className="py-12 text-center">
           <p className="text-sm font-medium text-foreground">No artists match this view.</p>
           <p className="mt-1 text-sm text-muted-foreground">Adjust the search or roster filter.</p>
         </div>
@@ -409,21 +355,21 @@ function RosterGroup({
     <section className="space-y-3">
       <div className="flex flex-col gap-1 border-b border-border pb-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
-          <p className="text-sm text-muted-foreground">{detail}</p>
+          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <p className="sr-only">{detail}</p>
         </div>
         <span className="text-sm font-medium text-muted-foreground">{artists.length}</span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+      <div className="divide-y divide-border">
         {artists.map((artist) => (
-          <ArtistGalleryCard key={artist.id} artist={artist} />
+          <ArtistRosterLine key={artist.id} artist={artist} />
         ))}
       </div>
     </section>
   );
 }
 
-function ArtistGalleryCard({
+function ArtistRosterLine({
   artist,
 }: {
   artist: ArtistRosterRow;
@@ -432,65 +378,46 @@ function ArtistGalleryCard({
   const relationship = relationshipLabel(artist);
   const health = completeness(artist);
   const releaseHref = linkedReleaseHref(artist);
-  const attention = attentionLabel(artist);
-  const summary = gallerySummary(artist);
   const openArtistHref = `/artists/${artist.id}`;
   const readinessHref = primaryReadinessHref(artist);
 
   return (
-    <article className="group overflow-hidden rounded-lg border border-border bg-background shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
-      <a href={openArtistHref} className="block" aria-label={`Open ${artist.name} artist workspace`}>
-        <div className="relative aspect-square overflow-hidden bg-neutral-950">
-          <ArtistCoverArt artist={artist} size="hero" />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,5,0.08)_0%,rgba(5,5,5,0.28)_38%,rgba(5,5,5,0.82)_100%)]" />
-
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5">
-            <span className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold ${status.className}`}>{status.label}</span>
-            {attention ? (
-              <span className="rounded-md border border-amber-200/70 bg-amber-50/95 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                {attention}
-              </span>
-            ) : (
-              <span className="rounded-md border border-white/20 bg-black/35 px-2 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur-sm">
-                {health}% ready
-              </span>
-            )}
-          </div>
-
-          <div className="absolute inset-x-0 bottom-0 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-normal text-white/70">
-              {artist.image_url ? "Artist image" : artist.next_release_id ? "Upcoming release" : artist.latest_release_id ? "Latest release" : "Artist profile"}
-            </p>
-            <h2 className="mt-1 truncate text-lg font-semibold tracking-tight text-white">{artist.name}</h2>
-            <p className="mt-0.5 line-clamp-1 text-xs text-white/82">{linkedReleaseTitle(artist)}</p>
-          </div>
-        </div>
-      </a>
-
-      <div className="space-y-2 p-2.5 sm:p-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold ${relationship.className}`}>{relationship.label}</span>
-        </div>
-        <p className="text-[11px] leading-4 text-muted-foreground">Evidence: {relationshipEvidence(artist)}</p>
-
-        <a href={readinessHref} className="line-clamp-2 block min-h-9 text-sm leading-snug text-muted-foreground hover:text-foreground hover:underline">
-          {summary}
-        </a>
-
-        <div className="flex flex-wrap gap-1.5 text-xs">
-          <MetaPill icon={<Users className="h-3.5 w-3.5" />} label={formatNumber(artist.spotify_followers)} />
-          <MetaPill icon={<Disc3 className="h-3.5 w-3.5" />} label={`${artist.release_count}`} />
-          <MetaPill icon={<CalendarDays className="h-3.5 w-3.5" />} label={formatDate(artist.next_release_date)} />
-          {artist.pro ? <MetaPill label={artist.pro} /> : null}
-        </div>
-
-        {releaseHref ? (
-          <a href={releaseHref} className="block truncate text-xs font-medium text-muted-foreground hover:text-foreground hover:underline">
-            {linkedReleaseTitle(artist)}
+    <article className="py-3">
+      <Item className="px-0 py-0">
+        <ItemMedia>
+          <a href={openArtistHref} className="size-12 overflow-hidden rounded-lg" aria-label={`Open ${artist.name} artist workspace`}>
+            <ArtistCoverArt artist={artist} size="thumb" />
           </a>
-        ) : (
-          <p className="truncate text-xs text-muted-foreground">No release linked</p>
-        )}
+        </ItemMedia>
+        <ItemContent className="min-w-0">
+          <ItemTitle><a href={openArtistHref} className="hover:underline">{artist.name}</a></ItemTitle>
+          <ItemDescription>
+            {releaseHref ? <a href={releaseHref}>{linkedReleaseTitle(artist)}</a> : "No release linked"}
+          </ItemDescription>
+        </ItemContent>
+        <Badge variant={status.variant}>{status.label}</Badge>
+      </Item>
+      <div className="mt-2 pl-[58px]">
+        <a href={readinessHref} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+          {missingProfileItems(artist).length ? readinessSummary({ ...artist, bio: null }) : `${health}% ready`}
+          {artist.release_count === 0 ? " · No catalog yet" : ""}
+        </a>
+        <Accordion>
+          <AccordionItem value="details">
+            <AccordionTrigger className="py-1.5">Details <span className="sr-only">for {artist.name}</span></AccordionTrigger>
+            <AccordionContent className="space-y-3">
+              <Badge variant={relationship.variant}>{relationship.label}</Badge>
+              <p className="text-xs text-muted-foreground">Evidence: {relationshipEvidence(artist)}</p>
+              {artist.bio ? <p className="text-sm text-muted-foreground">{artist.bio}</p> : null}
+              <dl className="grid gap-3 sm:grid-cols-3">
+                <div><dt className="text-xs text-muted-foreground">Spotify followers</dt><dd>{formatNumber(artist.spotify_followers)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Catalog</dt><dd>{artist.release_count} releases</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Next release</dt><dd>{formatDate(artist.next_release_date)}</dd></div>
+              </dl>
+              {artist.pro ? <p className="text-xs text-muted-foreground">PRO · {artist.pro}</p> : null}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </article>
   );
@@ -506,100 +433,50 @@ function ArtistOpsTable({
   canMutate: boolean;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-background">
-      <div className="min-w-[980px]">
-        <div className="grid grid-cols-[minmax(260px,1.35fr)_130px_90px_130px_170px_170px_120px] border-b border-border bg-muted/35 px-4 py-2 text-xs font-medium uppercase tracking-normal text-muted-foreground">
-          <div>Artist</div>
-          <div>Relationship</div>
-          <div>PRO</div>
-          <div>Audience</div>
-          <div>Catalog</div>
-          <div>Workflow</div>
-          <div className="text-right">Actions</div>
-        </div>
-
-        <div className="divide-y divide-border">
-          {artists.map((artist) => {
-            const status = statusLabel(artist);
-            const relationship = relationshipLabel(artist);
-            const health = completeness(artist);
-            const artistForActions = artist as Artist;
-            return (
-              <div key={artist.id} className="grid grid-cols-[minmax(260px,1.35fr)_130px_90px_130px_170px_170px_120px] items-center gap-4 px-4 py-3 transition hover:bg-muted/25">
-                <a href={`/artists/${artist.id}`} className="flex min-w-0 items-center gap-3">
-                  <div className="h-11 w-11 shrink-0 overflow-hidden rounded-md border border-border bg-neutral-950">
-                    <ArtistCoverArt artist={artist} size="thumb" />
-                  </div>
+    <Table className="min-w-[980px]">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Artist</TableHead><TableHead>Relationship</TableHead><TableHead>PRO</TableHead>
+          <TableHead>Audience</TableHead><TableHead>Catalog</TableHead><TableHead>Workflow</TableHead><TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {artists.map(artist => {
+          const status = statusLabel(artist);
+          const relationship = relationshipLabel(artist);
+          const missing = missingProfileItems(artist);
+          return (
+            <TableRow key={artist.id}>
+              <TableCell className="max-w-80">
+                <a href={`/artists/${artist.id}`} className="flex items-center gap-3">
+                  <div className="size-11 shrink-0 overflow-hidden rounded-lg"><ArtistCoverArt artist={artist} size="thumb" /></div>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate text-sm font-semibold text-foreground">{artist.name}</h2>
-                      <span className={`rounded-md border px-2 py-0.5 text-xs font-medium ${status.className}`}>{status.label}</span>
-                    </div>
-                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                      {artist.bio || linkedReleaseTitle(artist)}
-                    </p>
-                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                      Contact: {artist.contact_name ?? "No artist contact"} · {relationshipEvidence(artist)}
-                    </p>
+                    <div className="flex items-center gap-2"><span className="truncate font-medium">{artist.name}</span><Badge variant={status.variant}>{status.label}</Badge></div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{artist.bio || linkedReleaseTitle(artist)}</p>
                   </div>
                 </a>
-
-                <div>
-                  <span className={`rounded-md border px-2 py-0.5 text-xs font-medium ${relationship.className}`}>{relationship.label}</span>
-                </div>
-
-                <div className="text-sm text-foreground">{artist.pro || "-"}</div>
-
-                <div>
-                  <div className="text-sm font-medium text-foreground">{formatNumber(artist.spotify_followers)}</div>
-                  <div className="text-xs text-muted-foreground">Popularity {artist.spotify_popularity ?? "-"}</div>
-                </div>
-
-                <div className="space-y-1 text-sm">
-                  <div className="inline-flex items-center gap-1.5 text-foreground">
-                    <Disc3 className="h-4 w-4 text-muted-foreground" />
-                    {artist.release_count} release{artist.release_count === 1 ? "" : "s"}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {linkedReleaseHref(artist) ? (
-                      <a href={linkedReleaseHref(artist)!} className="hover:underline">{linkedReleaseTitle(artist)}</a>
-                    ) : (
-                      "No release linked"
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-sm">
-                  <div className="inline-flex items-center gap-1.5 text-foreground">
-                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                    {formatDate(artist.next_release_date)}
-                  </div>
-                  <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
-                  {artist.campaign_count ? <span>{artist.campaign_count} campaign{artist.campaign_count === 1 ? "" : "s"}</span> : null}
-                  {artist.open_task_count ? <span>{artist.open_task_count} task{artist.open_task_count === 1 ? "" : "s"}</span> : null}
-                  {!artist.campaign_count && !artist.open_task_count ? <span>No open workflow</span> : null}
-                  </div>
-                  {missingProfileItems(artist).length ? (
-                    <div className="inline-flex items-center gap-1 text-xs text-amber-700">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      {missingProfileItems(artist).slice(0, 2).join(", ")}
-                      {missingProfileItems(artist).length > 2 ? ` +${missingProfileItems(artist).length - 2}` : ""}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-emerald-700">{health}% complete</div>
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  {canMutate && <ArtistEditButton artist={artistForActions} contactOptions={contactOptions} />}
-                  {canMutate && <ArtistDeleteButton artist={artistForActions} />}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+                <p className="mt-2 whitespace-normal text-xs text-muted-foreground">Contact: {artist.contact_name ?? "No artist contact"} · {relationshipEvidence(artist)}</p>
+              </TableCell>
+              <TableCell><Badge variant={relationship.variant}>{relationship.label}</Badge></TableCell>
+              <TableCell>{artist.pro || "–"}</TableCell>
+              <TableCell><p>{formatNumber(artist.spotify_followers)}</p><p className="text-xs text-muted-foreground">Popularity {artist.spotify_popularity ?? "–"}</p></TableCell>
+              <TableCell>
+                <p>{artist.release_count} release{artist.release_count === 1 ? "" : "s"}</p>
+                {linkedReleaseHref(artist) ? <a href={linkedReleaseHref(artist)!} className="text-xs text-muted-foreground hover:underline">{linkedReleaseTitle(artist)}</a> : <p className="text-xs text-muted-foreground">No release linked</p>}
+              </TableCell>
+              <TableCell className="space-y-1">
+                <p>{formatDate(artist.next_release_date)}</p>
+                <p className="text-xs text-muted-foreground">{artist.campaign_count} campaigns · {artist.open_task_count} tasks</p>
+                <a href={primaryReadinessHref(artist)} className="text-xs text-muted-foreground hover:underline">{missing.length ? `Missing ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` +${missing.length - 2}` : ""}` : `${completeness(artist)}% complete`}</a>
+              </TableCell>
+              <TableCell>
+                {canMutate && <div className="flex justify-end gap-2"><ArtistEditButton artist={artist as Artist} contactOptions={contactOptions} /><ArtistDeleteButton artist={artist as Artist} /></div>}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -663,40 +540,18 @@ function ArtistCoverArt({
   }
 
   return (
-    <div className="flex h-full w-full items-end bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.18),_transparent_36%),linear-gradient(145deg,#262626_0%,#111111_45%,#050505_100%)] p-4">
-      <div>
-        <div className={`inline-flex items-center rounded-md border border-white/15 bg-white/8 px-2 py-0.5 font-semibold text-white/78 backdrop-blur-sm ${size === "hero" ? "text-xs" : "text-[11px]"}`}>
-          {artist.release_count ? `${artist.release_count} release${artist.release_count === 1 ? "" : "s"}` : "Artist profile"}
-        </div>
-        <div className={`mt-3 font-semibold tracking-tight text-white ${size === "hero" ? "text-4xl" : "text-lg"}`}>
-          {initials(artist.name)}
-        </div>
-      </div>
+    <div className="grid h-full w-full place-items-center bg-muted text-sm font-medium text-muted-foreground">
+      {initials(artist.name)}
     </div>
-  );
-}
-
-function MetaPill({
-  icon,
-  label,
-}: {
-  icon?: ReactNode;
-  label: string;
-}) {
-  return (
-    <span className="inline-flex min-h-7 max-w-full items-center gap-1.5 rounded-md border border-border bg-background px-2 py-0.5 text-muted-foreground">
-      {icon}
-      <span className="truncate">{label}</span>
-    </span>
   );
 }
 
 function RosterStat({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="rounded-lg border border-border bg-background px-4 py-3">
-      <div className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-foreground">{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{detail}</div>
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-base font-medium">{value}</dd>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
     </div>
   );
 }

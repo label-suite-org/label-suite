@@ -14,15 +14,11 @@ const contactOptions = canMutate ? await listContactOptions(orgId) : [];
 
 <AppLayout>
   <div class="space-y-6">
-    <section class="space-y-2 border-b border-[var(--border)] pb-6">
-      <p class="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Artists</p>
-      <h1 class="text-3xl font-semibold tracking-tight">Artist roster</h1>
-      <p class="max-w-3xl text-sm text-muted-foreground">Manage roster artists, collaborators, and profile readiness from one shared operator surface.</p>
-    </section>
+    <h1 class="text-base font-semibold md:sr-only">Artists</h1>
 
     {!artistRows.length ? (
-      <div class="rounded-lg border-2 border-dashed border-border p-12 text-center text-muted-foreground">
-        <p class="text-lg font-medium text-foreground">No artists yet.</p>
+      <div class="py-12 text-center text-muted-foreground">
+        <p class="text-base font-medium text-foreground">No artists yet.</p>
         <p class="mt-1 text-sm">Create the first roster profile to connect releases, assets, campaigns, and royalty records.</p>
         {canMutate && <div class="mt-5 flex justify-center">
           <ArtistCreateDialog client:load contactOptions={contactOptions} />

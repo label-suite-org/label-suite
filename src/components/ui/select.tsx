@@ -10,6 +10,7 @@ export type SelectOption = {
 };
 
 export function Select({
+  id,
   value,
   onValueChange,
   options,
@@ -18,6 +19,7 @@ export function Select({
   className,
   "aria-label": ariaLabel,
 }: {
+  id?: string;
   value: string;
   onValueChange: (value: string | null) => void;
   options: readonly SelectOption[];
@@ -34,9 +36,10 @@ export function Select({
       items={options}
     >
       <SelectPrimitive.Trigger
+        id={id}
         aria-label={ariaLabel}
         className={cn(
-          "inline-flex h-10 min-w-32 items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-sm outline-none transition-colors hover:bg-muted focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+          "inline-flex h-8 min-w-32 items-center justify-between gap-2 rounded-lg border border-input bg-background px-2.5 text-base text-foreground outline-none transition-colors hover:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
           className,
         )}
       >
@@ -47,7 +50,7 @@ export function Select({
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
         <SelectPrimitive.Positioner sideOffset={6} className="z-50 outline-none">
-          <SelectPrimitive.Popup className="min-w-(--anchor-width) overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none">
+          <SelectPrimitive.Popup className="max-h-(--available-height) min-w-(--anchor-width) overflow-y-auto overscroll-contain rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none">
             <SelectPrimitive.List>
               {options.map((option) => (
                 <SelectPrimitive.Item

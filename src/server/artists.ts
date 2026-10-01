@@ -4,7 +4,7 @@ import { db } from "../lib/db";
 import { artists, campaigns, contacts, documents, media_assets, ops_tasks, releases, roles, works } from "../db/schema";
 import { ConflictError, NotFoundError } from "./errors";
 import { recordAuditEvent } from "./integrations";
-import { hasOwn, idSchema, nullableInteger, nullableText } from "./validation";
+import { hasOwn, idSchema, nullableText } from "./validation";
 import {
   deriveCampaignDocument,
   type CampaignDocument,
@@ -61,8 +61,8 @@ const artistBaseSchema = {
   bio: nullableText,
   bio_document: artistBioDocumentSchema,
   spotify_id: nullableText,
-  spotify_followers: nullableInteger({ min: 0 }),
-  spotify_popularity: nullableInteger({ min: 0, max: 100 }),
+  spotify_followers: z.never().optional(),
+  spotify_popularity: z.never().optional(),
   pro: nullableText,
   ipi: nullableText,
   instagram: nullableText,
@@ -296,8 +296,6 @@ function missingArtistFields(row: {
   const missing: string[] = [];
   if (!row.bio) missing.push("bio");
   if (!row.spotify_id) missing.push("Spotify ID");
-  if (row.spotify_followers == null) missing.push("followers");
-  if (row.spotify_popularity == null) missing.push("popularity");
   if (!row.pro) missing.push("PRO");
   if (!row.ipi) missing.push("IPI");
   if (!row.instagram) missing.push("Instagram");
@@ -342,7 +340,8 @@ export async function getArtistDetail(orgId: string, id: string) {
   const releaseRows = await db
     .select()
     .from(releases)
-    .where(and(eq(releases.artist_id, id), eq(releases.org_id, orgId)));
+    .where(and(eq(releases.artist_id, id), eq(releases.org_id, orgId)))
+    .orderBy(sql`${releases.release_date} desc nulls last`, asc(releases.title));
   const assetRows = await db
     .select({
       id: media_assets.id,
@@ -486,8 +485,6 @@ export async function createArtist(orgId: string, input: CreateArtistInput) {
     bio_review_status: "draft",
     bio_reviewed_hash: null,
     spotify_id: input.spotify_id ?? null,
-    spotify_followers: input.spotify_followers ?? null,
-    spotify_popularity: input.spotify_popularity ?? null,
     pro: input.pro ?? null,
     ipi: input.ipi ?? null,
     instagram: input.instagram ?? null,
@@ -516,8 +513,6 @@ export async function createArtistForNative(orgId: string, input: NativeCreateAr
       bio_review_status: "draft",
       bio_reviewed_hash: null,
       spotify_id: input.spotify_id ?? null,
-      spotify_followers: input.spotify_followers ?? null,
-      spotify_popularity: input.spotify_popularity ?? null,
       pro: input.pro ?? null,
       ipi: input.ipi ?? null,
       instagram: input.instagram ?? null,
@@ -560,8 +555,6 @@ export async function updateArtist(orgId: string, input: UpdateArtistInput) {
     updates.bio_reviewed_by = null;
   }
   if (hasOwn(input, "spotify_id")) updates.spotify_id = input.spotify_id as string | null;
-  if (hasOwn(input, "spotify_followers")) updates.spotify_followers = input.spotify_followers as number | null;
-  if (hasOwn(input, "spotify_popularity")) updates.spotify_popularity = input.spotify_popularity as number | null;
   if (hasOwn(input, "pro")) updates.pro = input.pro as string | null;
   if (hasOwn(input, "ipi")) updates.ipi = input.ipi as string | null;
   if (hasOwn(input, "instagram")) updates.instagram = input.instagram as string | null;
@@ -647,8 +640,6 @@ function buildArtistUpdates(input: UpdateArtistInput, contactId?: string | null)
     updates.bio_reviewed_by = null;
   }
   if (hasOwn(input, "spotify_id")) updates.spotify_id = input.spotify_id as string | null;
-  if (hasOwn(input, "spotify_followers")) updates.spotify_followers = input.spotify_followers as number | null;
-  if (hasOwn(input, "spotify_popularity")) updates.spotify_popularity = input.spotify_popularity as number | null;
   if (hasOwn(input, "pro")) updates.pro = input.pro as string | null;
   if (hasOwn(input, "ipi")) updates.ipi = input.ipi as string | null;
   if (hasOwn(input, "instagram")) updates.instagram = input.instagram as string | null;

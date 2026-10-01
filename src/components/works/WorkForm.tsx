@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { Input } from "@/components/ui/input";
+import { FieldLabel, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 export interface Work {
   id?: string;
@@ -21,6 +22,7 @@ export function WorkForm({
   initial?: Work | null;
   onClose: () => void;
 }) {
+  const formId = useId();
   const isEdit = !!initial;
   const [title, setTitle] = useState(initial?.title || "");
   const [isrc, setIsrc] = useState(initial?.isrc || "");
@@ -64,78 +66,77 @@ export function WorkForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Work Title *</label>
-        <Input
+        <FieldLabel htmlFor={`${formId}-title`} className="mb-2">Work Title *</FieldLabel>
+        <Input id={`${formId}-title`}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
           placeholder="e.g. Cherry-Coloured Funk"
-          className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full"
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">ISRC</label>
-          <Input
+          <FieldLabel htmlFor={`${formId}-isrc`} className="mb-2">ISRC</FieldLabel>
+          <Input id={`${formId}-isrc`}
             value={isrc}
             onChange={(e) => setIsrc(e.target.value)}
             placeholder="DKO7P2600001"
-            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background font-mono"
+            className="w-full font-mono"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">ISWC</label>
-          <Input
+          <FieldLabel htmlFor={`${formId}-iswc`} className="mb-2">ISWC</FieldLabel>
+          <Input id={`${formId}-iswc`}
             value={iswc}
             onChange={(e) => setIswc(e.target.value)}
             placeholder="T-000.000.001-0"
-            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background font-mono"
+            className="w-full font-mono"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Duration (seconds)</label>
-          <Input
+          <FieldLabel htmlFor={`${formId}-duration`} className="mb-2">Duration (seconds)</FieldLabel>
+          <Input id={`${formId}-duration`}
             type="number"
             value={duration}
             onChange={(e) => setDuration(e.target.value)}
             placeholder="210"
-            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+            className="w-full"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Genre</label>
-          <Input
+          <FieldLabel htmlFor={`${formId}-genre`} className="mb-2">Genre</FieldLabel>
+          <Input id={`${formId}-genre`}
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
             placeholder="Indie pop"
-            className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+            className="w-full"
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Audio URL</label>
-        <Input
+        <FieldLabel htmlFor={`${formId}-audio`} className="mb-2">Audio URL</FieldLabel>
+        <Input id={`${formId}-audio`}
           value={audioUrl}
           onChange={(e) => setAudioUrl(e.target.value)}
           placeholder="https://..."
-          className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background"
+          className="w-full"
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <FieldError>{error}</FieldError>}
 
       <div className="flex gap-2 justify-end">
         <Button variant="ghost" type="button" onClick={onClose}
-          className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
+         >
           Cancel
         </Button>
-        <Button type="submit" disabled={loading}
-          className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
+        <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : isEdit ? "Save Changes" : "Create Work"}
         </Button>
       </div>

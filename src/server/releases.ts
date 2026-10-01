@@ -87,6 +87,7 @@ export interface ReleaseRosterRow {
   release_ready: boolean | null;
   release_missing: string | null;
   artist_id: string | null;
+  parent_release_id?: string | null;
   artist_name: string | null;
   track_count: number;
   ready_track_count: number;
@@ -139,6 +140,7 @@ export async function listReleaseRoster(orgId: string): Promise<ReleaseRosterRow
     release_ready: boolean | null;
     release_missing: string | null;
     artist_id: string | null;
+    parent_release_id: string | null;
     artist_name: string | null;
     track_count: string | number;
     ready_track_count: string | number;
@@ -208,6 +210,7 @@ export async function listReleaseRoster(orgId: string): Promise<ReleaseRosterRow
       r.release_ready,
       r.release_missing,
       r.artist_id,
+      r.parent_release_id,
       a.name as artist_name,
       coalesce(tr.track_count, 0)::int as track_count,
       coalesce(tr.ready_track_count, 0)::int as ready_track_count,

@@ -36,7 +36,7 @@ function makeArtist(overrides: Partial<ArtistRosterRow>): ArtistRosterRow {
   };
 }
 
-describe("ArtistRoster gallery cards", () => {
+describe("ArtistRoster browsing rows", () => {
   it("renders representative upcoming, incomplete, complete, and empty-catalog artists with textual readiness", () => {
     const html = renderToStaticMarkup(
       <ArtistRoster
@@ -78,6 +78,7 @@ describe("ArtistRoster gallery cards", () => {
       />,
     );
 
+    expect(html).toMatch(/<h2[^>]*><button[^>]*>4 of 4 profiles/);
     expect(html).toContain("Upcoming Artist");
     expect(html).toContain("Upcoming");
     expect(html).toContain('href="/artists/artist-upcoming"');

@@ -16,7 +16,7 @@ export const APP_NAV_SECTIONS = [
   { id: "primary", label: "Workspace" },
   { id: "operations", label: "Operations" },
   { id: "directory", label: "Directory" },
-  { id: "contextual", label: "Contextual" },
+  { id: "contextual", label: "Resources" },
 ] as const satisfies readonly { id: AppNavSection; label: string }[];
 
 export const APP_NAV_ITEMS = [

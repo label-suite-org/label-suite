@@ -158,7 +158,7 @@ describe("buildReleaseOperationsBrief", () => {
       severity: "blocker",
       title: "Masters, artwork & metadata is blocked",
       actionKey: "timeline",
-      evidence: { label: "Release timeline", href: "/releases/release-1#release-timeline" },
+      evidence: { label: "Release timeline", href: "/releases/release-1?section=timeline#release-timeline" },
     });
     expect(brief.items[0]?.detail).toContain("Approve final master was due Jul 20");
     expect(brief.items[1]).toMatchObject({ severity: "attention", title: "Campaign rollout needs attention" });
@@ -177,7 +177,7 @@ describe("buildReleaseOperationsBrief", () => {
       severity: "watch",
       title: "No scoped performance data is linked",
       actionKey: "analytics",
-      evidence: { label: "Release analytics", href: "/releases/release-1#performance-data" },
+      evidence: { label: "Release analytics", href: "/releases/release-1?section=analytics#performance-data" },
     });
   });
 

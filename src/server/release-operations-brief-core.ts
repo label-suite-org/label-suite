@@ -115,7 +115,7 @@ export function buildReleaseOperationsBrief(input: ReleaseOperationsBriefInput):
       timelineDetail(phase, input.today),
       "timeline",
       "Open timeline",
-      { label: "Release timeline", href: `${releaseHref}#release-timeline` },
+      { label: "Release timeline", href: `${releaseHref}?section=timeline#release-timeline` },
       phase.health === "blocked" ? 5 : 30,
     ));
   }
@@ -123,11 +123,11 @@ export function buildReleaseOperationsBrief(input: ReleaseOperationsBriefInput):
   if (input.pitches.length === 0) {
     const days = daysBetween(input.today, release.releaseDate);
     const severity: ReleaseBriefSeverity = days != null && days > 56 ? "watch" : "attention";
-    items.push(item("pitch", severity, "No DSP pitch is logged", "No platform pitch is linked to this release yet.", "pitch", "Add pitch", { label: "DSP pitches", href: `${releaseHref}#dsp-pitches` }, 45));
+    items.push(item("pitch", severity, "No DSP pitch is logged", "No platform pitch is linked to this release yet.", "pitch", "Add pitch", { label: "DSP pitches", href: `${releaseHref}?section=budget#dsp-pitches` }, 45));
   }
 
   if (!input.hasScopedAnalytics && isReleased(input.today, release.releaseDate, release.status)) {
-    items.push(item("analytics", "watch", "No scoped performance data is linked", "The release is out, but no matched stream or audience data is available for monitoring.", "analytics", "Check data", { label: "Release analytics", href: `${releaseHref}#performance-data` }, 70));
+    items.push(item("analytics", "watch", "No scoped performance data is linked", "The release is out, but no matched stream or audience data is available for monitoring.", "analytics", "Check data", { label: "Release analytics", href: `${releaseHref}?section=analytics#performance-data` }, 70));
   }
 
   const hasDerivedBlocker = items.some((entry) => entry.severity === "blocker");

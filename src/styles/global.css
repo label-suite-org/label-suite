@@ -33,6 +33,10 @@ body {
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -63,30 +67,34 @@ body {
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.51 0.23 260);
+  --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --muted-foreground: oklch(0.50 0 0);
+  --accent: oklch(0.96 0.025 260);
+  --accent-foreground: oklch(0.32 0.1 260);
   --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.979 0.021 166.113);
+  --success-foreground: oklch(0.508 0.118 165.612);
+  --warning: oklch(0.987 0.022 95.277);
+  --warning-foreground: oklch(0.473 0.137 46.201);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.51 0.23 260);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0rem;
+  --radius: 0.5rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 }
@@ -98,18 +106,22 @@ body {
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
+  --primary: oklch(0.72 0.13 260);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.27 0.045 260);
+  --accent-foreground: oklch(0.92 0.02 260);
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.262 0.051 172.552);
+  --success-foreground: oklch(0.845 0.143 164.978);
+  --warning: oklch(0.279 0.077 45.635);
+  --warning-foreground: oklch(0.879 0.169 91.605);
   --border: oklch(1 0 0 / 18%);
   --input: oklch(1 0 0 / 24%);
-  --ring: oklch(0.708 0 0);
+  --ring: oklch(0.72 0.13 260);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -119,26 +131,10 @@ body {
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: oklch(1 0 0 / 20%);
   --sidebar-ring: oklch(0.708 0 0);
-}
-
-.campaign-workspace {
-  --font-sans: "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --primary: oklch(0.51 0.23 260);
-  --primary-foreground: oklch(1 0 0);
-  --accent: oklch(0.96 0.025 260);
-  --accent-foreground: oklch(0.32 0.1 260);
-  --ring: oklch(0.68 0.13 260);
-  --radius: 0.5rem;
-  font-family: var(--font-sans);
-}
-
-.dark .campaign-workspace {
-  --accent: oklch(0.27 0.045 260);
-  --accent-foreground: oklch(0.92 0.02 260);
 }
 
 /* Public Fountain radio update: a warm, cardless editorial press sheet. */
@@ -525,12 +521,5 @@ body {
   }
   html {
     @apply font-sans;
-  }
-  :where([class*="rounded"]) {
-    border-radius: 0 !important;
-  }
-  :where([class*="rounded"])::before,
-  :where([class*="rounded"])::after {
-    border-radius: 0 !important;
   }
 }

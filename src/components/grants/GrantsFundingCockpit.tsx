@@ -109,14 +109,15 @@ export default function GrantsFundingCockpit({ workspace, currentUserName = null
             <Button
               key={id}
               type="button"
+              variant="ghost"
               role="tab"
               aria-selected={activeView === id}
               onClick={() => setActiveView(id)}
-              className={`relative inline-flex h-11 items-center gap-2 px-3 text-sm font-medium transition sm:px-4 ${activeView === id ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              className={`relative inline-flex h-11 items-center gap-2 rounded-none px-3 text-sm font-medium transition sm:px-4 ${activeView === id ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
             >
               <Icon className="size-4" />
               {label}
-              {activeView === id && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-foreground" />}
+              {activeView === id && <span className="absolute inset-x-0 -bottom-px h-0.5 bg-primary" />}
             </Button>
           ))}
         </div>

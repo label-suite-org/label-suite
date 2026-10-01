@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
-  ArrowDownUp,
   ArrowUpRight,
   BadgeCheck,
   CircleDollarSign,
@@ -16,7 +15,10 @@ import type { WorkPriorityRow } from "../../server/works";
 import { WorkCreateDialog, WorkDeleteButton, WorkEditButton } from "./WorkActionButtons";
 
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Item, ItemContent, ItemTitle, ItemDescription } from "@/components/ui/item";
 import { Button } from "@/components/ui/button";
 type FilterKey = "priority" | "payout" | "released" | "unknown" | "unclear" | "cleared" | "all";
 type SortKey = "priority" | "revenue" | "released" | "title";
@@ -83,98 +85,36 @@ export function WorksList({ works, canMutate = true }: { works: WorkPriorityRow[
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 md:grid-cols-4">
-        <TriageStat
-          label="Priority queue"
-          value={stats.priority}
-          detail="needs action"
-          tone="neutral"
-          icon={<ShieldAlert className="h-4 w-4" />}
-        />
-        <TriageStat
-          label="Payout blocked"
-          value={stats.payoutBlocked}
-          detail={formatMoney(stats.blockedNet)}
-          tone="red"
-          icon={<CircleDollarSign className="h-4 w-4" />}
-        />
-        <TriageStat
-          label="Released uncleared"
-          value={stats.releasedBlocked}
-          detail="live catalog"
-          tone="amber"
-          icon={<Disc3 className="h-4 w-4" />}
-        />
-        <TriageStat
-          label="Unknown works"
-          value={stats.unknown}
-          detail="needs identity"
-          tone="blue"
-          icon={<FileQuestion className="h-4 w-4" />}
-        />
-      </section>
+      <Accordion>
+        <AccordionItem value="summary">
+          <AccordionTrigger>{visible.length} of {works.length} works · clearance summary</AccordionTrigger>
+          <AccordionContent>
+            <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <TriageStat label="Priority queue" value={stats.priority} detail="needs action" />
+              <TriageStat label="Payout blocked" value={stats.payoutBlocked} detail={formatMoney(stats.blockedNet)} />
+              <TriageStat label="Released uncleared" value={stats.releasedBlocked} detail="live catalog" />
+              <TriageStat label="Unknown works" value={stats.unknown} detail="identity to confirm" />
+            </dl>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      {moneyQueue.length ? <UnblockMoneyQueue works={moneyQueue} onShowBlocked={() => setFilter("payout")} /> : null}
 
-      {moneyQueue.length ? <UnblockMoneyQueue works={moneyQueue} /> : null}
-
-      <section className="rounded-lg border border-border bg-card p-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {filters.map((item) => (
-              <Button
-                key={item.key}
-                type="button"
-                data-filter={item.key}
-                onClick={() => setFilter(item.key)}
-                className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  filter === item.key
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {item.label}
-                <span className={`rounded-full px-1.5 py-0.5 text-[11px] ${filter === item.key ? "bg-background/15" : "bg-muted text-muted-foreground"}`}>
-                  {item.count}
-                </span>
-              </Button>
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <label className="relative block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search work, artist, release, ISRC..."
-                className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-foreground sm:w-72"
-              />
-            </label>
-            <label className="flex h-10 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground">
-              <ArrowDownUp className="h-4 w-4" aria-hidden="true" />
-              <NativeSelect
-                value={sort}
-                onChange={(event) => setSort(event.target.value as SortKey)}
-                className="bg-transparent text-foreground outline-none"
-              >
-                <option value="priority">Priority first</option>
-                <option value="revenue">Blocked money</option>
-                <option value="released">Released tracks</option>
-                <option value="title">Title</option>
-              </NativeSelect>
-            </label>
-            {canMutate ? <WorkCreateDialog /> : <span className="text-sm text-muted-foreground">Read-only for fundraiser</span>}
-          </div>
+      <section className="flex flex-col gap-3 border-b border-border pb-4 lg:flex-row">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input aria-label="Search works" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search work, artist, release, ISRC…" className="w-full pl-9" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Select aria-label="Filter works" value={filter} onValueChange={value => setFilter((value ?? "priority") as FilterKey)} className="max-sm:w-full" options={filters.map(item => ({ value: item.key, label: `${item.label} (${item.count})` }))} />
+          <Select aria-label="Sort works" value={sort} onValueChange={value => setSort((value ?? "priority") as SortKey)} className="max-sm:w-full" options={[
+            { value: "priority", label: "Priority first" }, { value: "revenue", label: "Blocked money" }, { value: "released", label: "Released tracks" }, { value: "title", label: "Title" },
+          ]} />
+          {canMutate ? <WorkCreateDialog /> : <span className="self-center text-xs text-muted-foreground">Read-only for your role</span>}
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="hidden grid-cols-[minmax(280px,1.45fr)_170px_170px_160px_110px] gap-4 border-b border-border bg-muted/30 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground xl:grid">
-          <span>Work</span>
-          <span>Why it matters</span>
-          <span>Clearance</span>
-          <span>Statements</span>
-          <span className="text-right">Actions</span>
-        </div>
+      <section>
         {visible.length ? (
           <div className="divide-y divide-border">
             {visible.map((work) => (
@@ -197,96 +137,82 @@ function WorkPriorityLine({ work, canMutate }: { work: WorkPriorityRow; canMutat
   const priority = priorityBadge(work, state);
 
   return (
-    <div className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/25 xl:grid-cols-[minmax(280px,1.45fr)_170px_170px_160px_110px] xl:items-center">
-      <a href={`/works/${work.id}`} className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="truncate text-sm font-semibold text-foreground">{work.title}</h2>
-          {work.isUnknown ? <SmallBadge tone="blue">Unknown</SmallBadge> : null}
-          {state.allClear ? <SmallBadge tone="green">Cleared</SmallBadge> : null}
-        </div>
-        <p className="mt-1 truncate text-xs text-muted-foreground">
-          {[work.artistNames || "No artist", work.releaseTitles ? `via ${work.releaseTitles}` : null].filter(Boolean).join(" · ")}
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-          <span className="rounded-md bg-muted px-1.5 py-0.5">{work.trackCount} track{work.trackCount === 1 ? "" : "s"}</span>
-          <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono">{work.isrc || "No ISRC"}</span>
-          {work.iswc ? <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono">{work.iswc}</span> : null}
-        </div>
-      </a>
-
-      <div>
-        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${priority.className}`}>
-          {priority.icon}
-          {priority.label}
-        </span>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">{priority.detail}</p>
-      </div>
-
-      <div className="space-y-2">
-        <ClearanceMeter label="Pub" value={work.pubProgress} count={work.pubRoleCount} cleared={state.pubCleared} />
-        <ClearanceMeter label="Master" value={work.masterProgress} count={work.masterRoleCount} cleared={state.masterCleared} />
-      </div>
-
-      <div className="text-sm">
-        {work.payoutRows ? (
-          <>
-            <p className={`font-semibold ${state.payoutBlocked ? "text-red-700" : "text-emerald-700"}`}>
-              {formatMoney(work.payoutNet)}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {work.payoutRows} unpaid row{work.payoutRows === 1 ? "" : "s"}
-            </p>
-          </>
-        ) : (
-          <p className="text-xs text-muted-foreground">No unpaid statement rows</p>
-        )}
-      </div>
-
-      <div className="flex items-center justify-start gap-1 xl:justify-end">
-        {canMutate && <><WorkEditButton work={work} /><WorkDeleteButton work={work} /></>}
-      </div>
-    </div>
+    <article className="py-3">
+      <Item className="px-0 py-0">
+        <ItemContent className="min-w-0">
+          <ItemTitle><a href={`/works/${work.id}`} className="hover:underline">{work.title}</a></ItemTitle>
+          <ItemDescription>{[work.artistNames || "No artist", work.releaseTitles].filter(Boolean).join(" · ")}</ItemDescription>
+        </ItemContent>
+        <Badge variant={priority.variant}>{priority.icon}{priority.label}</Badge>
+      </Item>
+      <Accordion>
+        <AccordionItem value="clearance">
+          <AccordionTrigger className="py-1.5">Clearance & details <span className="sr-only">for {work.title}</span></AccordionTrigger>
+          <AccordionContent className="space-y-4">
+            <p className="text-xs text-muted-foreground">{priority.detail}</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <ClearanceMeter label="Publishing" value={work.pubProgress} count={work.pubRoleCount} cleared={state.pubCleared} />
+                <ClearanceMeter label="Master" value={work.masterProgress} count={work.masterRoleCount} cleared={state.masterCleared} />
+              </div>
+              <div className="text-sm">
+                {work.payoutRows ? <>
+                  <p className={state.payoutBlocked ? "text-destructive" : "text-success-foreground"}>{formatMoney(work.payoutNet)}</p>
+                  <p className="text-xs text-muted-foreground">{work.payoutRows} unpaid statement rows</p>
+                </> : <p className="text-xs text-muted-foreground">No unpaid statement rows</p>}
+              </div>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <p>{work.trackCount} track{work.trackCount === 1 ? "" : "s"}</p>
+                <p>ISRC · {work.isrc || "Not entered"}</p>
+                {work.iswc ? <p>ISWC · {work.iswc}</p> : null}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a href={`/works/${work.id}`} className="text-sm font-medium">Open rights editor</a>
+              {canMutate && <><WorkEditButton work={work} /><WorkDeleteButton work={work} /></>}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </article>
   );
 }
 
-function UnblockMoneyQueue({ works }: { works: WorkPriorityRow[] }) {
+function UnblockMoneyQueue({ works, onShowBlocked }: { works: WorkPriorityRow[]; onShowBlocked: () => void }) {
   const total = works.reduce((sum, work) => sum + work.payoutNet, 0);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-red-200 bg-red-50/70">
-      <div className="flex flex-col gap-2 border-b border-red-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="border-y border-border">
+      <div className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-red-950">Unblock money queue</h2>
-          <p className="mt-1 text-sm text-red-700">
+          <h2 className="text-base font-semibold text-foreground">Payouts awaiting clearance</h2>
+          <p className="mt-1 text-sm text-destructive">
             {formatMoney(total)} is waiting on master clearance across the top {works.length} work{works.length === 1 ? "" : "s"}.
           </p>
         </div>
         <Button
           type="button"
-          onClick={() => {
-            const button = document.querySelector<HTMLButtonElement>("[data-filter='payout']");
-            button?.click();
-          }}
-          className="inline-flex items-center gap-2 self-start rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800 sm:self-auto"
+          onClick={onShowBlocked}
+          variant="outline" className="self-start sm:self-auto"
         >
           Show all blocked
           <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
-      <div className="grid divide-y divide-red-100 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+      <Accordion><AccordionItem value="blocked"><AccordionTrigger>Top blocked works</AccordionTrigger><AccordionContent><div className="grid divide-y divide-border lg:grid-cols-4 lg:divide-x lg:divide-y-0">
         {works.map((work) => (
-          <a key={work.id} href={`/works/${work.id}`} className="block p-4 transition-colors hover:bg-white/70">
+          <a key={work.id} href={`/works/${work.id}`} className="block p-4 transition-colors hover:bg-muted/50">
             <div className="flex items-center justify-between gap-3">
-              <p className="truncate text-sm font-semibold text-red-950">{work.title}</p>
-              <ArrowUpRight className="h-4 w-4 shrink-0 text-red-500" aria-hidden="true" />
+              <p className="truncate text-sm font-semibold text-foreground">{work.title}</p>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
             </div>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-red-800">{formatMoney(work.payoutNet)}</p>
-            <p className="mt-1 text-xs leading-5 text-red-700">
+            <p className="mt-2 text-base font-medium text-destructive">{formatMoney(work.payoutNet)}</p>
+            <p className="mt-1 text-xs leading-5 text-destructive">
               {work.masterRoleCount ? `${Math.round(work.masterProgress)}% master confirmed` : "Missing master split"}
             </p>
           </a>
         ))}
-      </div>
+      </div></AccordionContent></AccordionItem></Accordion>
     </section>
   );
 }
@@ -297,54 +223,19 @@ function ClearanceMeter({ label, value, count, cleared }: { label: string; value
     <div>
       <div className="mb-1 flex items-center justify-between gap-2 text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className={`font-medium ${cleared ? "text-emerald-700" : count ? "text-amber-700" : "text-red-700"}`}>
+        <span className={`font-medium ${cleared ? "text-success-foreground" : count ? "text-warning-foreground" : "text-destructive"}`}>
           {count ? `${pct}%` : "Missing"}
         </span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-        <div className={`h-full rounded-full ${cleared ? "bg-emerald-600" : count ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${count ? pct : 8}%` }} />
+        <div className={`h-full rounded-full ${cleared ? "bg-success-foreground" : count ? "bg-warning-foreground" : "bg-destructive"}`} style={{ width: `${count ? pct : 8}%` }} />
       </div>
     </div>
   );
 }
 
-function TriageStat({
-  label,
-  value,
-  detail,
-  tone,
-  icon,
-}: {
-  label: string;
-  value: number;
-  detail: string;
-  tone: "neutral" | "red" | "amber" | "blue";
-  icon: React.ReactNode;
-}) {
-  const toneClass = {
-    neutral: "text-foreground bg-muted",
-    red: "text-red-700 bg-red-50 border-red-100",
-    amber: "text-amber-700 bg-amber-50 border-amber-100",
-    blue: "text-blue-700 bg-blue-50 border-blue-100",
-  }[tone];
-
-  return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
-        <span className={`flex h-8 w-8 items-center justify-center rounded-md border ${toneClass}`}>{icon}</span>
-      </div>
-      <p className="mt-3 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-      <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
-    </div>
-  );
-}
-
-function SmallBadge({ tone, children }: { tone: "green" | "blue"; children: React.ReactNode }) {
-  const className = tone === "green"
-    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-    : "border-blue-200 bg-blue-50 text-blue-700";
-  return <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${className}`}>{children}</span>;
+function TriageStat({ label, value, detail }: { label: string; value: number; detail: string }) {
+  return <div><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 text-base font-medium">{value}</dd><p className="mt-1 text-xs text-muted-foreground">{detail}</p></div>;
 }
 
 function buildStats(works: WorkPriorityRow[]) {
@@ -385,7 +276,7 @@ function priorityBadge(work: WorkPriorityRow, state = workState(work)) {
     return {
       label: "Payout blocked",
       detail: "Unpaid statement rows need master split clearance.",
-      className: "border-red-200 bg-red-50 text-red-700",
+      variant: "destructive" as const,
       icon: <CircleDollarSign className="h-3.5 w-3.5" />,
     };
   }
@@ -393,7 +284,7 @@ function priorityBadge(work: WorkPriorityRow, state = workState(work)) {
     return {
       label: "Released not cleared",
       detail: `${work.releasedTrackCount} released track${work.releasedTrackCount === 1 ? "" : "s"} still need rights fixed.`,
-      className: "border-amber-200 bg-amber-50 text-amber-700",
+      variant: "warning" as const,
       icon: <Disc3 className="h-3.5 w-3.5" />,
     };
   }
@@ -401,7 +292,7 @@ function priorityBadge(work: WorkPriorityRow, state = workState(work)) {
     return {
       label: "Unknown work",
       detail: "Needs identity cleanup before clearance is trustworthy.",
-      className: "border-blue-200 bg-blue-50 text-blue-700",
+      variant: "secondary" as const,
       icon: <FileQuestion className="h-3.5 w-3.5" />,
     };
   }
@@ -409,7 +300,7 @@ function priorityBadge(work: WorkPriorityRow, state = workState(work)) {
     return {
       label: "Missing splits",
       detail: "Publishing or master ownership has not been entered.",
-      className: "border-red-200 bg-red-50 text-red-700",
+      variant: "destructive" as const,
       icon: <AlertTriangle className="h-3.5 w-3.5" />,
     };
   }
@@ -417,7 +308,7 @@ function priorityBadge(work: WorkPriorityRow, state = workState(work)) {
     return {
       label: "Signature chase",
       detail: `${work.pendingRoleCount} split${work.pendingRoleCount === 1 ? "" : "s"} pending or unknown.`,
-      className: "border-amber-200 bg-amber-50 text-amber-700",
+      variant: "warning" as const,
       icon: <ShieldAlert className="h-3.5 w-3.5" />,
     };
   }
@@ -425,14 +316,14 @@ function priorityBadge(work: WorkPriorityRow, state = workState(work)) {
     return {
       label: "Cleared",
       detail: "Publishing and master are balanced and confirmed.",
-      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+      variant: "success" as const,
       icon: <BadgeCheck className="h-3.5 w-3.5" />,
     };
   }
   return {
     label: "Review",
     detail: "No urgent blocker, but clearance is not complete.",
-    className: "border-neutral-200 bg-neutral-50 text-neutral-700",
+    variant: "secondary" as const,
     icon: <ShieldAlert className="h-3.5 w-3.5" />,
   };
 }

@@ -336,7 +336,7 @@ async function scanSurface(page: Page, testInfo: TestInfo, path: string) {
   // Do not wait for network idle: the authenticated shell has health/worker activity by design.
   await expect(page.getByRole("main").first()).toBeVisible({ timeout: 30_000 });
   if (path.endsWith("?section=timeline")) {
-    await expect(page.getByRole("tab", { name: "Timeline", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("link", { name: "Timeline", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("region", { name: "Release schedule", exact: true })).toBeVisible();
   }
   await expectNoHorizontalPageOverflow(page);
@@ -417,8 +417,26 @@ test("release workspace fits before hydration", async ({ page }) => {
   await page.route("**/*", (route) => route.request().resourceType() === "script" ? route.abort() : route.continue());
   const releaseId = requiredFixture("E2E_RELEASE_ID", "Release layout requires a seeded release.");
   await page.goto(`/releases/${releaseId}?section=timeline`, { waitUntil: "load" });
-  await expect(page.getByText("Release workspace map", { exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Release sections" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Release Gate Single", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Timeline", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("region", { name: "Release schedule", exact: true })).toBeVisible();
   await expectNoHorizontalPageOverflow(page);
+});
+
+test("light initial theme preserves explicit system preference", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await login(page);
+  await page.evaluate(() => localStorage.removeItem("dark-mode"));
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+  await page.evaluate(() => localStorage.setItem("dark-mode", "system"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/dark/);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("dark-mode"))).toBe("system");
+  await page.evaluate(() => localStorage.setItem("dark-mode", "false"));
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
 });
 
 test("core-surfaces-light-dark-a11y", async ({ page }, testInfo) => {
@@ -456,6 +474,7 @@ test("release-blocker-to-exact-field", async ({ page }) => {
   await login(page);
   await page.goto(`/releases/${releaseId}`);
   await expect(page.getByRole("main")).toBeVisible();
+  await page.getByRole("button", { name: "Review checks", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Operations brief" })).toBeVisible({ timeout: 8_000 });
 
   const hasTrackBlocker = page.getByRole("button", { name: "Review tracks" }).first();
@@ -672,6 +691,7 @@ test("artist-readiness-to-exact-field", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/artists/${artistId}$`));
   await expect(page.getByRole("main")).toBeVisible();
 
+  await page.getByRole("button", { name: /Profile details and checks/ }).click();
   const readinessAction = page.getByRole("button", { name: /Edit .* Bio$/ }).first();
   await expect(readinessAction).toBeVisible({ timeout: 8_000 });
   await readinessAction.click();
@@ -746,6 +766,7 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
   const aiDraftRequests: Array<{ method: string; path: string }> = [];
   const publicationRequests: Array<{ method: string; path: string }> = [];
   let activeRevisionId = "";
+  let activeRevisionVersion = 0;
 
   await routeFixtureArtwork(page);
   page.on("request", (request) => {
@@ -780,7 +801,7 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
         context_snapshot: {
           scope: "radio_update",
           page_revision_id: activeRevisionId,
-          page_revision_version: 1,
+          page_revision_version: activeRevisionVersion,
           campaign_id: campaignId,
         },
         approval_hash: null,
@@ -793,6 +814,13 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
   });
 
   await login(page);
+  const editorResponse = await page.request.get(`/api/campaigns/${campaignId}/public-page`);
+  expect(editorResponse.ok()).toBe(true);
+  const editor = await editorResponse.json();
+  const reviewedRevision = editor.revisions.find((revision: { id: string }) => revision.id === editor.page.current_draft_revision_id);
+  expect(reviewedRevision.review_status).toBe("reviewed");
+  activeRevisionId = reviewedRevision.id;
+  activeRevisionVersion = reviewedRevision.version;
   await page.goto(`/campaigns/${campaignId}?tab=outreach`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("main").first()).toBeVisible({ timeout: 30_000 });
 
@@ -822,7 +850,7 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
   await expect(sequence).toContainText("Email reviewed");
   await expect(sequence).toContainText("Delivery preview");
 
-  await expect(page.getByText("Structured fields only · revision v1 · reviewed", { exact: true })).toBeVisible();
+  await expect(page.getByText(`Structured fields only · revision v${activeRevisionVersion} · reviewed`, { exact: true })).toBeVisible();
   await expect(page.getByText("Reviewed preview is available in this editor; it is not public.", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Authenticated preview · not public")).toBeVisible();
   await expect(page.getByText("Preview · not public · reviewed revision", { exact: true })).toBeVisible();
@@ -1354,6 +1382,18 @@ test("campaign-radio-delivery-preview-is-deduplicated-versioned-and-no-send", as
   });
 
   await login(page);
+  const [editorResponse, communicatorResponse] = await Promise.all([
+    page.request.get(`/api/campaigns/${campaignId}/public-page`),
+    page.request.get(`/api/campaigns/${campaignId}/communicator-prompt`),
+  ]);
+  expect(editorResponse.ok()).toBe(true);
+  expect(communicatorResponse.ok()).toBe(true);
+  const editor = await editorResponse.json();
+  const reviewedPage = editor.revisions.find((revision: { id: string }) => revision.id === editor.page.current_draft_revision_id);
+  expect(reviewedPage.review_status).toBe("reviewed");
+  const communicator = await communicatorResponse.json();
+  const reviewedEmail = communicator.radio_drafts.find((draft: { status: string; context_snapshot: { page_revision_id?: string } }) => draft.status === "approved" && draft.context_snapshot.page_revision_id === reviewedPage.id);
+  expect(reviewedEmail).toBeDefined();
   await page.goto(`/campaigns/${campaignId}?tab=channels`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("main").first()).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: "Saved audience targeting", exact: true })).toBeVisible();
@@ -1393,8 +1433,8 @@ test("campaign-radio-delivery-preview-is-deduplicated-versioned-and-no-send", as
     ready_count: 1,
     skipped_count: 2,
     deduped_count: 1,
-    reviewed_email: { version: 1 },
-    reviewed_page: { version: 1, status: "reviewed" },
+    reviewed_email: { id: reviewedEmail.id, version: reviewedEmail.version, approval_hash: reviewedEmail.approval_hash },
+    reviewed_page: { id: reviewedPage.id, version: reviewedPage.version, content_hash: reviewedPage.content_hash, status: "reviewed" },
     audience_counts: { included_stations: 2, excluded_stations: 1 },
   });
   expect(previewPayload.reviewed_email.approval_hash).toMatch(/^[0-9a-f]{64}$/);
@@ -1403,8 +1443,8 @@ test("campaign-radio-delivery-preview-is-deduplicated-versioned-and-no-send", as
   expect(previewPayload.excluded_stations).toContainEqual(expect.objectContaining({ name: "Release Gate FM", reason: "Focused outreach" }));
   expect(previewPayload.blockers).toContainEqual(expect.objectContaining({ code: "batch_compliance_unavailable" }));
 
-  await expect(page.getByText("Reviewed email:", { exact: true }).locator("..")).toContainText("version 1");
-  await expect(page.getByText("Reviewed page:", { exact: true }).locator("..")).toContainText("v1 · reviewed");
+  await expect(page.getByText("Reviewed email:", { exact: true }).locator("..")).toContainText(`version ${reviewedEmail.version}`);
+  await expect(page.getByText("Reviewed page:", { exact: true }).locator("..")).toContainText(`v${reviewedPage.version} · reviewed`);
   await expect(page.getByText("Audience counts:", { exact: true }).locator("..")).toContainText("2 included · 1 excluded");
   await expect(page.getByText("Preview hash:", { exact: true }).locator("..")).toContainText(previewPayload.preview_hash);
   await expect(page.getByText("Deduplicated:", { exact: true }).locator("..")).toContainText("1");

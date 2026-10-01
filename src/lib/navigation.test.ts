@@ -20,6 +20,7 @@ describe("app navigation manifest", () => {
     expect(NAV_ITEMS.find((item) => item.id === "forecast")?.parentId).toBe("analytics");
     expect(NAV_ITEMS.find((item) => item.id === "forecast")?.url)
       .toBe("/analytics?section=forecast");
+    for (const id of ["ops-tasks", "royalties"]) expect(NAV_ITEMS.find(item => item.id === id)?.section).toBe("operations");
     expect(ids.has("works")).toBe(true);
     expect(ids.has("catalog")).toBe(true);
     expect(NAV_ITEMS.find((item) => item.id === "projects")).toMatchObject({

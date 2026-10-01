@@ -4,6 +4,7 @@ import { useState } from "react";
 import { WorkForm, type Work } from "./WorkForm";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 export function WorkCreateDialog() {
   const [open, setOpen] = useState(false);
 
@@ -11,7 +12,6 @@ export function WorkCreateDialog() {
     return (
       <Button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/80 transition-colors"
       >
         + New Work
       </Button>
@@ -19,12 +19,12 @@ export function WorkCreateDialog() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setOpen(false)}>
-      <div className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold mb-4">New Work</h2>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" aria-describedby={undefined}>
+        <DialogTitle>New Work</DialogTitle>
         <WorkForm onClose={() => setOpen(false)} />
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -33,19 +33,18 @@ export function WorkEditButton({ work }: { work: Work & { id: string } }) {
 
   return (
     <>
-      <Button
+      <Button variant="outline"
         onClick={() => setOpen(true)}
-        className="text-xs px-2 py-1 rounded bg-muted hover:bg-accent transition-colors"
       >
         Edit
       </Button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setOpen(false)}>
-          <div className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold mb-4">Edit Work</h2>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" aria-describedby={undefined}>
+            <DialogTitle>Edit Work</DialogTitle>
             <WorkForm initial={work} onClose={() => setOpen(false)} />
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
@@ -79,32 +78,29 @@ export function WorkDeleteButton({ work }: { work: Work & { id: string } }) {
 
   return (
     <>
-      <Button
+      <Button variant="destructive"
         onClick={() => setConfirming(true)}
-        className="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 transition-colors"
       >
         Delete
       </Button>
       {confirming && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setConfirming(false)}>
-          <div className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-2">Delete Work?</h3>
+        <Dialog open={confirming} onOpenChange={setConfirming}>
+          <DialogContent aria-describedby={undefined}>
+            <DialogTitle>Delete Work?</DialogTitle>
             <p className="text-sm text-muted-foreground mb-4">
               This will remove <strong>{work.title}</strong>. Tracks linked to this work will be orphaned.
             </p>
-            {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
+            {error && <p className="text-sm text-destructive mb-3">{error}</p>}
             <div className="flex gap-2 justify-end">
-              <Button onClick={() => setConfirming(false)}
-                className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
+              <Button variant="ghost" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
-              <Button variant="ghost" onClick={doDelete} disabled={loading}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50">
+              <Button variant="destructive" onClick={doDelete} disabled={loading}>
                 {loading ? "Deleting..." : "Delete"}
               </Button>
             </div>
-          </div>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

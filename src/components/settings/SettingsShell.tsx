@@ -446,12 +446,12 @@ function ProfileSettings({ user, role }: { user: SettingsUser; role: MembershipR
 }
 
 function PreferenceSettings() {
-  const [theme, setTheme] = useState<ThemeMode>("system");
+  const [theme, setTheme] = useState<ThemeMode>("light");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const storedTheme = localStorage.getItem("dark-mode");
-    setTheme(storedTheme === null ? "system" : storedTheme === "true" ? "dark" : "light");
+    setTheme(storedTheme === "system" ? "system" : storedTheme === "true" ? "dark" : "light");
 
     const sidebarCookie = document.cookie
       .split("; ")
@@ -467,7 +467,7 @@ function PreferenceSettings() {
       (nextTheme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
     if (nextTheme === "system") {
-      localStorage.removeItem("dark-mode");
+      localStorage.setItem("dark-mode", "system");
     } else {
       localStorage.setItem("dark-mode", String(nextTheme === "dark"));
     }

@@ -5,9 +5,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   CircleAlert,
-  FileAudio,
-  ListFilter,
-  Music2,
   RefreshCw,
   Save,
   Upload,
@@ -15,11 +12,14 @@ import {
 import { uploadFileToStorage } from "../../lib/storage-client";
 import { TrackCreateDialog } from "./TrackCreateDialog";
 import { TrackDeleteButton, type Track } from "./TrackActionButtons";
-import { buildTrackReadinessChecks, isTrackReadinessComplete } from "./track-readiness-ui";
+import { buildTrackReadinessChecks } from "./track-readiness-ui";
 
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 interface ReleaseDetail {
   id: string;
   title: string;
@@ -61,7 +61,6 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   const missingAudioCount = tracks.filter((track) => !track.audio_url).length;
   const needsWorkCount = tracks.length - readyCount;
   const missingIsrcCount = tracks.filter((track) => !track.isrc).length;
-  const allTracksReady = isTrackReadinessComplete(readyCount, tracks.length);
   const avgClearance = tracks.length
     ? Math.round((tracks.reduce((sum, track) => sum + Number(track.clearance_progress ?? 0), 0) / tracks.length) * 100)
     : 0;
@@ -98,13 +97,13 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   useEffect(() => {
     if (!selectedTrack || !pendingTrackFocus) return;
     const timeout = window.setTimeout(() => {
+      setPendingTrackFocus(null);
       const fieldId = trackFocusId(pendingTrackFocus);
       const element = document.getElementById(fieldId);
       if (!element || !(element instanceof HTMLElement)) return;
       element.scrollIntoView({ behavior: "smooth", block: "start" });
       element.focus();
     }, 0);
-    setPendingTrackFocus(null);
     return () => window.clearTimeout(timeout);
   }, [selectedTrack?.id, pendingTrackFocus]);
 
@@ -123,7 +122,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
       <header className="border-b border-border pb-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -148,52 +147,39 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
             </div>
           )}
         </div>
-        {isrcAssignmentError && <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{isrcAssignmentError}</p>}
+        {isrcAssignmentError && <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{isrcAssignmentError}</p>}
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0">
-            <p className="text-sm text-muted-foreground">
-              {release.artist_name || "No artist"} · {release.format || "No format"} · {release.release_date ? formatDate(release.release_date) : "No date"}
-            </p>
-            <h1 className="mt-1 truncate text-4xl font-semibold tracking-tight">{release.title} tracks</h1>
-          </div>
-          <div className="rounded-lg border border-border p-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Track readiness</p>
-                <p className="mt-1 text-2xl font-semibold tracking-tight">{readyCount}/{tracks.length}</p>
-              </div>
-              {allTracksReady ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <CircleAlert className="h-5 w-5 text-amber-700" />}
-            </div>
-            <div className="mt-3 h-2 rounded-full bg-muted">
-              <div className="h-full rounded-full bg-neutral-900" style={{ width: `${tracks.length ? (readyCount / tracks.length) * 100 : 0}%` }} />
-            </div>
-          </div>
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">
+            {release.artist_name || "No artist"} · {release.format || "No format"} · {release.release_date ? formatDate(release.release_date) : "No date"}
+          </p>
+          <h1 className="mt-1 break-words text-2xl font-semibold tracking-tight sm:text-3xl">{release.title}</h1>
+          <p className="mt-3 text-sm text-muted-foreground">{tracks.length} tracks · {readyCount} ready{needsWorkCount > 0 ? ` · ${needsWorkCount} need attention` : ""}</p>
         </div>
+        <Accordion className="mt-2">
+          <AccordionItem value="release-checks">
+            <AccordionTrigger headingLevel={2} className="w-fit gap-3 text-muted-foreground">Release checks</AccordionTrigger>
+            <AccordionContent>
+              <dl className="flex flex-wrap gap-x-8 gap-y-3 text-sm">
+                <div><dt className="text-muted-foreground">Missing audio</dt><dd>{missingAudioCount} tracks</dd></div>
+                <div><dt className="text-muted-foreground">ISRCs assigned</dt><dd>{tracks.length - missingIsrcCount} of {tracks.length}</dd></div>
+                <div><dt className="text-muted-foreground">Average clearance</dt><dd>{avgClearance}%</dd></div>
+              </dl>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-5">
-        <Metric label="Tracks" value={String(tracks.length)} detail="on this release" />
-        <Metric label="Needs work" value={String(needsWorkCount)} detail="open fixes" tone={needsWorkCount ? "warn" : "ok"} />
-        <Metric label="Missing audio" value={String(missingAudioCount)} detail="files or links" tone={missingAudioCount ? "warn" : "ok"} />
-        <Metric label="ISRCs" value={`${tracks.length - missingIsrcCount}/${tracks.length}`} detail="assigned to recordings" tone={missingIsrcCount ? "warn" : "ok"} />
-        <Metric label="Clearance" value={`${avgClearance}%`} detail="average progress" />
-      </section>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <main className="min-w-0 rounded-lg border border-border bg-background">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Track queue</h2>
-              <p className="mt-1 text-xs text-muted-foreground">Select a track to edit metadata, audio, work link, and readiness blockers.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <ListFilter className="h-4 w-4 text-muted-foreground" />
-              <FilterButton active={filter === "all"} onClick={() => setFilter("all")}>All</FilterButton>
-              <FilterButton active={filter === "needs-work"} onClick={() => setFilter("needs-work")}>Needs work</FilterButton>
-              <FilterButton active={filter === "missing-audio"} onClick={() => setFilter("missing-audio")}>No audio</FilterButton>
-              <FilterButton active={filter === "ready"} onClick={() => setFilter("ready")}>Ready</FilterButton>
-            </div>
+      <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
+        <section className="min-w-0" aria-label="Tracks">
+          <div className="mb-4 space-y-3">
+            <h2 className="text-lg font-semibold">Tracks</h2>
+            <ToggleGroup aria-label="Filter tracks" value={[filter]} onValueChange={(values) => { if (values[0]) setFilter(values[0] as FilterKey); }} size="sm" className="max-w-full flex-wrap">
+              <ToggleGroupItem value="all">All</ToggleGroupItem>
+              <ToggleGroupItem value="needs-work">Needs work</ToggleGroupItem>
+              <ToggleGroupItem value="missing-audio">No audio</ToggleGroupItem>
+              <ToggleGroupItem value="ready">Ready</ToggleGroupItem>
+            </ToggleGroup>
           </div>
 
           <TrackTable
@@ -201,9 +187,9 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
             selectedId={selectedTrack?.id ?? ""}
             onSelect={setSelectedId}
           />
-        </main>
+        </section>
 
-        <aside className="xl:sticky xl:top-4 xl:self-start">
+        <aside aria-label="Selected track editor" className="min-w-0 border-t border-border pt-6 lg:sticky lg:top-4 lg:self-start lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
           {selectedTrack && canMutate ? (
             <TrackInspector key={selectedTrack.id} track={selectedTrack} releaseId={release.id} works={works} />
           ) : selectedTrack ? (
@@ -237,51 +223,32 @@ function TrackTable({
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-[44px_minmax(0,1fr)_160px_132px] border-b border-border bg-muted/35 px-4 py-2 text-xs font-medium uppercase tracking-normal text-muted-foreground max-md:hidden">
-        <div>No.</div>
-        <div>Track</div>
-        <div>Essentials</div>
-        <div>Readiness</div>
-      </div>
-      <div className="divide-y divide-border">
+    <div className="divide-y divide-border border-y border-border">
         {tracks.map((track) => {
           const selected = track.id === selectedId;
-          const clearance = Math.round(Number(track.clearance_progress ?? 0) * 100);
           return (
             <Button
               key={track.id}
+              variant="ghost"
               type="button"
               onClick={() => onSelect(track.id)}
-              className={`grid w-full gap-3 px-4 py-3 text-left outline-none transition focus:ring-0 focus-visible:ring-1 focus-visible:ring-neutral-300 md:grid-cols-[44px_minmax(0,1fr)_160px_132px] md:items-center ${selected ? "border-l-2 border-neutral-900 bg-muted/55 pl-3.5" : "border-l-2 border-transparent hover:bg-muted/30"}`}
+              aria-pressed={selected}
+              className={`grid h-auto min-h-16 w-full grid-cols-[24px_minmax(0,1fr)] items-center gap-3 rounded-none px-2 py-4 text-left whitespace-normal text-foreground ${selected ? "bg-accent text-accent-foreground" : ""}`}
             >
               <div className="text-sm font-medium text-muted-foreground">{track.position ?? "-"}</div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-semibold">{track.title}</p>
+                  <p className="break-words text-sm font-medium">{track.title}</p>
                   {track.version && track.version !== "Main" && <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">{track.version}</span>}
                 </div>
-                {track.track_missing && <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{track.track_missing}</p>}
-              </div>
-              <div className="grid gap-1.5 text-xs md:text-sm">
-                <Signal selected={selected} ok={Boolean(track.audio_url)} icon={<FileAudio className="h-4 w-4" />} label={track.audio_url ? "Audio linked" : "No audio"} />
-                <Signal selected={selected} ok={Boolean(track.isrc)} icon={<Music2 className="h-4 w-4" />} label={track.isrc ? "ISRC linked" : "No ISRC"} />
-              </div>
-              <div>
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="text-xs tabular-nums text-muted-foreground">{clearance}%</span>
-                  <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${track.track_ready ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}>
-                    {track.track_ready ? "Ready" : "Needs work"}
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-neutral-900" style={{ width: `${clearance}%` }} />
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                  <Badge variant="ghost" className="h-auto px-0 text-xs font-normal">{track.track_ready ? "Ready" : "Needs work"}</Badge>
+                  {track.track_missing && <span className={selected ? "text-accent-foreground" : "text-muted-foreground"}>{track.track_missing}</span>}
                 </div>
               </div>
             </Button>
           );
         })}
-      </div>
     </div>
   );
 }
@@ -354,27 +321,31 @@ function TrackInspector({
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-lg border border-border bg-background">
-      <div className="border-b border-border p-4">
-        <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">Fix selected track</p>
-        <h2 className="mt-1 line-clamp-2 text-xl font-semibold tracking-tight">{track.title}</h2>
+    <form onSubmit={onSubmit} className="space-y-5">
+      <div>
+        <h2 className="break-words text-xl font-semibold tracking-tight">{track.title}</h2>
         {track.track_missing && <p className="mt-2 text-sm text-muted-foreground">{track.track_missing}</p>}
       </div>
 
-      <div className="space-y-4 p-4">
-        <div className="grid gap-2">
-          {readinessChecks.map((check) => (
-            <div key={check.label} className="flex items-start gap-3 rounded-lg border border-border p-3">
-              <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${check.state === "complete" ? "bg-emerald-600 text-white" : check.state === "not-applicable" ? "bg-muted text-muted-foreground" : "bg-amber-100 text-amber-800"}`}>
-                {check.state === "complete" ? <CheckCircle2 className="h-3.5 w-3.5" /> : check.state === "not-applicable" ? <span className="text-xs font-semibold">—</span> : <CircleAlert className="h-3.5 w-3.5" />}
-              </span>
-              <span>
-                <span className="block text-sm font-medium text-foreground">{check.label}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">{check.detail}</span>
-              </span>
-            </div>
-          ))}
-        </div>
+      <div className="space-y-4">
+        <Accordion>
+          <AccordionItem value="track-checks">
+            <AccordionTrigger>Readiness checks</AccordionTrigger>
+            <AccordionContent className="space-y-3">
+              {readinessChecks.map((check) => (
+                <div key={check.label} className="flex items-start gap-3">
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${check.state === "complete" ? "bg-success-foreground text-background" : check.state === "not-applicable" ? "bg-muted text-muted-foreground" : "bg-warning text-warning-foreground"}`}>
+                    {check.state === "complete" ? <CheckCircle2 className="h-3.5 w-3.5" /> : check.state === "not-applicable" ? <span className="text-xs font-semibold">—</span> : <CircleAlert className="h-3.5 w-3.5" />}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-medium text-foreground">{check.label}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{check.detail}</span>
+                  </span>
+                </div>
+              ))}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         <div className="grid grid-cols-[86px_minmax(0,1fr)] gap-3">
           <Field label="No.">
@@ -435,14 +406,14 @@ function TrackInspector({
           </NativeSelect>
         </Field>
 
-        {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
         <TrackDeleteButton track={track} />
         <div className="flex items-center gap-3">
           <p className="text-xs text-muted-foreground max-sm:hidden">Saving refreshes readiness.</p>
-          <Button variant="ghost" type="submit" disabled={loading} className="inline-flex h-9 items-center gap-2 rounded-md bg-neutral-900 px-3 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50">
+          <Button type="submit" disabled={loading}>
             <Save className="h-4 w-4" />
             {loading ? "Saving..." : "Save track"}
           </Button>
@@ -452,43 +423,12 @@ function TrackInspector({
   );
 }
 
-function Metric({ label, value, detail, tone }: { label: string; value: string; detail: string; tone?: "ok" | "warn" }) {
-  return (
-    <div className="rounded-lg border border-border bg-background p-4">
-      <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">{label}</p>
-      <p className={`mt-2 text-2xl font-semibold tracking-tight ${tone === "ok" ? "text-emerald-700" : tone === "warn" ? "text-amber-800" : "text-foreground"}`}>{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-    </div>
-  );
-}
-
-function FilterButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
-  return (
-    <Button
-      type="button"
-      onClick={onClick}
-      className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition ${active ? "bg-neutral-900 text-white" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-    >
-      {children}
-    </Button>
-  );
-}
-
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
     </label>
-  );
-}
-
-function Signal({ ok, selected, icon, label }: { ok: boolean; selected: boolean; icon: ReactNode; label: string }) {
-  return (
-    <span className={`inline-flex min-w-0 items-center gap-1.5 ${selected ? "font-medium" : ""} ${ok ? "text-emerald-700" : "text-muted-foreground"}`}>
-      {icon}
-      <span className="truncate">{label}</span>
-    </span>
   );
 }
 

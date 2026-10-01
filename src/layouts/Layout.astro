@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import HomeScreenHead from "../components/HomeScreenHead.astro";
 ---
 
 <!DOCTYPE html>
@@ -7,6 +8,7 @@ import "../styles/global.css";
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <HomeScreenHead />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -17,7 +19,7 @@ import "../styles/global.css";
         const stored = localStorage.getItem("dark-mode");
         const dark =
           stored === "true" ||
-          (stored === null && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          (stored === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
         document.documentElement.classList.toggle("dark", dark);
       })();

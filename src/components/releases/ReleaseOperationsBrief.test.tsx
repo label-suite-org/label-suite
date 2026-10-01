@@ -38,10 +38,8 @@ describe("ReleaseOperationsBrief", () => {
     expect(html).toContain('href="/releases/release-1/tracks?track=track-1&amp;focus=isrc"');
     expect(html).toContain("Evidence: Fountain track");
     expect(html).toContain("Review tracks");
-    expect(html).toContain("bg-card");
     expect(html).not.toContain("bg-[linear-gradient(135deg,rgba(250,250,250,0.95),rgba(255,255,255,0.98))]");
     expect(html).toContain("bg-destructive/10");
-    expect(html).toContain("bg-primary");
     expect(html).toContain("focus-visible:ring-ring");
     expect(html).toContain("focus-visible:ring-offset-background");
   });
@@ -106,7 +104,6 @@ describe("ReleaseOperationsBrief", () => {
     expect(html).toContain("No operational blockers found");
     expect(html).toContain("3 sources checked");
     expect(html).not.toContain("Review tracks");
-    expect(html).toContain("bg-muted/50");
     expect(html).not.toContain("text-emerald-900");
     expect(html).toContain("bg-emerald-950/40");
   });

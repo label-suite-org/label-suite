@@ -25,11 +25,11 @@ const TOOLTIP_STYLE = {
 } as const;
 
 interface Props {
-  section: ReleaseSisenseSection;
+  section: ReleaseSisenseSection | null;
 }
 
 export default function ReleaseSisensePanel({ section }: Props) {
-  const { weeklyStreams, topCountries, sourceMix, superfanReach } = section;
+  const { weeklyStreams, topCountries, sourceMix, superfanReach } = section ?? { weeklyStreams: null, topCountries: null, sourceMix: null, superfanReach: null };
   return (
     <section className="space-y-4">
       <div>
@@ -39,14 +39,14 @@ export default function ReleaseSisensePanel({ section }: Props) {
         </p>
       </div>
 
-      {weeklyStreams && <WeeklyStreamsCard data={weeklyStreams} />}
+      {weeklyStreams ? <WeeklyStreamsCard data={weeklyStreams} /> : <p className="text-sm text-muted-foreground">Weekly streams history is unavailable.</p>}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {topCountries && <TopCountriesCard data={topCountries} />}
-        {superfanReach && <SuperfanReachCard data={superfanReach} />}
+        {topCountries ? <TopCountriesCard data={topCountries} /> : <p className="text-sm text-muted-foreground">Country history is unavailable.</p>}
+        {superfanReach ? <SuperfanReachCard data={superfanReach} /> : <p className="text-sm text-muted-foreground">Superfan history is unavailable.</p>}
       </div>
 
-      {sourceMix && <SourceMixCard data={sourceMix} />}
+      {sourceMix ? <SourceMixCard data={sourceMix} /> : <p className="text-sm text-muted-foreground">Spotify and Apple source history is unavailable.</p>}
     </section>
   );
 }
@@ -55,11 +55,11 @@ function WeeklyStreamsCard({ data }: { data: NonNullable<ReleaseSisenseSection["
   return (
     <Card
       title="Streams per week"
-      windowLabel={`Last 12 weeks · data covers ${windowText(data.window)} · Spotify and Apple plotted separately, never summed`}
+      windowLabel={`Last 12 weeks · data covers ${windowText(data.window)} · Spotify and Apple plotted separately, never summed · import freshness unavailable`}
     >
-      <div className="h-64 w-full" style={{ minWidth: 1, minHeight: 1 }}>
+      <div aria-hidden="true" className="h-64 w-full" style={{ minWidth: 1, minHeight: 1 }}>
         <ResponsiveContainer width="100%" height="100%" debounce={50}>
-          <LineChart data={data.points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
+          <LineChart accessibilityLayer={false} data={data.points} margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
             <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
             <XAxis
               dataKey="weekStart"
@@ -98,6 +98,14 @@ function WeeklyStreamsCard({ data }: { data: NonNullable<ReleaseSisenseSection["
           </LineChart>
         </ResponsiveContainer>
       </div>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer">View weekly stream values</summary>
+        <div className="overflow-x-auto"><table className="mt-2 w-full text-left">
+          <caption className="text-left">Weekly streams · {windowText(data.window)}</caption>
+          <thead><tr><th scope="col">Week</th><th scope="col">Spotify</th><th scope="col">Apple</th></tr></thead>
+          <tbody>{data.points.map(point => <tr key={point.weekStart}><th scope="row">{formatAnalyticsDate(point.weekStart)}</th><td>{point.spotifyStreams === null ? "Unavailable" : formatAnalyticsNumber(point.spotifyStreams)}</td><td>{point.appleStreams === null ? "Unavailable" : formatAnalyticsNumber(point.appleStreams)}</td></tr>)}</tbody>
+        </table></div>
+      </details>
     </Card>
   );
 }
@@ -108,9 +116,9 @@ function TopCountriesCard({ data }: { data: NonNullable<ReleaseSisenseSection["t
       title="Top 5 countries"
       windowLabel={`Share of ${formatAnalyticsNumber(data.totalStreams)} window-total streams (cumulative window, not all-time) · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
     >
-      <div className="h-56 w-full" style={{ minWidth: 1, minHeight: 1 }}>
+      <div aria-hidden="true" className="h-56 w-full" style={{ minWidth: 1, minHeight: 1 }}>
         <ResponsiveContainer width="100%" height="100%" debounce={50}>
-          <BarChart data={data.rows} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }}>
+          <BarChart accessibilityLayer={false} data={data.rows} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }}>
             <XAxis type="number" hide />
             <YAxis
               type="category"
@@ -135,6 +143,14 @@ function TopCountriesCard({ data }: { data: NonNullable<ReleaseSisenseSection["t
           </BarChart>
         </ResponsiveContainer>
       </div>
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer">View country stream values</summary>
+        <div className="overflow-x-auto"><table className="mt-2 w-full text-left">
+          <caption className="text-left">Country streams · synced {data.asOf ? formatAnalyticsDate(data.asOf) : "unknown"}</caption>
+          <thead><tr><th scope="col">Country</th><th scope="col">Streams</th><th scope="col">Share</th></tr></thead>
+          <tbody>{data.rows.map(row => <tr key={row.country}><th scope="row">{row.country}</th><td>{formatAnalyticsNumber(row.streams)}</td><td>{row.sharePct.toFixed(1)}%</td></tr>)}</tbody>
+        </table></div>
+      </details>
     </Card>
   );
 }
@@ -162,7 +178,7 @@ function SourceMixCard({ data }: { data: NonNullable<ReleaseSisenseSection["sour
   return (
     <Card
       title="Source mix"
-      windowLabel="How streams arrived (playlist, search, library, algorithmic …) · Spotify and Apple listed separately, never summed"
+      windowLabel="How streams arrived (playlist, search, library, algorithmic …) · Spotify and Apple listed separately, never summed · import freshness unavailable"
     >
       <div className="grid gap-6 md:grid-cols-2">
         <SourceShareList
@@ -189,7 +205,7 @@ function SourceShareList({
   rows: SisenseSourceShareRow[];
   barColor: string;
 }) {
-  if (!rows.length) return null;
+  if (!rows.length) return <p className="text-sm text-muted-foreground">{title} · no imported source rows.</p>;
   return (
     <div>
       <p className="text-sm font-medium mb-3">{title}</p>

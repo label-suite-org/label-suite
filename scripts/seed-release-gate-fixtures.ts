@@ -11,6 +11,7 @@ import {
 } from "../src/db/schema";
 import {
   getCampaignPublicPageEditor,
+  getCampaignPublicPageRevisionPreview,
   publishCampaignPublicPageRevision,
   reviewCampaignPublicPageRevision,
   saveCampaignPublicPageDraft,
@@ -23,6 +24,7 @@ import {
 import { deriveCampaignDocument, legacyTextToCampaignDocument } from "../src/lib/campaign-rich-text";
 import { assertDisposableReleaseGateTarget } from "./release-gate-fixture-safety";
 import { configuredReleaseGateFixtureWorld, releaseGateFixtureManifest } from "./release-gate-fixture-world";
+import { ConflictError } from "../src/server/errors";
 const releaseGateFixtureWorld = configuredReleaseGateFixtureWorld();
 
 const { orgId: ORG_ID, foreignTenant: FOREIGN_TENANT_FIXTURE, ids: FIXTURE_IDS, relationships: FIXTURE_RELATIONSHIPS, radio } = releaseGateFixtureWorld;
@@ -614,7 +616,15 @@ async function ensureReviewedRadioPage(input: {
       releaseNote.hash,
     )
   ));
-  if (currentReviewed && editor.page?.slug === input.slug) return currentReviewed;
+  if (currentReviewed && editor.page?.slug === input.slug) {
+    try {
+      await getCampaignPublicPageRevisionPreview(ORG_ID, input.campaignId, currentReviewed.id);
+      return currentReviewed;
+    } catch (error) {
+      if (!(error instanceof ConflictError)) throw error;
+      // A prior correction changed the fixture sources; create a fresh reviewed draft.
+    }
+  }
 
   const saved = await saveCampaignPublicPageDraft(ORG_ID, input.campaignId, {
     slug: input.slug,
