@@ -65,6 +65,17 @@ describe("ReleaseWorkspace", () => {
       expect(host.contains(input)).toBe(false);
       expect(document.activeElement).toBe(host.querySelector("#release-correct-upc"));
       expect(window.location.search).toContain("returnTo=today");
+      await act(async () => {
+        window.history.replaceState(null, "", "/releases/release-1?section=details&focus=date&returnTo=today");
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
+      expect(document.activeElement).toBe(host.querySelector("#release-date"));
+      await act(async () => {
+        [...host.querySelectorAll("button")].find(button => button.textContent === "Close correction")!.click();
+      });
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
+      expect(document.activeElement).toBe(host.querySelector("#release-correct-date"));
     } finally {
       act(() => root.unmount()); host.remove(); confirm.mockRestore(); vi.unstubAllGlobals();
       if (scroll) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", scroll);

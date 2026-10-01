@@ -257,6 +257,7 @@ export function ReleaseWorkspace({
         return;
       }
       currentLocation.current = window.location.href;
+      correctionTrigger.current = null;
       setRouteSearch(window.location.search);
       setFromToday(new URLSearchParams(window.location.search).get("returnTo") === "today");
       const route = routeFromLocation(window.location.search, window.location.hash);
@@ -632,7 +633,7 @@ export function ReleaseWorkspace({
             fallbackValue={({ cover: release.cover_art_url, upc: release.upc_ean, date: release.release_date, format: release.format })[activeFix as ReleaseOverviewFixFocus]}
             inputId={releaseFocusId(activeFix as ReleaseOverviewFixFocus)} initial={readiness} canManage={canManage}
             onSnapshot={acceptReadiness} onDirtyChange={onCorrectionDirty}
-            onClose={() => { if (selectSection(activeSection)) requestAnimationFrame(() => (correctionTrigger.current?.isConnected ? correctionTrigger.current : document.getElementById("release-tab-overview"))?.focus()); }} />
+            onClose={() => { if (selectSection(activeSection)) requestAnimationFrame(() => (correctionTrigger.current?.isConnected ? correctionTrigger.current : document.getElementById(activeSection === "details" ? `release-correct-${activeFix}` : "release-tab-overview"))?.focus()); }} />
         </section>
       )}
 
