@@ -36,7 +36,7 @@ import { buildReleaseOperationsBrief, type ReleaseBriefActionKey } from "../../s
 
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -113,6 +113,7 @@ interface SamplyProjectOption {
 }
 
 interface Props {
+  initialSearch?: string;
   readiness?: ReleaseReadinessSnapshot | null;
   release: ReleaseDetail;
   tracks: TrackRow[];
@@ -198,6 +199,7 @@ const RELEASE_SECTIONS: Array<{ key: ReleaseSection; label: string; description:
 ];
 
 export function ReleaseWorkspace({
+  initialSearch = "",
   release: initialRelease,
   readiness: initialReadiness = null,
   tracks,
@@ -228,7 +230,7 @@ export function ReleaseWorkspace({
     setRelease(current => ({ ...current, ...snapshot.release, release_ready: snapshot.readiness.isReady }));
   };
   const [activeFix, setActiveFix] = useState<FixKey | null>(null);
-  const [activeSection, setActiveSection] = useState<ReleaseSection>("overview");
+  const [activeSection, setActiveSection] = useState<ReleaseSection>(() => routeFromLocation(initialSearch, "").section);
   const [pendingSectionFocus, setPendingSectionFocus] = useState<ReleaseOverviewFixFocus | null>(null);
   const [pitchOpen, setPitchOpen] = useState(false);
   const [samplyReview, setSamplyReview] = useState<SamplyReviewState | null>(initialSamplyReview);
@@ -534,18 +536,21 @@ export function ReleaseWorkspace({
 
       <nav className="sticky top-0 z-20 flex items-center gap-1 overflow-x-auto border-b border-border bg-background py-1" aria-label="Release sections">
           {RELEASE_SECTIONS.slice(0, 4).map((section) => (
-            <Button
+            <a
               key={section.key}
               id={`release-tab-${section.key}`}
-              variant="ghost"
-              type="button"
+              href={`/releases/${release.id}?section=${section.key}#${sectionHash(section.key)}`}
               aria-current={activeSection === section.key ? "page" : undefined}
               title={section.description}
-              onClick={() => selectSection(section.key)}
-              className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm font-medium transition ${(section.key === "timeline" || section.key === "campaigns") && activeSection !== section.key ? "hidden sm:inline-flex" : ""} ${activeSection === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={(event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                selectSection(section.key);
+              }}
+              className={`${buttonVariants({ variant: "ghost" })} h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm font-medium transition ${(section.key === "timeline" || section.key === "campaigns") && activeSection !== section.key ? "hidden sm:inline-flex" : ""} ${activeSection === section.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               {section.label}
-            </Button>
+            </a>
           ))}
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" type="button" className={`h-10 shrink-0 rounded-none border-0 border-b-2 px-3 text-sm ${activeSection !== "overview" && activeSection !== "tracks" ? "border-primary text-primary" : "border-transparent text-muted-foreground"} ${RELEASE_SECTIONS.slice(4).some((section) => section.key === activeSection) ? "sm:border-primary sm:text-primary" : "sm:border-transparent sm:text-muted-foreground"}`} aria-label="More release sections" />}>
@@ -1024,7 +1029,7 @@ function SamplyReviewPanel({
       </div>
 
       {!audioVersionCount && (
-        <p className="rounded-md border border-warning-foreground/25 bg-warning0/10 p-3 text-sm text-warning-foreground dark:text-warning-foreground">
+        <p className="rounded-md border border-warning-foreground/25 bg-warning/10 p-3 text-sm text-warning-foreground dark:text-warning-foreground">
           The project is linked, but Label Suite has not pulled the Samply file inventory yet. Run sync to ingest cover art, tracklist, and stable audio links.
         </p>
       )}

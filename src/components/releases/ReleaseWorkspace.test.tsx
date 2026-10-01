@@ -7,6 +7,15 @@ import { ReleaseDataPanel, ReleaseWorkspace } from "./ReleaseWorkspace";
 import { buildReleaseCockpit } from "../../server/analytics-command-center-core";
 
 describe("ReleaseWorkspace", () => {
+  it("renders section deep links before hydration", () => {
+    const html = renderToStaticMarkup(<ReleaseWorkspace
+      initialSearch="?section=timeline"
+      release={{ id: "release-1", title: "Fixture" }}
+      tracks={[]} budgetItems={[]} pitches={[]} works={[]} artists={[]} cockpit={null} samplyReview={null} canManage={true} timeline={null} parentReleases={[]} campaigns={[]} documents={[]} mediaAssets={[]}
+    />);
+    expect(html).toMatch(/<a[^>]*href="[^"]*section=timeline[^"]*"[^>]*aria-current="page"/);
+    expect(html).not.toContain("Review checks");
+  });
   it("names the actual imported period and withholds stale release totals", () => {
     const cockpit = buildReleaseCockpit({ releaseId: "fixture", releaseTitle: "Fixture", artistName: null, format: null, releaseDate: null, trackCount: 0,
       dailySources: [{ date: "2026-09-05", platform: "spotify", source: "fixture", streams: 12 }], tracks: [], cities: [], playlists: [], shazams: [] });

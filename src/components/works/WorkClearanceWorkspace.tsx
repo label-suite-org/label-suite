@@ -1165,8 +1165,8 @@ function saveButtonTitle(dirty: boolean, isDraft?: boolean, saveState?: SaveStat
 }
 
 function activityDotClass(tone: ActivityItem["tone"]) {
-  if (tone === "green") return "bg-success0";
-  if (tone === "amber") return "bg-warning0";
+  if (tone === "green") return "bg-success";
+  if (tone === "amber") return "bg-warning";
   return "bg-muted-foreground";
 }
 
@@ -1267,7 +1267,7 @@ function addOptionalScopeAction(fixes: NextFix[], summary: ScopeSummary, action:
 
 function statusSelectClass(status: string) {
   if (status === "Signed") return "font-semibold text-success-foreground";
-  if (status === "Confirmed") return "font-semibold text-sky-700";
+  if (status === "Confirmed") return "font-semibold text-accent-foreground";
   if (status === "Pending") return "font-semibold text-warning-foreground";
   return "font-semibold text-muted-foreground";
 }

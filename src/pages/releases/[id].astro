@@ -48,6 +48,7 @@ const pitchRowsForClient = pitchRows.map((pitch) => ({
   {!release ? <p class="text-muted-foreground">Release not found.</p> : (
     <ReleaseWorkspace
       client:load
+      initialSearch={Astro.url.search}
       release={release}
       readiness={readiness}
       tracks={trackRows}
