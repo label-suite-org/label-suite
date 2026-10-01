@@ -20,6 +20,8 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import ReleaseSisensePanel from "../analytics/ReleaseSisensePanel";
+import type { ReleaseSisenseSection } from "../../server/analytics";
 import type { ReleaseCockpit } from "../../server/analytics-command-center-core";
 import { resolveFileUrl } from "../../lib/storage-client";
 import { BudgetBucketSummary, type BudgetItemWithCategory } from "../budget/BudgetBucketSummary";
@@ -122,6 +124,7 @@ interface Props {
   works: Array<{ id: string; title: string; isrc: string | null }>;
   artists: Array<{ id: string; name: string }>;
   cockpit: ReleaseCockpit | null;
+  sisense?: ReleaseSisenseSection | null;
   samplyReview: SamplyReviewState | null;
   canManage: boolean;
   timeline: ReleaseTimelineData | null;
@@ -208,6 +211,7 @@ export function ReleaseWorkspace({
   works,
   artists,
   cockpit,
+  sisense = null,
   samplyReview: initialSamplyReview,
   canManage,
   timeline,
@@ -684,6 +688,10 @@ export function ReleaseWorkspace({
         {activeSection === "analytics" && <div id="performance-data" className="scroll-mt-4">
           <Panel title="Performance data" action={<span className="text-xs text-muted-foreground">{cockpit?.dataWindow.from ? `${formatDate(cockpit.dataWindow.from)} to ${cockpit.dataWindow.to ? formatDate(cockpit.dataWindow.to) : "now"}` : "No scoped window"}</span>}>
             <ReleaseDataPanel cockpit={cockpit} hasScopedAnalytics={hasScopedAnalytics} />
+            <div className="mt-6 space-y-3">
+              <p className="text-sm text-muted-foreground">Imported reporting history. Each chart states its own data window; historical figures do not establish current release totals.</p>
+              <ReleaseSisensePanel section={sisense} />
+            </div>
           </Panel>
         </div>}
       </section>

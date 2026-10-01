@@ -3,6 +3,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import ReleaseSisensePanel from "../analytics/ReleaseSisensePanel";
 import { ReleaseDataPanel, ReleaseWorkspace } from "./ReleaseWorkspace";
 import { buildReleaseCockpit } from "../../server/analytics-command-center-core";
 
@@ -26,6 +27,31 @@ describe("ReleaseWorkspace", () => {
     expect(html).toContain("Source data is stale");
     expect(html).toContain("2026-09-05");
     expect(html).not.toContain("Period streams");
+  });
+  it("keeps imported release history visible without presenting it as current totals", () => {
+    const html = renderToStaticMarkup(<ReleaseWorkspace
+      initialSearch="?section=analytics"
+      release={{ id: "release-1", title: "Fixture" }}
+      tracks={[]} budgetItems={[]} pitches={[]} works={[]} artists={[]} cockpit={null} samplyReview={null} canManage={false} timeline={null} parentReleases={[]} campaigns={[]} documents={[]} mediaAssets={[]}
+      sisense={{ weeklyStreams: { points: [{ weekStart: "2026-09-01", spotifyStreams: 12, appleStreams: null }], window: { from: "2026-09-01", to: "2026-09-07" } }, topCountries: { rows: [{ country: "Denmark", streams: 12, sharePct: 100 }], totalStreams: 12, asOf: "2026-09-07" }, sourceMix: { spotify: [], apple: [], spotifyWindow: { from: "2026-09-01", to: "2026-09-07" }, appleWindow: { from: "2026-09-01", to: "2026-09-07" } }, superfanReach: { superfans: 3, cityCount: 1, asOf: "2026-09-07" } }}
+    />);
+    expect(html).toContain("historical figures do not establish current release totals");
+    for (const title of ["Streams per week", "Top 5 countries", "Source mix", "Superfan reach"]) expect(html).toContain(title);
+    expect(html).toContain("Spotify and Apple plotted separately, never summed");
+    expect(html).toContain("No trustworthy release-level stream data yet");
+    expect(html).not.toContain("Period streams");
+    expect(html).toContain("<table");
+    expect(html).toContain("Unavailable</td>");
+    expect(html).toContain("Denmark</th><td>12</td><td>100.0%");
+    expect(html).toContain("import freshness unavailable");
+  });
+  it("explains absent reporting history and missing source platforms", () => {
+    const empty = renderToStaticMarkup(<ReleaseSisensePanel section={null} />);
+    for (const message of ["Weekly streams history is unavailable", "Country history is unavailable", "Superfan history is unavailable", "Spotify and Apple source history is unavailable"]) expect(empty).toContain(message);
+    const partial = renderToStaticMarkup(<ReleaseSisensePanel section={{ weeklyStreams: null, topCountries: null, superfanReach: null, sourceMix: { spotify: [{ source: "playlist", streams: 12, sharePct: 100 }], apple: [], spotifyWindow: { from: "2026-09-01", to: "2026-09-07" }, appleWindow: { from: null, to: null } } }} />);
+    expect(partial).toContain("Apple · no dated rows · no imported source rows");
+    expect(partial).toContain("100.0%");
+    expect(partial).toContain("playlist");
   });
   it("focuses a correction, preserves it when departure is cancelled, and restores its trigger on close", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
