@@ -30,6 +30,7 @@ struct NativeSettingsView: View {
   @State private var membersOffset = 0
   @State private var integrationsOffset = 0
   @State private var loading = false
+  @State private var signingOut = false
   @State private var message: String?
   @State private var generation = UUID()
 
@@ -43,6 +44,17 @@ struct NativeSettingsView: View {
     List {
       if owner == nil { Text("Sign in and select this workspace to view Settings.") }
       else {
+        Section("Session") {
+          Button(signingOut ? "Signing out…" : "Sign out", role: .destructive) {
+            signingOut = true
+            Task {
+              await session.signOut(api: api)
+              signingOut = false
+            }
+          }
+          .disabled(signingOut)
+          .frame(minHeight: 44)
+        }
         if let value = snapshot, snapshotState == session.state, snapshotOwner == owner {
           Section("Account and workspace") {
             LabeledContent("Account", value: value.account.name)
