@@ -766,6 +766,7 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
   const aiDraftRequests: Array<{ method: string; path: string }> = [];
   const publicationRequests: Array<{ method: string; path: string }> = [];
   let activeRevisionId = "";
+  let activeRevisionVersion = 0;
 
   await routeFixtureArtwork(page);
   page.on("request", (request) => {
@@ -800,7 +801,7 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
         context_snapshot: {
           scope: "radio_update",
           page_revision_id: activeRevisionId,
-          page_revision_version: 1,
+          page_revision_version: activeRevisionVersion,
           campaign_id: campaignId,
         },
         approval_hash: null,
@@ -813,6 +814,13 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
   });
 
   await login(page);
+  const editorResponse = await page.request.get(`/api/campaigns/${campaignId}/public-page`);
+  expect(editorResponse.ok()).toBe(true);
+  const editor = await editorResponse.json();
+  const reviewedRevision = editor.revisions.find((revision: { id: string }) => revision.id === editor.page.current_draft_revision_id);
+  expect(reviewedRevision.review_status).toBe("reviewed");
+  activeRevisionId = reviewedRevision.id;
+  activeRevisionVersion = reviewedRevision.version;
   await page.goto(`/campaigns/${campaignId}?tab=outreach`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("main").first()).toBeVisible({ timeout: 30_000 });
 
@@ -842,7 +850,7 @@ test("campaign-outreach-radio-workbench-keeps-review-and-send-authority-separate
   await expect(sequence).toContainText("Email reviewed");
   await expect(sequence).toContainText("Delivery preview");
 
-  await expect(page.getByText("Structured fields only · revision v1 · reviewed", { exact: true })).toBeVisible();
+  await expect(page.getByText(`Structured fields only · revision v${activeRevisionVersion} · reviewed`, { exact: true })).toBeVisible();
   await expect(page.getByText("Reviewed preview is available in this editor; it is not public.", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Authenticated preview · not public")).toBeVisible();
   await expect(page.getByText("Preview · not public · reviewed revision", { exact: true })).toBeVisible();
