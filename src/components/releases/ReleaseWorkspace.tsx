@@ -588,7 +588,7 @@ export function ReleaseWorkspace({
           {!readiness && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/60 px-4 py-3"><p className="text-sm text-muted-foreground">Required checks are unavailable.</p><Button variant="outline" type="button" onClick={() => selectSection("details")}>View details</Button></div>}
           <div className="flex items-end justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight">Tracks <span className="ml-1 text-sm font-normal text-muted-foreground">{tracks.length}</span></h2>
-            <Button variant="ghost" nativeButton={false} render={<a href={`/releases/${release.id}/tracks`} />} className="text-sm">Manage tracks</Button>
+            <a href={`/releases/${release.id}/tracks`} className={buttonVariants({ variant: "ghost", className: "text-sm" })}>Manage tracks</a>
           </div>
           {tracks.length ? (
             <ol className="divide-y divide-border border-y border-border">
