@@ -49,7 +49,7 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
     expect(projectAudit.after).toMatchObject({ notes: "Production notes", location_name: "Studio" });
     const [eventAudit] = await sql!`select "before", "after" from label_suite.audit_events where org_id=${orgA} and object_id=${event.id} and event_type='event.updated'`;
     expect(eventAudit.before).toMatchObject({ notes: null, venue_name: null, starts_at: "2027-01-01T09:00:00.000Z" });
-    expect(eventAudit.after).toMatchObject({ notes: "Updated agenda", venue_name: "Main room", starts_at: "2027-01-01T10:00:00.000Z" });
+    expect(eventAudit.after).toMatchObject({ notes: "Updated agenda", venue_name: "Main room", starts_at: null, ends_at: null, all_day: true });
     const datedProject = await service.updateNativeProject(orgA, { id: project.id, description: null, start_date: "2027-01-01", end_date: "2027-01-02", expected_revision: updatedProject.revision }, userA);
     expect(datedProject).toMatchObject({ goal: null, start_date: "2027-01-01", end_date: "2027-01-02" });
     await expect(service.updateNativeProject(orgA, { id: project.id, start_date: "2027-01-03", expected_revision: datedProject.revision }, userA)).rejects.toThrow("End date must be on or after start date");
