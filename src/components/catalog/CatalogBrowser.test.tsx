@@ -78,3 +78,36 @@ it("resolves linked artwork and audio into image and native player elements", as
     expect(host.textContent).not.toContain("No audio linked yet.");
   } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
 });
+
+
+it("focuses the record and restores both columns to their previous state", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const sidebar = document.createElement("div"); sidebar.dataset.slot = "sidebar"; sidebar.dataset.state = "collapsed"; document.body.append(sidebar);
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const changes: boolean[] = [];
+  const onChange = (event: Event) => changes.push((event as CustomEvent<{ open: boolean }>).detail.open);
+  window.addEventListener("label-suite:sidebar-state-change", onChange);
+  try {
+    await act(async () => root.render(<CatalogBrowser {...props} />));
+    const focus = [...host.querySelectorAll("button")].find(item => item.textContent === "Focus")!;
+    const browser = [...host.querySelectorAll("button")].find(item => item.textContent?.includes("Hide browser"))!;
+    await act(async () => focus.click());
+    expect(browser.getAttribute("aria-expanded")).toBe("false");
+    expect(focus.getAttribute("aria-pressed")).toBe("true");
+    expect(host.querySelector("h1")?.textContent).toBe("Track b");
+    await act(async () => focus.click());
+    expect(browser.getAttribute("aria-expanded")).toBe("true");
+    expect(changes).toEqual([false, false]);
+    // A hidden browser and expanded global sidebar also restore independently.
+    sidebar.dataset.state = "expanded";
+    await act(async () => browser.click());
+    await act(async () => focus.click());
+    await act(async () => focus.click());
+    expect(browser.getAttribute("aria-expanded")).toBe("false");
+    expect(changes).toEqual([false, false, false, true]);
+  } finally {
+    window.removeEventListener("label-suite:sidebar-state-change", onChange);
+    await act(async () => root.unmount()); host.remove(); sidebar.remove(); vi.unstubAllGlobals();
+  }
+});

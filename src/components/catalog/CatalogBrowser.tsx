@@ -27,6 +27,7 @@ export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedA
   const [showBrowser, setShowBrowser] = useState(false);
   const [showDesktopBrowser, setShowDesktopBrowser] = useState(true);
   const [showArtists, setShowArtists] = useState(false);
+  const [columnsBeforeFocus, setColumnsBeforeFocus] = useState<{ browser: boolean; sidebar: boolean } | null>(null);
   const requested = Boolean(selectedArtistId || selectedReleaseId || selectedTrackId);
   const track = tracks.find(item => item.id === selectedTrackId);
   const release = releases.find(item => item.id === (track?.release_id ?? selectedReleaseId));
@@ -44,6 +45,13 @@ export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedA
   const recordUrl = track ? trackEditor : release ? `/releases/${encodeURIComponent(release.id)}` : artist ? `/artists/${encodeURIComponent(artist.id)}` : null;
   const linkClass = "block min-h-11 rounded-md px-3 py-2.5 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring break-words";
   const selectedClass = "bg-accent text-accent-foreground font-medium";
+
+  function toggleFocus() {
+    const sidebar = columnsBeforeFocus?.sidebar ?? document.querySelector("[data-slot='sidebar'][data-state]")?.getAttribute("data-state") !== "collapsed";
+    setShowDesktopBrowser(columnsBeforeFocus?.browser ?? false);
+    window.dispatchEvent(new CustomEvent("label-suite:sidebar-state-change", { detail: { open: columnsBeforeFocus ? sidebar : false } }));
+    setColumnsBeforeFocus(columnsBeforeFocus ? null : { browser: showDesktopBrowser, sidebar });
+  }
 
   function releaseLink(item: Release) {
     const open = item.id === release?.id;
@@ -85,6 +93,7 @@ export function CatalogBrowser({ artists, releases, tracks, canMutate, selectedA
     <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-border pb-5">
       <div className="hidden min-w-0 flex-1 md:block">{searchInput}</div>
       <Button variant="ghost" size="sm" className="hidden md:inline-flex" aria-expanded={showDesktopBrowser} aria-controls="catalog-objects" onClick={() => setShowDesktopBrowser(!showDesktopBrowser)}>{showDesktopBrowser ? <PanelLeftClose aria-hidden /> : <PanelLeftOpen aria-hidden />}{showDesktopBrowser ? "Hide browser" : "Show browser"}</Button>
+      <Button variant="ghost" size="sm" className="hidden md:inline-flex" aria-pressed={Boolean(columnsBeforeFocus)} onClick={toggleFocus}>{columnsBeforeFocus ? "Restore columns" : "Focus"}</Button>
       <Sheet open={showBrowser && isMobile} onOpenChange={setShowBrowser}>
         <SheetTrigger render={<Button variant="outline" className="md:hidden" />}>Browse records</SheetTrigger>
         <SheetContent side="left" className="w-[min(90vw,24rem)] overflow-y-auto duration-300 motion-reduce:transition-none">
