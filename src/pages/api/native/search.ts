@@ -12,6 +12,7 @@ export const GET: APIRoute = async ({ request, url }) => {
   try {
     const actor = await resolveNativeActor(request);
     if (!actor) return json({ error: "Authentication required" }, 401);
+    if (actor.workspace.role === "payee") return json({ error: "Search requires operator-workspace access", code: "insufficient_permissions" }, 403);
     return await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => {
       const records = await searchRecords(actor.workspace.org.id, url.searchParams.get("q"));
       return json(projectNativeSearch(records));
