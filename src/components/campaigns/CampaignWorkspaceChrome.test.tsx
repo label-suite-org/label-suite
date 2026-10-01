@@ -1,5 +1,8 @@
+/* @vitest-environment jsdom */
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CampaignContextRail, CampaignWorkingTasks, CampaignWorkspaceNavigation } from "./CampaignWorkspaceChrome";
 
 describe("CampaignWorkspaceNavigation", () => {
@@ -43,4 +46,38 @@ describe("CampaignWorkspaceNavigation", () => {
     expect(html).toContain('class="truncate text-xs text-accent-foreground">Album release');
     expect(html).toContain('class="truncate text-xs text-muted-foreground">Other Artist');
   });
+});
+
+it("focuses both columns and restores their independent prior states across Campaigns islands", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const sidebar = document.createElement("div"); sidebar.dataset.slot = "sidebar"; sidebar.dataset.state = "expanded"; document.body.append(sidebar);
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const changes: boolean[] = [];
+  const change = (event: Event) => changes.push((event as CustomEvent<{ open: boolean }>).detail.open);
+  window.addEventListener("label-suite:sidebar-state-change", change);
+  try {
+    await act(async () => root.render(<>
+      <CampaignContextRail campaigns={[]} selectedId="selected" />
+      <CampaignWorkspaceNavigation campaignId="selected" campaignName="Selected campaign" status="active" activeTab="overview" sections={[]} campaigns={[]} />
+    </>));
+    const focus = [...host.querySelectorAll("button")].find(button => button.textContent === "Focus")!;
+    const rail = host.querySelector("aside")!;
+    await act(async () => focus.click());
+    expect(rail.dataset.campaignRailState).toBe("collapsed");
+    expect(focus.getAttribute("aria-pressed")).toBe("true");
+    expect(host.querySelector("h1")?.textContent).toBe("Selected campaign");
+    await act(async () => focus.click());
+    expect(rail.dataset.campaignRailState).toBe("expanded");
+    expect(changes).toEqual([false, true]);
+    sidebar.dataset.state = "collapsed";
+    await act(async () => (host.querySelector('[aria-label="Collapse campaign list"]') as HTMLButtonElement).click());
+    await act(async () => focus.click());
+    await act(async () => focus.click());
+    expect(rail.dataset.campaignRailState).toBe("collapsed");
+    expect(changes).toEqual([false, true, false, false]);
+  } finally {
+    window.removeEventListener("label-suite:sidebar-state-change", change);
+    await act(async () => root.unmount()); host.remove(); sidebar.remove(); vi.unstubAllGlobals();
+  }
 });

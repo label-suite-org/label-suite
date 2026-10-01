@@ -63,7 +63,12 @@ function CampaignList({ campaigns, selectedId, compact = false }: { campaigns: C
 
 export function CampaignContextRail({ campaigns, selectedId }: { campaigns: CampaignRailItem[]; selectedId: string }) {
   const [collapsed, setCollapsed] = useState(false);
-  return <aside aria-label="Campaign list" className={`hidden shrink-0 overflow-hidden border-r border-border bg-background transition-[width] duration-300 ease-out motion-reduce:transition-none xl:block ${collapsed ? "w-[72px]" : "w-80"}`}>
+  useEffect(() => {
+    const change = (event: Event) => setCollapsed(!(event as CustomEvent<{ open: boolean }>).detail.open);
+    window.addEventListener("label-suite:campaign-rail-state-change", change);
+    return () => window.removeEventListener("label-suite:campaign-rail-state-change", change);
+  }, []);
+  return <aside data-campaign-rail-state={collapsed ? "collapsed" : "expanded"} aria-label="Campaign list" className={`hidden shrink-0 overflow-hidden border-r border-border bg-background transition-[width] duration-300 ease-out motion-reduce:transition-none xl:block ${collapsed ? "w-[72px]" : "w-80"}`}>
     <div className="sticky top-0 max-h-[calc(100vh-3rem)] overflow-y-auto px-2 py-3">
       <div className={`mb-3 flex h-8 items-center ${collapsed ? "justify-center" : "justify-between px-2"}`}>
         {!collapsed && <span className="text-xs font-medium text-muted-foreground">Browse</span>}
@@ -86,6 +91,16 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
   sections: Section[];
   campaigns: CampaignRailItem[];
 }) {
+  const [columnsBeforeFocus, setColumnsBeforeFocus] = useState<{ rail: boolean; sidebar: boolean } | null>(null);
+  const toggleFocus = () => {
+    const previous = columnsBeforeFocus ?? {
+      rail: document.querySelector("[data-campaign-rail-state]")?.getAttribute("data-campaign-rail-state") === "expanded",
+      sidebar: document.querySelector('[data-slot="sidebar"][data-state]')?.getAttribute("data-state") === "expanded",
+    };
+    window.dispatchEvent(new CustomEvent("label-suite:campaign-rail-state-change", { detail: { open: columnsBeforeFocus ? previous.rail : false } }));
+    window.dispatchEvent(new CustomEvent("label-suite:sidebar-state-change", { detail: { open: columnsBeforeFocus ? previous.sidebar : false } }));
+    setColumnsBeforeFocus(columnsBeforeFocus ? null : previous);
+  };
   const primary = sections.filter((section) => ["overview", "outreach", "content"].includes(section.key));
   const more = sections.filter((section) => !["overview", "outreach", "content"].includes(section.key));
   const activeMore = more.find((section) => section.key === activeTab);
@@ -103,6 +118,7 @@ export function CampaignWorkspaceNavigation({ campaignId, campaignName, status, 
       </Breadcrumb>
       <div className="flex items-center gap-2">
         <Badge variant="ghost" className="capitalize">{status === "active" && <span className="size-1.5 rounded-full bg-emerald-600" />}{status || "planning"}</Badge>
+        <Button variant="outline" size="sm" className="hidden xl:inline-flex" aria-pressed={columnsBeforeFocus !== null} onClick={toggleFocus}>{columnsBeforeFocus ? "Restore columns" : "Focus"}</Button>
         <Sheet>
           <SheetTrigger render={<Button variant="outline" size="sm" className="xl:hidden" />}><PanelLeftOpen /> Campaign list</SheetTrigger>
           <SheetContent side="left" className="w-[min(88vw,22rem)] overflow-y-auto">
