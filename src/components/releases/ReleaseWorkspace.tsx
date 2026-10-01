@@ -261,8 +261,8 @@ export function ReleaseWorkspace({
       setFromToday(new URLSearchParams(window.location.search).get("returnTo") === "today");
       const route = routeFromLocation(window.location.search, window.location.hash);
       setActiveSection(route.section);
-      setActiveFix(route.section === "overview" ? route.focus : null);
-      setPendingSectionFocus(route.section === "overview" ? route.focus : null);
+      setActiveFix(route.section === "overview" || route.section === "details" ? route.focus : null);
+      setPendingSectionFocus(route.section === "overview" || route.section === "details" ? route.focus : null);
     };
     applyRoute();
     window.addEventListener("hashchange", applyRoute);
@@ -274,7 +274,7 @@ export function ReleaseWorkspace({
   }, []);
 
   useEffect(() => {
-    if (!pendingSectionFocus || activeSection !== "overview") return;
+    if (!pendingSectionFocus || (activeSection !== "overview" && activeSection !== "details")) return;
     const timeout = window.setTimeout(() => {
       setPendingSectionFocus(null);
       const fieldId = releaseFocusId(pendingSectionFocus);
@@ -429,7 +429,7 @@ export function ReleaseWorkspace({
     } else if (key === "tracks" || key === "track-readiness") {
       selectSection("tracks");
     } else if (key === "cover" || key === "upc" || key === "date" || key === "format") {
-      selectSection("overview", key);
+      selectSection(activeSection === "details" ? "details" : "overview", key);
     } else {
       selectSection(key);
     }
@@ -438,8 +438,8 @@ export function ReleaseWorkspace({
     if (!confirmDeparture()) return false;
     if (focus) correctionTrigger.current = document.activeElement as HTMLElement | null;
     setActiveSection(section);
-    setActiveFix(section === "overview" ? focus ?? null : null);
-    if (section === "overview" && focus) {
+    setActiveFix(section === "overview" || section === "details" ? focus ?? null : null);
+    if ((section === "overview" || section === "details") && focus) {
       setPendingSectionFocus(focus);
     } else {
       setPendingSectionFocus(null);
@@ -618,8 +618,9 @@ export function ReleaseWorkspace({
         <p className="text-sm text-muted-foreground">Required metadata, track audio, and rights checks.</p>
         {readiness && <ul className="list-disc pl-5 text-sm">{readiness.readiness.missing.map((missing, index) => <li key={`${index}-${missing}`}>{missing}</li>)}</ul>}
         <div className="flex flex-wrap gap-2">
-          {(["cover", "upc", "date", "format"] as const).map(key => <Button id={`release-correct-${key}`} key={key} type="button" variant="outline" onClick={() => selectSection("overview", key)}>{canManage ? "Correct" : "Inspect"} {key === "upc" ? "UPC/EAN" : key === "cover" ? "cover art" : key}</Button>)}
+          {(["cover", "upc", "date", "format"] as const).map(key => <Button id={`release-correct-${key}`} key={key} type="button" variant="outline" onClick={() => selectSection("details", key)}>{canManage ? "Correct" : "Inspect"} {key === "upc" ? "UPC/EAN" : key === "cover" ? "cover art" : key}</Button>)}
           <Button type="button" variant="outline" onClick={() => selectSection("tracks")}>Review track evidence</Button>
+          <a href={`/releases/${release.id}/tracks`} className={buttonVariants({ variant: "ghost" })}>Manage tracks</a>
           {fromToday && <a className="self-center underline" href="/today">Back to Today</a>}
         </div>
       </section>}
@@ -631,7 +632,7 @@ export function ReleaseWorkspace({
             fallbackValue={({ cover: release.cover_art_url, upc: release.upc_ean, date: release.release_date, format: release.format })[activeFix as ReleaseOverviewFixFocus]}
             inputId={releaseFocusId(activeFix as ReleaseOverviewFixFocus)} initial={readiness} canManage={canManage}
             onSnapshot={acceptReadiness} onDirtyChange={onCorrectionDirty}
-            onClose={() => { if (selectSection("overview")) requestAnimationFrame(() => (correctionTrigger.current?.isConnected ? correctionTrigger.current : document.getElementById("release-tab-overview"))?.focus()); }} />
+            onClose={() => { if (selectSection(activeSection)) requestAnimationFrame(() => (correctionTrigger.current?.isConnected ? correctionTrigger.current : document.getElementById("release-tab-overview"))?.focus()); }} />
         </section>
       )}
 
@@ -1753,7 +1754,7 @@ function releaseFixFromSearch(value: string | null): ReleaseOverviewFixFocus | n
 export function routeFromLocation(search: string, hash: string): ParsedReleaseRoute {
   const params = new URLSearchParams(search);
   const section = sectionFromSearch(params.get("section")) ?? sectionFromHash(hash);
-  const focus = section === "overview" ? releaseFixFromSearch(params.get("focus")) : null;
+  const focus = section === "overview" || section === "details" ? releaseFixFromSearch(params.get("focus")) : null;
   return { section, focus };
 }
 

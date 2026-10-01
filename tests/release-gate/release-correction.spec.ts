@@ -18,6 +18,7 @@ async function login(page: Page) {
   await page.getByLabel("Password", { exact: true }).fill(process.env.E2E_USER_PASSWORD!);
   await Promise.all([page.waitForURL("**/dashboard"), page.getByRole("button", { name: "Sign in", exact: true }).click()]);
   await page.goto(`/releases/${process.env.E2E_RELEASE_ID}?section=overview&returnTo=today#release-readiness`);
+  await page.getByRole("button", { name: "Review checks", exact: true }).click();
   await page.getByRole("heading", { name: /Required release checks pass|Release needs attention/ }).waitFor();
 }
 

@@ -8,6 +8,7 @@ describe("ReleaseWorkspace routing helpers", () => {
       focus: "cover",
     });
     expect(releaseFocusId("cover")).toBe("release-cover-input");
+    expect(routeFromLocation("?section=details&focus=upc", "#release-details")).toEqual({ section: "details", focus: "upc" });
   });
 
   it("keeps both current and existing budget links openable", () => {

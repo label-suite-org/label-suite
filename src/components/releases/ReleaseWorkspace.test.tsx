@@ -63,7 +63,7 @@ describe("ReleaseWorkspace", () => {
       await act(async () => close.click());
       await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)); });
       expect(host.contains(input)).toBe(false);
-      expect(document.activeElement).toBe(host.querySelector("#release-tab-overview"));
+      expect(document.activeElement).toBe(host.querySelector("#release-correct-upc"));
       expect(window.location.search).toContain("returnTo=today");
     } finally {
       act(() => root.unmount()); host.remove(); confirm.mockRestore(); vi.unstubAllGlobals();
