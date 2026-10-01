@@ -38,7 +38,7 @@ public struct LabelSuiteAppRoot: View {
   private let configuration: LabelSuiteConfiguration
   @ObservedObject private var notifications: NativeNotificationController
   @Environment(\.scenePhase) private var scenePhase
-  @State private var selectedTab = AppTab.artists
+  @State private var selectedTab = AppTab.catalog
   @State private var releasePipelineStates: [String: ReleasePipelineViewState] = [:]
   @State private var recentSearchRecords: [NativeRecentSearchRecord] = []
   @State private var catalogStates: [String: CatalogViewState] = [:]
@@ -111,7 +111,7 @@ public struct LabelSuiteAppRoot: View {
       guard case .authenticated = state else {
         releasePipelineStates.removeAll()
         catalogStates.removeAll()
-        selectedTab = .artists
+        selectedTab = .catalog
         return
       }
     }
@@ -251,7 +251,7 @@ private struct CleanupLockedView: View {
 }
 
 private enum AppTab: String, CaseIterable {
-  case artists = "Catalog"
+  case catalog = "Catalog"
   case releases = "Releases"
   case campaigns = "Campaigns"
   case today = "Today"
@@ -260,7 +260,7 @@ private enum AppTab: String, CaseIterable {
 
   var icon: String {
     switch self {
-    case .artists: "books.vertical"
+    case .catalog: "books.vertical"
     case .releases: "opticaldisc"
     case .campaigns: "megaphone"
     case .today: "checklist"
@@ -309,7 +309,7 @@ private struct AuthenticatedShell: View {
     ZStack(alignment: .bottom) {
       TabView(selection: $selectedTab) {
       NativeCatalogView(workspace: workspace, session: session, api: configuration.api, state: $catalogState)
-          .tag(AppTab.artists)
+          .tag(AppTab.catalog)
       NativeReleasePipelineView(
         workspace: workspace,
         session: session,
@@ -796,10 +796,15 @@ struct NativeArtistDetailView: View {
     Section("Releases") {
       if detail.relationships.releases.isEmpty { Text("No releases linked to this artist.").foregroundStyle(.secondary) }
       ForEach(detail.relationships.releases) { release in
-        VStack(alignment: .leading, spacing: 3) {
-          Text(release.title).font(.headline)
-          Text([release.releaseDate, release.status].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+        NavigationLink {
+          NativeReleaseDetailView(releaseID: release.id, workspace: workspace, session: session, api: api)
+        } label: {
+          VStack(alignment: .leading, spacing: 3) {
+            Text(release.title).font(.headline)
+            Text([release.releaseDate, release.status].compactMap { $0 }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+          }
         }
+        .accessibilityHint("Opens this artist’s release and its tracks")
       }
       relationshipCount(detail.relationships.counts.releases, displayed: detail.relationships.releases.count, label: "release")
     }
@@ -959,7 +964,7 @@ private struct NativeCatalogView: View {
         Section { Button(loadingMore ? "Loading…" : "Load more") { Task { await loadMore(response) } }.disabled(loading || loadingMore || state.stale || response.query != normalizedSearch) }
       }
     }
-    .listStyle(.plain).nativeSoftScrollEdges().scrollPosition(id: $state.position).navigationTitle("Library")
+    .listStyle(.plain).nativeSoftScrollEdges().scrollPosition(id: $state.position).navigationTitle("Catalog")
 #if os(iOS)
     .toolbar(.hidden, for: .navigationBar)
 #endif
@@ -976,15 +981,24 @@ private struct NativeCatalogView: View {
 
   @ViewBuilder private func catalogRow(_ item: NativeCatalogItem, release: NativeCatalogRelease?) -> some View {
     HStack(alignment: .top, spacing: 14) {
-      AsyncImage(url: release?.coverArtURL) { image in
-        image.resizable().scaledToFill()
-      } placeholder: {
-        Image(systemName: "opticaldisc").foregroundStyle(.secondary)
+      AsyncImage(url: release?.coverArtURL) { phase in
+        switch phase {
+        case .success(let image): image.resizable().scaledToFill().accessibilityLabel("Cover art for \(release?.title ?? item.title)")
+        case .failure:
+          Image(systemName: "photo.badge.exclamationmark").foregroundStyle(.secondary).accessibilityLabel("Cover art unavailable")
+        case .empty:
+          if release?.coverArtURL == nil {
+            Image(systemName: "opticaldisc").foregroundStyle(.secondary).accessibilityLabel("No cover art")
+          } else {
+            ProgressView().accessibilityLabel("Loading cover art")
+          }
+        @unknown default:
+          Image(systemName: "photo").foregroundStyle(.secondary).accessibilityLabel("Cover art unavailable")
+        }
       }
       .frame(width: 64, height: 64)
       .background(.quaternary)
       .clipShape(RoundedRectangle(cornerRadius: 6))
-      .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 5) {
         Text(item.title).font(.headline)
         Text(item.catalogNumber ?? "Catalog number not assigned").font(.subheadline).foregroundStyle(.secondary)
