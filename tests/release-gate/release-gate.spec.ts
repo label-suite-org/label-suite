@@ -691,6 +691,7 @@ test("artist-readiness-to-exact-field", async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/artists/${artistId}$`));
   await expect(page.getByRole("main")).toBeVisible();
 
+  await page.getByRole("button", { name: /Profile details and checks/ }).click();
   const readinessAction = page.getByRole("button", { name: /Edit .* Bio$/ }).first();
   await expect(readinessAction).toBeVisible({ timeout: 8_000 });
   await readinessAction.click();
