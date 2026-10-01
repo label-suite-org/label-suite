@@ -493,10 +493,14 @@ export async function listExternalObjectLinks(
     .orderBy(desc(external_object_links.updated_at));
 }
 
-export async function upsertExternalObjectLink(orgId: string, raw: z.input<typeof upsertExternalObjectLinkSchema>) {
+export async function upsertExternalObjectLink(
+  orgId: string,
+  raw: z.input<typeof upsertExternalObjectLinkSchema>,
+  client: Pick<typeof db, "insert"> = db,
+) {
   const input = upsertExternalObjectLinkSchema.parse(raw);
   const id = input.id ?? `xlink_${crypto.randomUUID()}`;
-  const [row] = await db
+  const [row] = await client
     .insert(external_object_links)
     .values({
       id,

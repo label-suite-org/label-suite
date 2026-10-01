@@ -91,38 +91,40 @@ export async function proposeSpotifyIdentity(orgId: string, raw: z.input<typeof 
 export async function confirmSpotifyIdentity(orgId: string, raw: z.input<typeof confirmSpotifyIdentitySchema>, actorUserId: string | null = null) {
   requireSpotifyIdentityFlag();
   const input = confirmSpotifyIdentitySchema.parse(raw);
-  const [connection] = await db.select({ id: integration_connections.id, provider_key: integration_providers.key })
-    .from(integration_connections)
-    .innerJoin(integration_providers, eq(integration_connections.provider_id, integration_providers.id))
-    .where(and(eq(integration_connections.org_id, orgId), eq(integration_connections.id, input.connection_id), eq(integration_connections.status, "connected")))
-    .limit(1);
-  if (!connection || connection.provider_key !== "spotify") throw new NotFoundError("Connected Spotify integration not found in active workspace");
+  return db.transaction(async (tx) => {
+    const [connection] = await tx.select({ id: integration_connections.id, provider_key: integration_providers.key })
+      .from(integration_connections)
+      .innerJoin(integration_providers, eq(integration_connections.provider_id, integration_providers.id))
+      .where(and(eq(integration_connections.org_id, orgId), eq(integration_connections.id, input.connection_id), eq(integration_connections.status, "connected")))
+      .limit(1);
+    if (!connection || connection.provider_key !== "spotify") throw new NotFoundError("Connected Spotify integration not found in active workspace");
 
-  const table = input.label_suite_object_type === "artist" ? artists : input.label_suite_object_type === "release" ? releases : tracks;
-  const [target] = await db.select({ id: table.id }).from(table)
-    .where(and(eq(table.org_id, orgId), eq(table.id, input.label_suite_object_id))).limit(1);
-  if (!target) throw new NotFoundError("Spotify identity target not found in active workspace");
+    const table = input.label_suite_object_type === "artist" ? artists : input.label_suite_object_type === "release" ? releases : tracks;
+    const [target] = await tx.select({ id: table.id }).from(table)
+      .where(and(eq(table.org_id, orgId), eq(table.id, input.label_suite_object_id))).limit(1);
+    if (!target) throw new NotFoundError("Spotify identity target not found in active workspace");
 
-  const link = await upsertExternalObjectLink(orgId, {
-    connection_id: input.connection_id,
-    provider_key: "spotify",
-    external_object_type: input.object_type,
-    external_object_id: input.external_id,
-    external_object_url: input.external_url ?? null,
-    label_suite_object_type: input.label_suite_object_type,
-    label_suite_object_id: input.label_suite_object_id,
-    match_method: input.match_method,
-    match_confidence: input.match_confidence,
-    status: "active",
-    metadata: { ...(input.metadata ?? {}), confirmation: "human", confirmed_by: actorUserId },
+    const link = await upsertExternalObjectLink(orgId, {
+      connection_id: input.connection_id,
+      provider_key: "spotify",
+      external_object_type: input.object_type,
+      external_object_id: input.external_id,
+      external_object_url: input.external_url ?? null,
+      label_suite_object_type: input.label_suite_object_type,
+      label_suite_object_id: input.label_suite_object_id,
+      match_method: input.match_method,
+      match_confidence: input.match_confidence,
+      status: "active",
+      metadata: { ...(input.metadata ?? {}), confirmation: "human", confirmed_by: actorUserId },
+    }, tx);
+    await recordAuditEvent(orgId, {
+      actor_user_id: actorUserId,
+      actor_type: "user",
+      event_type: "spotify_identity_confirmed",
+      object_type: input.label_suite_object_type,
+      object_id: input.label_suite_object_id,
+      metadata: { provider_key: "spotify", external_object_type: input.object_type, external_object_id: input.external_id, match_method: input.match_method, match_confidence: input.match_confidence },
+    }, tx);
+    return link;
   });
-  await recordAuditEvent(orgId, {
-    actor_user_id: actorUserId,
-    actor_type: "user",
-    event_type: "spotify_identity_confirmed",
-    object_type: input.label_suite_object_type,
-    object_id: input.label_suite_object_id,
-    metadata: { provider_key: "spotify", external_object_type: input.object_type, external_object_id: input.external_id, match_method: input.match_method, match_confidence: input.match_confidence },
-  });
-  return link;
 }

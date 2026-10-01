@@ -4,7 +4,8 @@ const mocks = vi.hoisted(() => ({ limit: vi.fn(), link: vi.fn(), audit: vi.fn() 
 vi.mock("../lib/db", () => {
   const query = { from: vi.fn(), innerJoin: vi.fn(), where: vi.fn(), limit: mocks.limit };
   for (const method of [query.from, query.innerJoin, query.where]) method.mockReturnValue(query);
-  return { db: { select: () => query } };
+  const tx = { select: () => query };
+  return { db: { transaction: async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx) } };
 });
 vi.mock("./integrations", () => ({ upsertExternalObjectLink: mocks.link, recordAuditEvent: mocks.audit }));
 import { confirmSpotifyIdentity } from "./spotify-identity";
@@ -24,8 +25,8 @@ it("records a confirmed workspace target and its audit", async () => {
     label_suite_object_type: "track", label_suite_object_id: "track-a",
     match_method: "isrc", match_confidence: 100,
   }, "actor-a")).resolves.toEqual({ id: "link-a" });
-  expect(mocks.link).toHaveBeenCalledWith("org-a", expect.objectContaining({ label_suite_object_id: "track-a" }));
-  expect(mocks.audit).toHaveBeenCalledWith("org-a", expect.objectContaining({ actor_user_id: "actor-a", object_id: "track-a" }));
+  expect(mocks.link).toHaveBeenCalledWith("org-a", expect.objectContaining({ label_suite_object_id: "track-a" }), expect.anything());
+  expect(mocks.audit).toHaveBeenCalledWith("org-a", expect.objectContaining({ actor_user_id: "actor-a", object_id: "track-a" }), mocks.link.mock.calls[0][2]);
 });
 
 it.each(["artist", "release", "track"] as const)("rejects a missing or foreign %s before writing a link or audit", async (type) => {
