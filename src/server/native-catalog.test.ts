@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { projectNativeCatalog } from "./native-catalog";
 
 describe("native catalog projection", () => {
+  it("includes artwork only through a valid canonical release relationship", () => {
+    const row = { id: "catalog-a", catalog_number: "TN-001", entry_type: "release", title: "Entry", release_date: null, status: "planned", notes: null, release_id: "release-a", release_title: "Canonical", release_cover_art_url: "https://media.example.test/sleeve.jpg" };
+    expect(projectNativeCatalog([row])[0].release).toEqual({ id: "release-a", title: "Canonical", cover_art_url: row.release_cover_art_url });
+    expect(projectNativeCatalog([{ ...row, release_title: null }])[0].release).toBeNull();
+  });
   it("retains duplicate warnings when the other relationship is outside the current page", () => {
     const [item] = projectNativeCatalog([{ id: "catalog-a", catalog_number: "TN-001", entry_type: "release", title: "Entry", release_date: null, status: "planned", notes: null, release_id: "release-a", release_title: "Canonical", release_count: 2 }]);
     expect(item.relationship_state).toBe("duplicate");

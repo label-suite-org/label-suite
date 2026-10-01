@@ -3,6 +3,14 @@ import XCTest
 @testable import LabelSuite
 
 final class NativeAPICatalogTests: XCTestCase {
+  func testCatalogReleaseDecodesArtworkAndRetainsOlderSnapshots() throws {
+    let decoder = JSONDecoder()
+    let illustrated = try decoder.decode(NativeCatalogRelease.self, from: Data(#"{"id":"release-a","title":"Canonical","cover_art_url":"https://media.example.test/sleeve.jpg"}"#.utf8))
+    XCTAssertEqual(illustrated.coverArtURL?.absoluteString, "https://media.example.test/sleeve.jpg")
+    let older = try decoder.decode(NativeCatalogRelease.self, from: Data(#"{"id":"release-a","title":"Canonical"}"#.utf8))
+    XCTAssertNil(older.coverArtURL)
+  }
+
   func testCatalogPermissionDenialDoesNotMasqueradeAsWorkspaceRevocation() async throws {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [CatalogURLProtocol.self]

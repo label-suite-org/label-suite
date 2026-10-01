@@ -93,7 +93,7 @@ export async function listNativeCatalogEntries(orgId: string, options: { query: 
     db.select({
       id: catalog_entries.id, catalog_number: catalog_entries.catalog_number, entry_type: catalog_entries.entry_type,
       title: catalog_entries.title, release_date: catalog_entries.release_date, status: catalog_entries.status, notes: catalog_entries.notes,
-      release_id: catalog_entries.release_id, release_title: releases.title,
+      release_id: catalog_entries.release_id, release_title: releases.title, release_cover_art_url: releases.cover_art_url,
       release_count: sql<number>`(select count(*)::int from ${catalog_entries} related where related.org_id = ${orgId} and related.release_id = ${catalog_entries.release_id})`,
     }).from(catalog_entries).leftJoin(releases, and(eq(catalog_entries.release_id, releases.id), eq(releases.org_id, orgId)))
       .where(and(...filters)).orderBy(...order).limit(limit + 1).offset(offset),

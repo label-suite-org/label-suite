@@ -11,12 +11,13 @@ export type NativeCatalogSource = {
   release_id: string | null;
   release_title: string | null;
   release_count?: number;
+  release_cover_art_url?: string | null;
 };
 
 export type NativeCatalogRelationshipState = "linked" | "missing" | "invalid" | "duplicate";
 
-export type NativeCatalogItem = Omit<NativeCatalogSource, "release_id" | "release_title"> & {
-  release: { id: string; title: string } | null;
+export type NativeCatalogItem = Omit<NativeCatalogSource, "release_id" | "release_title" | "release_cover_art_url"> & {
+  release: { id: string; title: string; cover_art_url?: string | null } | null;
   relationship_state: NativeCatalogRelationshipState;
 };
 
@@ -27,7 +28,7 @@ export function projectNativeCatalog(rows: NativeCatalogSource[]): NativeCatalog
   }
 
   return rows.map((row) => {
-    const release = row.release_id && row.release_title ? { id: row.release_id, title: row.release_title } : null;
+    const release = row.release_id && row.release_title ? { id: row.release_id, title: row.release_title, ...(row.release_cover_art_url !== undefined ? { cover_art_url: row.release_cover_art_url } : {}) } : null;
     const relationship_state: NativeCatalogRelationshipState = !row.release_id
       ? "missing"
       : !row.release_title
