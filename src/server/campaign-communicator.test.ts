@@ -205,7 +205,7 @@ function createHarness() {
     },
     updateLead: async (orgId, campaignId, leadId, changes, expectedUpdatedAt) => {
       const row = state.leads.find((candidate) => candidate.org_id === orgId && candidate.campaign_id === campaignId && candidate.id === leadId);
-      if (!row || (expectedUpdatedAt && row.updated_at?.getTime() !== expectedUpdatedAt.getTime())) return false;
+      if (!row || (expectedUpdatedAt && row.updated_at?.getTime() !== (typeof expectedUpdatedAt === "string" ? new Date(expectedUpdatedAt) : expectedUpdatedAt).getTime())) return false;
       Object.assign(row, changes);
       return true;
     },
@@ -979,7 +979,7 @@ describe("tenant-scoped campaign communicator persistence", () => {
   });
 
   test("saves a plain draft only when its loaded revision is current", async () => {
-    harness.state.drafts.push(draft({ body_document: null, body_html: null }));
+    harness.state.drafts.push(toDraft({ ...draft(), body_document: null, body_html: null }));
 
     const result = await createManualDraftVersion(ORG, "draft-1", {
       subject: "Updated subject",
@@ -992,6 +992,21 @@ describe("tenant-scoped campaign communicator persistence", () => {
 
     expect(result).toMatchObject({ version: 2, status: "draft", subject: "Updated subject", body: "Updated body", body_document: null });
     expect(harness.state.drafts[0].status).toBe("superseded");
+  });
+
+  test("compares microsecond draft and lead revisions without rounding", async () => {
+    harness.state.drafts.push(draft({ body_document: null, updated_at_revision: "2026-08-04T10:00:00.000123Z" }));
+    harness.state.leads[0].updated_at_revision = "2026-08-04T09:00:00.000321Z";
+    await expect(createManualDraftVersion(ORG, "draft-1", { subject: "Updated", body: "Updated" }, USER, harness.dependencies, {
+      expectedUpdatedAt: "2026-08-04T10:00:00.000124Z", expectedLeadId: LEAD, plainOnly: true,
+    })).rejects.toThrow("Draft changed");
+    await expect(approveDraft(ORG, "draft-1", USER, harness.dependencies, {
+      expectedDraftUpdatedAt: "2026-08-04T10:00:00.000123Z", expectedLeadUpdatedAt: "2026-08-04T09:00:00.000322Z", expectedLeadId: LEAD,
+    })).rejects.toThrow("Campaign lead changed");
+    const result = await createManualDraftVersion(ORG, "draft-1", { subject: "Updated", body: "Updated" }, USER, harness.dependencies, {
+      expectedUpdatedAt: "2026-08-04T10:00:00.000123Z", expectedLeadId: LEAD, plainOnly: true,
+    });
+    expect(result).toMatchObject({ version: 2, status: "draft", body_document: null });
   });
 
   test("rejects stale plain draft revisions without creating a version", async () => {

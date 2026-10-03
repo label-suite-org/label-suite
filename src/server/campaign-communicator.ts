@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, gte, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, gte, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   artists,
@@ -110,6 +110,7 @@ export type CampaignCommunicatorLead = {
   last_contacted_at: Date | null;
   follow_up_at: Date | null;
   updated_at: Date | null;
+  updated_at_revision?: string | null;
 };
 
 export type CampaignCommunicatorPrompt = {
@@ -172,6 +173,7 @@ export type CampaignCommunicatorDraft = {
   body: string;
   body_document?: CampaignDocument | null;
   body_html?: string | null;
+  source_body_document_present?: boolean;
   body_document_repair_required?: boolean;
   body_document_repair_reason?: "malformed" | "over_limit";
   context_snapshot: Record<string, unknown>;
@@ -180,6 +182,7 @@ export type CampaignCommunicatorDraft = {
   approved_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  updated_at_revision?: string | null;
 };
 
 export type CampaignRadioPageRevision = {
@@ -258,7 +261,7 @@ export interface CampaignCommunicatorTransaction {
     campaignId: string,
     leadId: string,
     changes: Partial<CampaignCommunicatorLead>,
-    expectedUpdatedAt?: Date,
+    expectedUpdatedAt?: Date | string,
   ): Promise<boolean>;
   supersedeDrafts(orgId: string, campaignId: string, leadId: string | null, updatedAt: Date): Promise<unknown>;
   insertDraft(row: DraftInsert): Promise<unknown>;
@@ -349,7 +352,7 @@ export async function saveCommunicatorPrompt(
       if (!await tx.lockLead(orgId, campaignId, lead.id)) continue;
       await tx.supersedeDrafts(orgId, campaignId, lead.id, now);
       if (lead.pipeline_stage === "ready") {
-        if (!await tx.updateLead(orgId, campaignId, lead.id, { pipeline_stage: "qualified", updated_at: now }, lead.updated_at ?? undefined)) {
+        if (!await tx.updateLead(orgId, campaignId, lead.id, { pipeline_stage: "qualified", updated_at: now }, lead.updated_at_revision ?? lead.updated_at ?? undefined)) {
           throw new ConflictError("Campaign lead changed while updating the communicator prompt");
         }
       }
@@ -851,6 +854,9 @@ export async function updateLeadPreparation(
     if (!await tx.lockLead(orgId, payload.campaign_id, leadId)) throw new NotFoundError("Campaign lead not found");
     const lead = await tx.findLead(orgId, leadId);
     if (!lead || lead.campaign_id !== payload.campaign_id) throw new NotFoundError("Campaign lead not found");
+    if (payload.expected_updated_at && !campaignTimestampMatches(lead, payload.expected_updated_at)) {
+      throw new ConflictError("Campaign lead changed while updating preparation");
+    }
     const changes: Partial<CampaignCommunicatorLead> = { updated_at: now };
     const contactRouteProvided = Object.prototype.hasOwnProperty.call(payload, "contact_route");
     const nextContactRoute = contactRouteProvided ? payload.contact_route ?? null : lead.contact_route;
@@ -890,7 +896,7 @@ export async function updateLeadPreparation(
       changes.pipeline_stage = "ready";
     }
 
-    const expectedUpdatedAt = payload.expected_updated_at ? new Date(payload.expected_updated_at) : lead.updated_at ?? undefined;
+    const expectedUpdatedAt = payload.expected_updated_at ?? lead.updated_at_revision ?? lead.updated_at ?? undefined;
     if (!await tx.updateLead(orgId, lead.campaign_id, lead.id, changes, expectedUpdatedAt)) {
       throw new ConflictError("Campaign lead changed while updating preparation");
     }
@@ -954,10 +960,10 @@ export async function createManualDraftVersion(
     const source = await tx.findDraft(orgId, sourceDraftId);
     if (!source) throw new NotFoundError("Draft not found");
     if (options.expectedLeadId && source.lead_id !== options.expectedLeadId) throw new NotFoundError("Draft not found");
-    if (options.expectedUpdatedAt && source.updated_at?.getTime() !== new Date(options.expectedUpdatedAt).getTime()) {
+    if (options.expectedUpdatedAt && !campaignTimestampMatches(source, options.expectedUpdatedAt)) {
       throw new ConflictError("Draft changed while editing; reload the draft");
     }
-    if (options.plainOnly && source.body_document) throw new ConflictError("Rich drafts are read-only in native editing");
+    if (options.plainOnly && (source.source_body_document_present ?? Boolean(source.body_document))) throw new ConflictError("Rich drafts are read-only in native editing");
     if (options.plainOnly && source.status !== "draft") throw new ConflictError("Only an unapproved draft can be edited in native");
     if (!source.lead_id && source.scope === "focused") throw new ConflictError("Focused draft is not linked to a lead");
     if (source.lead_id) {
@@ -1019,7 +1025,7 @@ export async function approveDraft(
     const draft = await tx.findDraft(orgId, draftId);
     if (!draft) throw new NotFoundError("Draft not found");
     if (options.expectedLeadId && draft.lead_id !== options.expectedLeadId) throw new NotFoundError("Draft not found");
-    if (options.expectedDraftUpdatedAt && draft.updated_at?.getTime() !== new Date(options.expectedDraftUpdatedAt).getTime()) {
+    if (options.expectedDraftUpdatedAt && !campaignTimestampMatches(draft, options.expectedDraftUpdatedAt)) {
       throw new ConflictError("Draft changed while approving it");
     }
     if (draft.status !== "draft") throw new ConflictError("Draft is not awaiting approval");
@@ -1063,12 +1069,12 @@ export async function approveDraft(
     if (!await tx.lockLead(orgId, draft.campaign_id, draft.lead_id)) throw new NotFoundError("Campaign lead not found");
     const currentDraft = await tx.findDraft(orgId, draftId);
     if (!currentDraft || currentDraft.status !== "draft") throw new ConflictError("Draft changed while approving it");
-    if (options.expectedDraftUpdatedAt && currentDraft.updated_at?.getTime() !== new Date(options.expectedDraftUpdatedAt).getTime()) {
+    if (options.expectedDraftUpdatedAt && !campaignTimestampMatches(currentDraft, options.expectedDraftUpdatedAt)) {
       throw new ConflictError("Draft changed while approving it");
     }
     const lead = await tx.findLead(orgId, draft.lead_id);
     if (!lead || lead.campaign_id !== draft.campaign_id) throw new NotFoundError("Campaign lead not found");
-    if (options.expectedLeadUpdatedAt && lead.updated_at?.getTime() !== new Date(options.expectedLeadUpdatedAt).getTime()) {
+    if (options.expectedLeadUpdatedAt && !campaignTimestampMatches(lead, options.expectedLeadUpdatedAt)) {
       throw new ConflictError("Campaign lead changed while approving the draft");
     }
     const tasks = await tx.listLeadTasks(orgId, draft.campaign_id, lead.id);
@@ -1083,7 +1089,7 @@ export async function approveDraft(
       approved_at: now,
       updated_at: now,
     })) throw new ConflictError("Draft changed while approving it");
-    if (!await tx.updateLead(orgId, draft.campaign_id, lead.id, { pipeline_stage: "ready", updated_at: now }, lead.updated_at ?? undefined)) {
+    if (!await tx.updateLead(orgId, draft.campaign_id, lead.id, { pipeline_stage: "ready", updated_at: now }, lead.updated_at_revision ?? lead.updated_at ?? undefined)) {
       throw new ConflictError("Campaign lead changed while approving the draft");
     }
     await tx.insertEvent(makeEvent(dependencies, {
@@ -1770,7 +1776,7 @@ function makeDrizzleTransaction(executor: DrizzleExecutor): CampaignCommunicator
       return rows.map(toDraft);
     },
     async findDraft(orgId, draftId) {
-      const row = (await executor.select().from(campaign_outreach_drafts).where(and(
+      const row = (await executor.select({ ...getTableColumns(campaign_outreach_drafts), updated_at_revision: sql<string | null>`to_char(${campaign_outreach_drafts.updated_at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')` }).from(campaign_outreach_drafts).where(and(
         eq(campaign_outreach_drafts.org_id, orgId),
         eq(campaign_outreach_drafts.id, draftId),
       )).limit(1))[0];
@@ -1856,7 +1862,9 @@ function makeDrizzleTransaction(executor: DrizzleExecutor): CampaignCommunicator
         eq(campaign_leads.campaign_id, campaignId),
         eq(campaign_leads.id, leadId),
       ];
-      if (expectedUpdatedAt) conditions.push(eq(campaign_leads.updated_at, expectedUpdatedAt));
+      if (expectedUpdatedAt) conditions.push(typeof expectedUpdatedAt === "string"
+        ? sql`${campaign_leads.updated_at} = ${expectedUpdatedAt}::timestamp`
+        : eq(campaign_leads.updated_at, expectedUpdatedAt));
       const rows = await executor.update(campaign_leads).set(leadChanges(changes)).where(and(...conditions)).returning({ id: campaign_leads.id });
       return rows.length === 1;
     },
@@ -1910,6 +1918,7 @@ function leadQuery(executor: DrizzleExecutor, orgId: string) {
     last_contacted_at: campaign_leads.last_contacted_at,
     follow_up_at: campaign_leads.follow_up_at,
     updated_at: campaign_leads.updated_at,
+    updated_at_revision: sql<string | null>`to_char(${campaign_leads.updated_at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
   }).from(campaign_leads)
     .innerJoin(campaigns, and(eq(campaign_leads.campaign_id, campaigns.id), eq(campaigns.org_id, orgId)))
     .leftJoin(artists, and(eq(campaigns.linked_artist_id, artists.id), eq(artists.org_id, orgId)))
@@ -1991,6 +2000,7 @@ export function toDraft(row: typeof campaign_outreach_drafts.$inferSelect): Camp
   const normalized = presentCampaignDraftBody({ body_document: row.body_document ?? undefined, body: row.body }, 20_000);
   return {
     ...row,
+    source_body_document_present: row.body_document != null,
     body: normalized.body,
     body_document: normalized.document,
     body_html: normalized.html,
@@ -2045,3 +2055,13 @@ const defaultDependencies: CampaignCommunicatorDependencies = {
 
 export type CampaignCommunicatorContext = Awaited<ReturnType<typeof getCommunicatorContext>>;
 export type CampaignCommunicatorReadyBlocker = ReadyBlocker;
+
+// Compare the exact database revision; JavaScript Date alone discards microseconds.
+function campaignTimestampMatches(record: { updated_at: Date | null; updated_at_revision?: string | null }, expected: string) {
+  const normalize = (value: string) => {
+    const match = /^(.*T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/.exec(value);
+    return match ? `${match[1]}.${(match[2] ?? "").padEnd(6, "0")}Z` : null;
+  };
+  const current = normalize(record.updated_at_revision ?? record.updated_at?.toISOString() ?? "");
+  return current !== null && current === normalize(expected);
+}

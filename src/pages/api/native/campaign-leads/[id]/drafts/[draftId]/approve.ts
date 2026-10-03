@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { resolveNativeActor } from "../../../../../../../lib/native-workspace";
+import { runWithDatabaseContext } from "../../../../../../../lib/db";
 import { handleApiError, json, parseJson } from "../../../../../../../server/api";
 import { approveDraft } from "../../../../../../../server/campaign-communicator";
 import { HttpError } from "../../../../../../../server/errors";
@@ -21,11 +22,11 @@ export const POST: APIRoute = async ({ request, params }) => {
     const leadId = requiredParam(params.id, "Campaign lead id");
     const draftId = requiredParam(params.draftId, "Outreach draft id");
     const input = await parseJson(request, nativeApprovalSchema);
-    return json(await approveDraft(actor.workspace.org.id, draftId, actor.userId, undefined, {
+    return await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => json(await approveDraft(actor.workspace.org.id, draftId, actor.userId, undefined, {
       expectedDraftUpdatedAt: input.expected_draft_updated_at,
       expectedLeadUpdatedAt: input.expected_lead_updated_at,
       expectedLeadId: leadId,
-    }));
+    })));
   } catch (error) {
     return handleApiError(error);
   }

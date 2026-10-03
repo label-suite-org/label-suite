@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const database = vi.hoisted(() => ({ runWithDatabaseContext: vi.fn(async (_context: { userId: string; orgId: string }, operation: () => Promise<unknown>) => operation()) }));
+vi.mock("../../../../../lib/db", () => database);
+
 const native = vi.hoisted(() => ({ resolveNativeActor: vi.fn() }));
 const service = vi.hoisted(() => ({ updateLeadPreparation: vi.fn() }));
 
@@ -27,6 +30,7 @@ describe("native lead preparation mutation", () => {
   it("passes the explicit revision and actor through for an operator", async () => {
     const response = await PATCH({ request: new Request("https://suite.test/api/native/campaign-leads/lead-a/preparation?workspaceId=org-a", { method: "PATCH", body: JSON.stringify(body), headers: { "content-type": "application/json" } }), params: { id: "lead-a" } } as never);
     expect(response.status).toBe(200);
+    expect(database.runWithDatabaseContext).toHaveBeenCalledWith({ userId: "user-a", orgId: "org-a" }, expect.any(Function));
     expect(service.updateLeadPreparation).toHaveBeenCalledWith("org-a", "lead-a", body, "user-a");
   });
 
