@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import {
   campaign_enrichment_suggestions,
   campaign_leads,
@@ -68,7 +68,7 @@ async function findLead(orgId: string, campaignId: string, leadId: string) {
       pipeline_stage: campaign_leads.pipeline_stage,
       last_contacted_at: campaign_leads.last_contacted_at,
       follow_up_at: campaign_leads.follow_up_at,
-      updated_at: campaign_leads.updated_at,
+      updated_at: sql<string | null>`to_char(${campaign_leads.updated_at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
     })
     .from(campaign_leads)
     .innerJoin(campaigns, and(eq(campaign_leads.campaign_id, campaigns.id), eq(campaigns.org_id, orgId)))
@@ -107,7 +107,7 @@ export async function getNativeLeadWorkbench(
       body: campaign_outreach_drafts.body,
       body_document: campaign_outreach_drafts.body_document,
       created_at: campaign_outreach_drafts.created_at,
-      updated_at: campaign_outreach_drafts.updated_at,
+      updated_at: sql<string | null>`to_char(${campaign_outreach_drafts.updated_at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
     }).from(campaign_outreach_drafts).where(and(eq(campaign_outreach_drafts.org_id, orgId), eq(campaign_outreach_drafts.campaign_id, campaignId), eq(campaign_outreach_drafts.lead_id, leadId))).orderBy(desc(campaign_outreach_drafts.version)),
     db.select({
       id: campaign_enrichment_suggestions.id,

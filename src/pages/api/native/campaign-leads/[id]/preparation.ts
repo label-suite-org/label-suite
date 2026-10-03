@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { resolveNativeActor } from "../../../../../lib/native-workspace";
+import { runWithDatabaseContext } from "../../../../../lib/db";
 import { handleApiError, json, parseJson } from "../../../../../server/api";
 import { updateLeadPreparation, updateLeadPreparationSchema } from "../../../../../server/campaign-communicator";
 import { hasCapability } from "../../../../../server/tenant";
@@ -20,7 +21,7 @@ export const PATCH: APIRoute = async ({ request, params }) => {
     const leadId = params.id?.trim();
     if (!leadId) throw new HttpError("Campaign lead id is required", 400);
     const input = await parseJson(request, nativePreparationSchema);
-    return json(await updateLeadPreparation(actor.workspace.org.id, leadId, input, actor.userId));
+    return await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => json(await updateLeadPreparation(actor.workspace.org.id, leadId, input, actor.userId)));
   } catch (error) {
     return handleApiError(error);
   }

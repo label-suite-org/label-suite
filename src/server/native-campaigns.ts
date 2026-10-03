@@ -258,7 +258,7 @@ export async function listNativeCampaignLeads(
       priority_score: priority,
       last_contacted_at: campaign_leads.last_contacted_at,
       follow_up_at: campaign_leads.follow_up_at,
-      updated_at: campaign_leads.updated_at,
+      updated_at: sql<string | null>`to_char(${campaign_leads.updated_at}, 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
     })
     .from(campaign_leads)
     .leftJoin(tracks, and(eq(campaign_leads.exact_edit_track_id, tracks.id), eq(tracks.org_id, orgId)))
