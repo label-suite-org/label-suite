@@ -1,3 +1,4 @@
+import { enqueueTourSquareSyncs } from "../src/server/tour-square-sync";
 import { enqueueCalendarSyncs } from "../src/server/calendar-sync";
 import { jobHandlers } from "../src/server/jobs/handlers";
 import { jobStore, runWorkerLoop } from "../src/server/jobs";
@@ -19,7 +20,7 @@ console.log(`[worker] starting ${workerId}`);
 let scheduling: Promise<void> | undefined;
 function scheduleCalendars() {
   if (scheduling || controller.signal.aborted) return;
-  scheduling = enqueueCalendarSyncs().catch((error) => console.error("[worker] calendar scheduling failed", error)).finally(() => { scheduling = undefined; });
+  scheduling = Promise.allSettled([enqueueCalendarSyncs(), enqueueTourSquareSyncs()]).then(results => { for (const result of results) if (result.status === "rejected") console.error("[worker] scheduling failed", result.reason); }).finally(() => { scheduling = undefined; });
 }
 scheduleCalendars();
 const calendarTimer = setInterval(scheduleCalendars, 60_000);

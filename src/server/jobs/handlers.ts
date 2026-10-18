@@ -1,3 +1,4 @@
+import { syncTourSquare } from "../tour-square-sync";
 import { syncCalendar } from "../calendar-sync";
 import { runValidationSweep } from "../../lib/readiness";
 import type { JobHandlerRegistry } from "./types";
@@ -5,6 +6,10 @@ import { collectNativeNotifications } from "../native-notification-collection";
 import { dispatchNativeNotifications } from "../native-notification-delivery";
 
 export const jobHandlers: JobHandlerRegistry = {
+  tour_square_sync: async (job, context) => {
+    if (job.schemaVersion !== 1 || typeof job.payload.projectId !== "string") throw new Error("Invalid tour Square sync job");
+    return syncTourSquare(job.orgId, job.payload.projectId, context.signal);
+  },
   notification_sync: async (job, context) => {
     if (job.schemaVersion !== 1) throw new Error("Unsupported notification sync version");
     const collection = await collectNativeNotifications(job.orgId, context.signal);
