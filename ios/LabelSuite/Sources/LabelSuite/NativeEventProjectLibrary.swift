@@ -888,6 +888,7 @@ struct NativeProjectDetailView: View {
   @ObservedObject var session: NativeSessionController
   let api: NativeAPI
   @StateObject private var coordinator = NativeLibraryCoordinator()
+  @State private var showProjectDetails = false
   @State private var detail: NativeProjectDetail?
   @State private var errorMessage: String?
   @State private var editing = false
@@ -908,6 +909,17 @@ struct NativeProjectDetailView: View {
         }
       }
       if let detail {
+        if detail.projectType == "tour" {
+          Section {
+            Picker("Tour view", selection: $showProjectDetails) {
+              Text("Dashboard").tag(false)
+              Text("Project details").tag(true)
+            }.pickerStyle(.segmented)
+          }
+        }
+        if detail.projectType == "tour" && !showProjectDetails {
+          NativeTourDashboardSections(projectID: id, workspace: workspace, session: session, api: api)
+        } else {
         Section("Project") {
           Text(detail.name).font(.title2.bold())
           Text(detail.goal ?? "No goal recorded.")
@@ -1023,6 +1035,7 @@ struct NativeProjectDetailView: View {
             Text("Showing a partial list.").font(.caption)
           }
         }
+      }
       } else if let errorMessage {
         ContentUnavailableView(
           "Project unavailable", systemImage: "folder.badge.questionmark",
@@ -1030,7 +1043,7 @@ struct NativeProjectDetailView: View {
       } else {
         ProgressView("Loading Project…")
       }
-    }.navigationTitle("Project").toolbar {
+    }.navigationTitle(detail?.projectType == "tour" ? "Tour" : "Project").toolbar {
       if canMutate && detail != nil { Button("Edit") { editing = true } }
     }.refreshable { await load() }.task(id: session.sessionForRequests()) {
       detail = nil

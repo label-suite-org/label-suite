@@ -153,6 +153,8 @@ const EXPECTED_TABLE_EXPORTS = [
   "tour_deal_terms",
   "tour_details",
   "tour_lodging",
+  "tour_money_entries",
+  "tour_square_connections",
   "tour_show_details",
   "tour_travel_legs",
   "tracks",

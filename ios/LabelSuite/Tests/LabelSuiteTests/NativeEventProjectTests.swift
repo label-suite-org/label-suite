@@ -173,3 +173,15 @@ private final class EventProjectURLProtocol: URLProtocol, @unchecked Sendable {
   override func stopLoading() {}
   private static func respond(_ request: URLRequest) throws -> (HTTPURLResponse, Data) { lock.lock(); defer { lock.unlock() }; guard let responder else { throw URLError(.badServerResponse) }; return try responder(request) }
 }
+
+final class NativeTourDashboardTests: XCTestCase {
+  func testDashboardKeepsMissingSalesDistinctFromZeroAndCurrenciesSeparate() throws {
+    let wire = Data(#"{"project_id":"tour","title":"Fixture tour","as_of":"2026-10-18T12:00:00Z","today":"2026-10-18","timezone":"America/Los_Angeles","money":{"currency":"USD","recorded_income":1000,"contracted":2000,"forecast_cost":3000,"forecast_result":null,"remaining_shows":1,"observed_nights":0,"average_merch":null,"breakeven_per_show":0,"processing_fees":45,"last_show":{"title":"Fixture show","date":"2026-10-17","card":1000,"cash":null,"received":0},"cash_counts":[{"currency":"USD","amount":12000,"person":"Person A","date":"2026-10-17"},{"currency":"CAD","amount":5000,"person":"Person B","date":"2026-10-17"}],"attention":["Cash unrecorded"]},"next":null,"stays":[],"travel":[],"expenses_by_person":[],"sync":{"enabled":true,"last_success":null,"error":"Connection unavailable","held":1,"interval_minutes":5}}"#.utf8)
+    let dashboard = try JSONDecoder().decode(NativeTourDashboard.self, from: wire)
+    XCTAssertNil(dashboard.money.last_show?.cash)
+    XCTAssertEqual(dashboard.money.last_show?.received, 0)
+    XCTAssertNil(dashboard.money.forecast_result)
+    XCTAssertEqual(dashboard.money.cash_counts.map(\.currency), ["USD", "CAD"])
+    XCTAssertEqual(dashboard.sync.interval_minutes, 5)
+  }
+}
