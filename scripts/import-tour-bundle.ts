@@ -8,11 +8,18 @@ import { sealSecret } from "../src/server/gmail-enrichment";
 const cents = z.number().int().nonnegative();
 const bundleSchema = z.object({
   org: z.string().min(1), project: z.string().min(1),
+  unresolved: z.array(z.string()).default([]),
   entries: z.array(z.object({ data: tourEntrySchema, voided: z.boolean().default(false) })),
   budgets: z.array(z.object({ source: z.string(), name: z.string(), cents })).default([]),
   supersededBudgets: z.array(z.object({ id: z.string(), expectedForecast: z.number() })).default([]),
   shows: z.array(z.object({ event: z.string(), expectedDate: z.iso.date(), guarantee: cents, expectedGuarantee: z.number().nullable(), currency: z.string() })).default([]),
-  stays: z.array(z.object({ source: z.string(), title: z.string(), address: z.string().nullable(), checkIn: z.iso.date(), checkOut: z.iso.date().nullable(), status: z.string(), reference: z.string().nullable(), notes: z.string().nullable() })).default([]),
+  stays: z.array(z.object({ source: z.string(), title: z.string(), address: z.string().nullable(), checkIn: z.iso.date(), checkOut: z.iso.date().nullable(), status: z.string(), reference: z.string().nullable(), notes: z.string().nullable(), estimatedCost: cents.optional(),
+    existingId: z.string().optional(), expectedUpdatedAt: z.iso.datetime({ offset: true }).optional(),
+  }).refine(stay => Boolean(stay.existingId) === Boolean(stay.expectedUpdatedAt), "Existing lodging requires its snapshot revision")).default([]),
+  itinerary: z.array(z.object({ event: z.string(), expectedDate: z.iso.date(), expectedNotes: z.string().nullable(), notes: z.string(),
+    title: z.object({ expected: z.string(), value: z.string() }).optional(),
+    status: z.object({ expected: z.string(), value: z.enum(["planned", "confirmed", "tentative", "cancelled", "external"]) }).optional(),
+  })).default([]),
   square: z.object({ merchant: z.string(), client: z.string(), begin: z.iso.datetime({ offset: true }), end: z.iso.datetime({ offset: true }),
     token: z.object({ access_token: z.string(), refresh_token: z.string(), expires_at: z.iso.datetime({ offset: true }), merchant_id: z.string().optional() }).passthrough(),
   }).optional(),
@@ -22,6 +29,7 @@ if (!path || args.some(a => a.startsWith("--") && !["--apply", "--enable-square"
 const mode = await stat(path);
 if (mode.mode & 0o077) throw new Error("Tour bundle must be private (chmod 600)");
 const bundle = bundleSchema.parse(JSON.parse(await readFile(path, "utf8")));
+if (bundle.unresolved.length) throw new Error("Tour bundle has unresolved reconciliation decisions; no import attempted");
 if (new Set(bundle.entries.map(e => e.data.source)).size !== bundle.entries.length) throw new Error("Duplicate source identities in bundle");
 const client = await pool.connect();
 let changes = 0;
@@ -65,11 +73,32 @@ try {
     changes += result.rowCount ?? 0;
   }
   for (const stay of bundle.stays) {
-    const id = sourceID(`${bundle.org}:${stay.source}`);
+    const id = stay.existingId ?? sourceID(`${bundle.org}:${stay.source}`);
     const duplicate = await client.query("select id from label_suite.tour_lodging where org_id=$1 and project_id=$2 and check_in=$3 and id<>$4 and (booking_reference=$5 or stop_name=$6)", [bundle.org, bundle.project, stay.checkIn, id, stay.reference, stay.title]);
     if (duplicate.rowCount) throw new Error("Lodging overlaps an existing record; reconcile before importing");
-    const result = await client.query("insert into label_suite.tour_lodging(id,org_id,project_id,stop_name,address,check_in,check_out,booking_status,booking_reference,notes) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict(id) do nothing", [id, bundle.org, bundle.project, stay.title, stay.address, stay.checkIn, stay.checkOut, stay.status, stay.reference, stay.notes]);
+    if (stay.existingId) {
+      const prior = (await client.query("select *,check_in::text as arrival,check_out::text as departure from label_suite.tour_lodging where id=$1 and org_id=$2 and project_id=$3 for update", [id, bundle.org, bundle.project])).rows[0];
+      if (!prior) throw new Error("Existing lodging is outside this tour");
+      const same = prior.stop_name === stay.title && prior.address === stay.address && prior.arrival === stay.checkIn && prior.departure === stay.checkOut && prior.booking_status === stay.status && prior.booking_reference === stay.reference && prior.notes === stay.notes && (stay.estimatedCost === undefined || Number(prior.estimated_cost) === stay.estimatedCost / 100);
+      if (same) continue;
+      if (new Date(prior.updated_at).getTime() !== Date.parse(stay.expectedUpdatedAt!)) throw new Error("Lodging changed since reconciliation");
+      await client.query("update label_suite.tour_lodging set stop_name=$4,address=$5,check_in=$6,check_out=$7,booking_status=$8,booking_reference=$9,notes=$10,estimated_cost=coalesce($11,estimated_cost),updated_at=now() where id=$1 and org_id=$2 and project_id=$3", [id,bundle.org,bundle.project,stay.title,stay.address,stay.checkIn,stay.checkOut,stay.status,stay.reference,stay.notes,stay.estimatedCost === undefined ? null : stay.estimatedCost / 100]);
+      changes++;
+      continue;
+    }
+    const result = await client.query("insert into label_suite.tour_lodging(id,org_id,project_id,stop_name,address,check_in,check_out,booking_status,booking_reference,notes,estimated_cost) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) on conflict(id) do nothing", [id, bundle.org, bundle.project, stay.title, stay.address, stay.checkIn, stay.checkOut, stay.status, stay.reference, stay.notes,stay.estimatedCost === undefined ? null : stay.estimatedCost / 100]);
     changes += result.rowCount ?? 0;
+  }
+  for (const day of bundle.itinerary) {
+    const prior = (await client.query("select title,status,notes from label_suite.project_events where id=$1 and org_id=$2 and project_id=$3 and start_date=$4 for update", [day.event,bundle.org,bundle.project,day.expectedDate])).rows[0];
+    if (!prior) throw new Error("Itinerary mapping no longer matches the tour");
+    if (prior.notes !== day.expectedNotes && prior.notes !== day.notes) throw new Error("Itinerary notes changed since reconciliation");
+    if (day.title && prior.title !== day.title.expected && prior.title !== day.title.value) throw new Error("Event title changed since reconciliation");
+    if (day.status && prior.status !== day.status.expected && prior.status !== day.status.value) throw new Error("Event status changed since reconciliation");
+    const title = day.title?.value ?? prior.title, status = day.status?.value ?? prior.status;
+    if (prior.notes === day.notes && prior.title === title && prior.status === status) continue;
+    await client.query("update label_suite.project_events set notes=$4,title=$5,status=$6,updated_at=now() where id=$1 and org_id=$2 and project_id=$3", [day.event,bundle.org,bundle.project,day.notes,title,status]);
+    changes++;
   }
   if (bundle.square) {
     const square = bundle.square, providerID = sourceID(`square-provider:${bundle.org}`), connectionID = sourceID(`square-connection:${bundle.org}:${bundle.project}`);
@@ -91,7 +120,7 @@ try {
     await client.query("insert into label_suite.project_source_records(id,org_id,import_run_id,source_system,source_base_id,source_table_id,source_record_id,normalized_payload_hash,raw_payload,entity_type,entity_id) values($1,$2,$3,'trek',$4,'tour-bundle',$5,$5,$6,'project',$4) on conflict do nothing", [sourceID(`${bundle.org}:${bundle.project}:${hash}`), bundle.org, run, bundle.project, hash, source]);
   }
   await client.query(args.includes("--apply") ? "commit" : "rollback");
-  console.log(JSON.stringify({ applied: args.includes("--apply"), changes, entries: bundle.entries.length, stays: bundle.stays.length, budgets: bundle.budgets.length, squareProvisioned: Boolean(bundle.square) }));
+  console.log(JSON.stringify({ applied: args.includes("--apply"), changes, entries: bundle.entries.length, stays: bundle.stays.length, budgets: bundle.budgets.length, itineraryDays: bundle.itinerary.length, squareProvisioned: Boolean(bundle.square) }));
 } catch {
   await client.query("rollback");
   // Do not print database parameters or credentials from an operator bundle.

@@ -5,6 +5,13 @@ const order: SquareOrder = { id: "order", total_money: payment.total_money, tota
 const shows: TourShow[] = [{ id: "show-1", date: "2026-10-17", title: "Past show", timezone: "America/Los_Angeles", guarantee: 150000, currency: "USD" }, { id: "show-2", date: "2026-10-20", title: "Next show", timezone: "America/Los_Angeles", guarantee: 150000, currency: "USD" }];
 const entry = (kind: string, amount: number, extra = {}) => tourEntrySchema.parse({ kind, amount, currency: "USD", date: "2026-10-17", source: "fixture", ...extra });
 describe("tour money", () => {
+  it("excludes dates where the touring artist is not performing from show forecasts", () => {
+    const external = { ...shows[1], id: "external", date: "2026-10-24", guarantee: null, participation: "not_performing" };
+    const result = tourMoneySummary([entry("merch_card", 10000)], [...shows, external], "2026-10-18", "USD", 400000);
+    expect(result.contracted).toBe(300000);
+    expect(result.remaining_shows).toBe(1);
+    expect(result.forecast_result).toBe(-80000);
+  });
   it("retains the same identity across imports and deducts refunds exactly once", () => {
     const first = normalizeSquare("merchant", payment, order);
     const repeat = normalizeSquare("merchant", { ...payment, refunded_money: payment.total_money }, order);

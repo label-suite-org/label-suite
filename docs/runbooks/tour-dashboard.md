@@ -26,6 +26,7 @@ balances/movements, not revenue. USD/CAD totals are not combined. Show payments
 fulfil guarantees; they are not added to the same guarantee. Forecast merch is
 the average of observed nights, explicitly provisional; missing nights are not
 zeroes. An absent cost budget or guarantee produces an unknown forecast.
+Dates marked `not_performing` are excluded from show revenue and projections.
 
 ## Operator migration
 
@@ -38,6 +39,13 @@ expected old amount. Import current allowances once using stable source keys.
 Booking costs belong in the expense ledger once, not again in lodging costs.
 Expense attribution includes unpaid items and does not claim a reimbursement
 balance. Preserve unknown payment dates and owners.
+
+An `unresolved` list blocks the bundle before a database connection opens.
+Mapped lodging requires its existing ID and snapshot revision; subsequent user
+edits abort the import. Lodging estimated costs are references, not additional
+ledger expenses. Itinerary mappings check the event date and previous notes,
+with optional checked title/status corrections. Preserve original notes in the
+prepared text. An identical rerun skips those updates.
 
 Follow the public web cutover runbook: private database/config/image backup,
 isolated migration rehearsal, approved drift policy, reviewed public main,

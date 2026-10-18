@@ -46,7 +46,7 @@ export function normalizeSquare(merchant: string, payment: SquarePayment, order?
   } catch (error) { return { source, held: error instanceof z.ZodError ? "Invalid payment fields" : (error as Error).message }; }
 }
 
-export type TourShow = { id: string; date: string; title: string; timezone: string; guarantee: number | null; currency: string; address?: string | null };
+export type TourShow = { id: string; date: string; title: string; timezone: string; guarantee: number | null; currency: string; address?: string | null; participation?: string | null };
 export function localDate(instant: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(instant);
 }
@@ -64,6 +64,7 @@ export function entryShow(entry: TourEntry, shows: TourShow[]) {
   return matches.length === 1 ? matches[0] : undefined;
 }
 export function tourMoneySummary(entries: TourEntry[], shows: TourShow[], today: string, currency: string, forecastCost: number | null) {
+  shows = shows.filter(show => show.participation !== "not_performing");
   const usable = entries.filter(e => e.currency === currency && !e.square?.review);
   const sum = (rows: TourEntry[]) => rows.reduce((n, e) => n + (e.kind === "merch_refund" ? -e.amount : e.amount), 0);
   const merch = usable.filter(e => ["merch_card", "merch_cash", "merch_refund"].includes(e.kind));

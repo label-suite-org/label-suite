@@ -21,7 +21,7 @@ export async function getNativeTourDashboard(org: string, projectID: string, now
   const today = localDate(now, timezone);
   const shows: TourShow[] = events.filter(e => e.event_type === "concert" && e.status !== "cancelled").map(event => {
     const show = showDetails.find(d => d.detail.event_id === event.id)?.detail;
-    return { id: event.id, date: event.start_date, title: event.title, timezone: event.timezone || timezone, guarantee: show?.guarantee == null ? null : Math.round(show.guarantee * 100), currency: show?.currency || project.currency || "USD", address: event.address };
+    return { id: event.id, date: event.start_date, title: event.title, timezone: event.timezone || timezone, guarantee: show?.guarantee == null ? null : Math.round(show.guarantee * 100), currency: show?.currency || project.currency || "USD", address: event.address, participation: show?.participation };
   });
   const parsed = ledger.map(row => tourEntrySchema.safeParse(row.data));
   const entries = parsed.flatMap(result => result.success ? [result.data] : []);
