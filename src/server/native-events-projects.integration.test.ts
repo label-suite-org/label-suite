@@ -21,7 +21,7 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
     await sql`insert into label_suite.media_assets (id, org_id, asset_name, project_id) values ('native-asset-own', ${orgA}, 'Project asset', 'native-project'), ('native-asset-other', ${orgA}, 'Other project asset', 'native-project-next'), ('native-asset-event', ${orgA}, 'Event attachment', null)`;
     await sql`insert into label_suite.media_asset_files (id, org_id, media_asset_id, source_postgres_table, source_postgres_record_id, file_name, storage_bucket, storage_key) values ('native-event-file', ${orgA}, 'native-asset-event', 'project_events', 'native-event', 'event.pdf', 'native', 'event.pdf')`;
     await sql`insert into label_suite.artists (id, org_id, name) values ('native-project-artist', ${orgA}, 'Project artist')`;
-    await sql`update label_suite.budget_projects set artist_id='native-project-artist' where org_id=${orgA} and id='native-project'`;
+    await sql`update label_suite.budget_projects set project_type='tour', artist_id='native-project-artist' where org_id=${orgA} and id='native-project'`;
     await sql`insert into label_suite.campaigns (id, org_id, campaign_name, linked_artist_id) values ('native-artist-campaign', ${orgA}, 'Artist campaign', 'native-project-artist'), ('native-unrelated-campaign', ${orgA}, 'Unrelated campaign', null), ('native-other-org-campaign', ${orgB}, 'Other workspace campaign', 'native-project-artist')`;
     await sql`insert into label_suite.contacts (id, org_id, name) values ('native-owner', ${orgA}, 'Project owner'), ('native-event-contact', ${orgA}, 'Event contact')`;
     await sql`update label_suite.budget_projects set owner_contact_id='native-owner' where org_id=${orgA} and id='native-project'`;
@@ -70,7 +70,7 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
   it("keeps same-looking Event and Project identities distinct, bounded, and tenant scoped", async () => {
     const [events, projects, event, project] = await Promise.all([service.listNativeEvents(orgA, { limit: '1', cursor: null }), service.listNativeProjects(orgA, { limit: '1', cursor: null }), service.getNativeEventDetail(orgA, 'native-event'), service.getNativeProjectDetail(orgA, 'native-project')]);
     expect(events.items[0]).toMatchObject({ record_type: 'event', id: 'native-event', next_action: 'Confirm venue' });
-    expect(projects.items[0]).toMatchObject({ record_type: 'project', id: 'native-project', goal: 'Deliver the record', next_action: 'Confirm venue' });
+    expect(projects.items[0]).toMatchObject({ record_type: 'project', id: 'native-project', project_type: 'tour', goal: 'Deliver the record', next_action: 'Confirm venue' });
     expect(event).toMatchObject({ record_type: 'event', relationships: { project_id: 'native-project' } });
     expect(project).toMatchObject({ record_type: 'project', relationships: { events: expect.arrayContaining([expect.objectContaining({ id: 'native-event' })]), assets: [{ id: 'native-asset-own' }] }, relationship_availability: { assets: { status: 'available', association: 'project_id' } } });
     expect(project!.relationships.assets.map((asset) => asset.id)).not.toContain('native-asset-other');
