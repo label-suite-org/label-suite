@@ -104,6 +104,14 @@ jobs:
           # Astro type checking exceeds Node's default 2 GB heap on standard runners.
           NODE_OPTIONS: --max-old-space-size=4096
         run: bash scripts/run-ci-release-gate.sh
+      - name: Verify native tour discovery on disposable PostgreSQL
+        run: |
+          fixture_database=native_events_projects_fixture
+          trap 'dropdb -h "$PGHOST" -U "$PGUSER" --if-exists native_events_projects_fixture' EXIT
+          createdb -h "$PGHOST" -U "$PGUSER" "$fixture_database"
+          export DATABASE_URL="postgres://label_suite:label_suite@127.0.0.1:5432/$fixture_database"
+          npm run db:migrate
+          NATIVE_EVENTS_PROJECTS_INTEGRATION=1 npm exec vitest run src/server/native-events-projects.integration.test.ts -- --maxWorkers=1
       - name: Verify analytics source imports on migrated disposable PostgreSQL
         run: |
           fixture_database=analytics_fixture_ci
