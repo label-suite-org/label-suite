@@ -1,10 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { entryShow, normalizeSquare, tourEntrySchema, tourMoneySummary, type SquarePayment, type SquareOrder, type TourShow } from "./tour-money-core";
 const payment: SquarePayment = { id: "payment-1", location_id: "location", order_id: "order", created_at: "2026-10-18T06:30:00Z", updated_at: "2026-10-18T07:00:00Z", status: "COMPLETED", source_type: "CARD", total_money: { amount: 1100, currency: "USD" }, processing_fee: [{ amount_money: { amount: 45, currency: "USD" } }] };
 const order: SquareOrder = { id: "order", total_money: payment.total_money, total_tax_money: { amount: 100, currency: "USD" }, tenders: [{ payment_id: payment.id }] };
 const shows: TourShow[] = [{ id: "show-1", date: "2026-10-17", title: "Past show", timezone: "America/Los_Angeles", guarantee: 150000, currency: "USD" }, { id: "show-2", date: "2026-10-20", title: "Next show", timezone: "America/Los_Angeles", guarantee: 150000, currency: "USD" }];
 const entry = (kind: string, amount: number, extra = {}) => tourEntrySchema.parse({ kind, amount, currency: "USD", date: "2026-10-17", source: "fixture", ...extra });
 describe("tour money", () => {
+  it("reuses timezone formatters across repeated full-tour dashboard reads", () => {
+    const receipt = normalizeSquare("m", payment, order).data!;
+    const receipts = Array.from({ length: 100 }, (_, i) => ({ ...receipt, source: `fixture-${i}` }));
+    const tour = Array.from({ length: 16 }, (_, i) => ({ ...shows[0], id: `show-${i}`, date: `2026-10-${String(i + 10).padStart(2, "0")}` }));
+    const OriginalFormatter = Intl.DateTimeFormat;
+    const constructor = vi.spyOn(Intl, "DateTimeFormat").mockImplementation(function (locales, options) {
+      return new OriginalFormatter(locales, options);
+    });
+    try {
+      const first = tourMoneySummary(receipts, tour, "2026-10-18", "USD", 400000);
+      const repeated = tourMoneySummary(receipts, tour, "2026-10-18", "USD", 400000);
+      expect(repeated).toEqual(first);
+      expect(first.last_show?.card).toBe(100000);
+      expect(constructor.mock.calls.length).toBeLessThanOrEqual(2);
+    } finally { constructor.mockRestore(); }
+  });
   it("excludes dates where the touring artist is not performing from show forecasts", () => {
     const external = { ...shows[1], id: "external", date: "2026-10-24", guarantee: null, participation: "not_performing" };
     const result = tourMoneySummary([entry("merch_card", 10000)], [...shows, external], "2026-10-18", "USD", 400000);

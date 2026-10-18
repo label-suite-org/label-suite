@@ -47,8 +47,16 @@ export function normalizeSquare(merchant: string, payment: SquarePayment, order?
 }
 
 export type TourShow = { id: string; date: string; title: string; timezone: string; guarantee: number | null; currency: string; address?: string | null; participation?: string | null };
+// ICU formatters are expensive native allocations; reuse them across dashboard reads.
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+const hourFormatters = new Map<string, Intl.DateTimeFormat>();
 export function localDate(instant: Date, timezone: string) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(instant);
+  let formatter = dateFormatters.get(timezone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" });
+    dateFormatters.set(timezone, formatter);
+  }
+  return formatter.format(instant);
 }
 export function entryShow(entry: TourEntry, shows: TourShow[]) {
   if (entry.show) return shows.find(show => show.id === entry.show || show.date === entry.show);
@@ -56,7 +64,12 @@ export function entryShow(entry: TourEntry, shows: TourShow[]) {
   // A 4am local cutoff keeps after-midnight merch with the preceding show.
   const at = new Date(entry.square.createdAt);
   const matches = shows.filter(show => {
-    const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: show.timezone, hour: "2-digit", hourCycle: "h23" }).format(at));
+    let formatter = hourFormatters.get(show.timezone);
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat("en-US", { timeZone: show.timezone, hour: "2-digit", hourCycle: "h23" });
+      hourFormatters.set(show.timezone, formatter);
+    }
+    const hour = Number(formatter.format(at));
     const date = localDate(at, show.timezone);
     const showDate = hour < 4 ? new Date(Date.parse(date + "T12:00:00Z") - 86400000).toISOString().slice(0, 10) : date;
     return show.date === showDate;
@@ -66,22 +79,23 @@ export function entryShow(entry: TourEntry, shows: TourShow[]) {
 export function tourMoneySummary(entries: TourEntry[], shows: TourShow[], today: string, currency: string, forecastCost: number | null) {
   shows = shows.filter(show => show.participation !== "not_performing");
   const usable = entries.filter(e => e.currency === currency && !e.square?.review);
+  const assignedShows = new Map(usable.map(entry => [entry, entryShow(entry, shows)]));
   const sum = (rows: TourEntry[]) => rows.reduce((n, e) => n + (e.kind === "merch_refund" ? -e.amount : e.amount), 0);
   const merch = usable.filter(e => ["merch_card", "merch_cash", "merch_refund"].includes(e.kind));
   const past = shows.filter(s => s.date < today), remaining = shows.filter(s => s.date >= today).length;
-  const observed = past.filter(s => merch.some(e => entryShow(e, shows)?.id === s.id));
-  const average = observed.length ? Math.round(sum(merch.filter(e => observed.some(s => entryShow(e, shows)?.id === s.id))) / observed.length) : null;
+  const observed = past.filter(s => merch.some(e => assignedShows.get(e)?.id === s.id));
+  const average = observed.length ? Math.round(sum(merch.filter(e => observed.some(s => assignedShows.get(e)?.id === s.id))) / observed.length) : null;
   const guaranteesKnown = shows.length > 0 && shows.every(s => s.guarantee !== null && s.currency === currency);
   const contracted = guaranteesKnown ? shows.reduce((n, s) => n + s.guarantee!, 0) : null;
   // Payments fulfil guarantees; they must never be added on top of the same guarantee.
-  const forecastShows = contracted === null ? null : shows.reduce((n, s) => n + Math.max(s.guarantee!, sum(usable.filter(e => e.kind === "show_payment" && entryShow(e, shows)?.id === s.id))), 0);
+  const forecastShows = contracted === null ? null : shows.reduce((n, s) => n + Math.max(s.guarantee!, sum(usable.filter(e => e.kind === "show_payment" && assignedShows.get(e)?.id === s.id))), 0);
   const grants = sum(usable.filter(e => e.kind === "grant"));
   const recordedIncome = sum(usable.filter(e => ["merch_card", "merch_cash", "merch_refund", "show_payment", "grant"].includes(e.kind)));
   const fees = usable.reduce((n, e) => n + (e.square?.fees ?? 0), 0);
   const required = forecastCost === null || forecastShows === null ? null : Math.max(0, forecastCost - forecastShows - grants - sum(merch));
   const forecastResult = required === null || (remaining > 0 && average === null) ? null : forecastShows! + grants + sum(merch) + (average ?? 0) * remaining - forecastCost!;
   const last = [...past].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const lastEntries = last ? usable.filter(e => entryShow(e, shows)?.id === last.id) : [];
+  const lastEntries = last ? usable.filter(e => assignedShows.get(e)?.id === last.id) : [];
   const latestCounts = new Map<string, TourEntry>();
   for (const entry of entries.filter(e => e.kind === "cash_count").sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))) latestCounts.set([entry.currency, entry.person, entry.account].join(":"), entry);
   return { currency, recorded_income: recordedIncome, contracted, forecast_cost: forecastCost, forecast_result: forecastResult,
@@ -98,6 +112,6 @@ export function tourMoneySummary(entries: TourEntry[], shows: TourShow[], today:
       ...(forecastCost === null ? ["No complete cost forecast is recorded."] : []),
       ...(!lastEntries.some(e => e.kind === "merch_cash") ? ["Cash merch for the last show is unrecorded."] : []),
       ...(entries.some(e => e.square?.review) ? ["Previously imported Square payments changed and need review; excluded from totals."] : []),
-      ...(usable.some(e => e.kind === "show_payment" && !entryShow(e, shows)) ? ["Unallocated show payments are excluded from the forecast."] : []),
+      ...(usable.some(e => e.kind === "show_payment" && !assignedShows.get(e)) ? ["Unallocated show payments are excluded from the forecast."] : []),
     ] };
 }
