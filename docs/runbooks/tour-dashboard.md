@@ -1,8 +1,9 @@
 # Native tour dashboard and Square sync
 
-Open Library → Projects → a tour. Dashboard is the default; Project details
-retains the existing editor, events, budget and linked resources. It reads the
-same organization-scoped project records as the web application.
+The current iPhone client consumes `GET /api/native/projects/:id/tour`. Its
+Today → Tour entry opens the dashboard, with Project details retaining the
+existing editor, events, budget and linked resources. The client is delivered
+separately; this change provides the shared organization-scoped API and worker.
 
 The worker schedules enabled Square connections every five minutes. The phone
 refreshes the dashboard every minute while its screen is open. The dashboard

@@ -661,13 +661,6 @@ public struct NativeAPI: NativeAPIClient, Sendable {
   public func updateEvent(id: String, input: NativeEventUpdateInput, workspace: Workspace, session: NativeSession) async throws -> NativeEventDetail { try await libraryRequest(path: "/api/native/events/\(id)", method: "PATCH", payload: input, workspace: workspace, session: session) }
   public func projects(for workspace: Workspace, session: NativeSession, cursor: String? = nil) async throws -> NativeListResponse<NativeProjectSummary> { try await libraryRequest(path: "/api/native/projects", method: "GET", payload: Optional<NativeProjectCreateInput>.none, workspace: workspace, session: session, cursor: cursor) }
   public func project(id: String, workspace: Workspace, session: NativeSession) async throws -> NativeProjectDetail { try await libraryRequest(path: "/api/native/projects/\(id)", method: "GET", payload: Optional<NativeProjectCreateInput>.none, workspace: workspace, session: session) }
-  func tourDashboard(id: String, workspace: Workspace, session: NativeSession) async throws -> NativeTourDashboard {
-    try await libraryRequest(path: "/api/native/projects/\(id)/tour", method: "GET", payload: Optional<NativeProjectCreateInput>.none, workspace: workspace, session: session)
-  }
-  func syncTourSquare(id: String, workspace: Workspace, session: NativeSession) async throws {
-    struct Result: Decodable { let queued: Bool }
-    let _: Result = try await libraryRequest(path: "/api/native/projects/\(id)/tour", method: "POST", payload: Optional<NativeProjectCreateInput>.none, workspace: workspace, session: session)
-  }
   public func createProject(input: NativeProjectCreateInput, workspace: Workspace, session: NativeSession) async throws -> NativeProjectDetail { try await libraryRequest(path: "/api/native/projects", method: "POST", payload: input, workspace: workspace, session: session) }
   public func updateProject(id: String, input: NativeProjectUpdateInput, workspace: Workspace, session: NativeSession) async throws -> NativeProjectDetail { try await libraryRequest(path: "/api/native/projects/\(id)", method: "PATCH", payload: input, workspace: workspace, session: session) }
 
