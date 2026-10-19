@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import { resolveNativeActor } from "../../../../../../lib/native-workspace";
+import { runWithDatabaseContext } from "../../../../../../lib/db";
 import { handleApiError, json, parseJson } from "../../../../../../server/api";
 import { createManualDraftVersion } from "../../../../../../server/campaign-communicator";
 import { hasCapability } from "../../../../../../server/tenant";
@@ -22,14 +23,14 @@ export const PATCH: APIRoute = async ({ request, params }) => {
     const leadId = requiredParam(params.id, "Campaign lead id");
     const draftId = requiredParam(params.draftId, "Outreach draft id");
     const input = await parseJson(request, nativePlainDraftSchema);
-    return json(await createManualDraftVersion(
+    return await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => json(await createManualDraftVersion(
       actor.workspace.org.id,
       draftId,
       input,
       actor.userId,
       undefined,
       { expectedUpdatedAt: input.expected_updated_at, expectedLeadId: leadId, plainOnly: true },
-    ), 201);
+    ), 201));
   } catch (error) {
     return handleApiError(error);
   }
