@@ -9,6 +9,7 @@ const NAMED_CAPABILITY = /requireCapability\(locals, "[^"]+"\)/;
 
 const JUSTIFIED_EXCEPTIONS = new Map([
   ["api/native/projects/[id]/tour.ts", "scoped native bearer tour read and integrations.manage queue request with fresh membership and project ownership"],
+  ["api/native/projects/[id]/tour/entries.ts", "scoped native bearer tour money save with fresh budgets.mutate membership, project ownership, idempotency, show revision and atomic audit"],
   ["api/native/data-quality/[id].ts", "scoped native bearer data-quality actions with fresh integrations.manage membership, revision and atomic audit"],
   ["api/native/notifications/preferences.ts", "native bearer self-owned notification consent with fresh workspace membership, role-limited categories and generation CAS"],
   ["api/native/notifications/devices.ts", "native bearer self-owned session registration/cancellation; registration additionally requires current workspace membership and explicit notification consent"],

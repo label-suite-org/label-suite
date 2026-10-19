@@ -1,8 +1,9 @@
-import { and, eq, asc } from "drizzle-orm";
+import { and, eq, asc, inArray } from "drizzle-orm";
 import { db } from "../lib/db";
-import { budget_projects, budget_line_items, project_events, tour_details, tour_show_details, tour_lodging, tour_travel_legs, tour_money_entries, tour_square_connections } from "../db/schema";
+import { budget_projects, budget_line_items, project_events, tour_details, tour_show_details, tour_lodging, tour_travel_legs, tour_money_entries, tour_square_connections, contacts } from "../db/schema";
+import { showCloseSummary } from "./tour-daily-flow";
 import { rollupBudgetCosts } from "./budget-efc-core";
-import { localDate, tourEntrySchema, tourMoneySummary, type TourShow } from "./tour-money-core";
+import { entryShow, localDate, tourEntrySchema, tourMoneySummary, type TourShow } from "./tour-money-core";
 
 export async function getNativeTourDashboard(org: string, projectID: string, now = new Date()) {
   const [project] = await db.select().from(budget_projects).where(and(eq(budget_projects.org_id, org), eq(budget_projects.id, projectID)));
@@ -34,7 +35,31 @@ export async function getNativeTourDashboard(org: string, projectID: string, now
   if (connection?.held) money.attention.push(`${connection.held} Square payments need review and are excluded.`);
   const next = events.find(e => e.start_date >= today && e.status !== "cancelled");
   const expenses = entries.filter(e => e.kind === "expense");
-  return { project_id: project.id, title: project.name, as_of: now.toISOString(), today, timezone, money,
+  const contactIDs = [...new Set(events.flatMap(e => [e.contact_id, e.owner_contact_id]).filter((id): id is string => Boolean(id)))];
+  const people = contactIDs.length ? await db.select({ id: contacts.id, name: contacts.name, email: contacts.email, phone: contacts.phone }).from(contacts).where(and(eq(contacts.org_id, org), inArray(contacts.id, contactIDs))) : [];
+  const dates = new Set(events.map(e => e.start_date));
+  const start = project.start_date || events[0]?.start_date, end = project.end_date || events.at(-1)?.start_date;
+  if (start && end) for (let at = Date.parse(start + "T12:00:00Z"), i = 0; at <= Date.parse(end + "T12:00:00Z") && i < 366; at += 86400000, i++) dates.add(new Date(at).toISOString().slice(0, 10));
+  const daily = [...dates].sort().map(date => ({ date,
+    events: events.filter(e => e.start_date <= date && (e.end_date || e.start_date) >= date && e.status !== "cancelled").map(e => ({ id: e.id, title: e.title, kind: e.event_type, confirmed: e.is_confirmed,
+      timezone: e.timezone || timezone, time: e.all_day ? null : e.starts_at?.toISOString() ?? null, venue: e.venue_name, address: e.address, notes: e.notes,
+      contacts: people.filter(p => p.id === e.contact_id || p.id === e.owner_contact_id) })),
+    stays: stays.filter(s => s.check_in <= date && (s.check_out ? s.check_out > date : s.check_in === date)).map(s => ({ id: s.id, title: s.stop_name, address: s.address, status: s.booking_status,
+      dates: [s.check_in, s.check_out].filter(Boolean).join(" – "), reference: s.booking_reference, notes: s.notes })),
+    travel: travel.filter(t => t.start_date <= date && (t.end_date || t.start_date) >= date).map(t => ({ id: t.id,
+      title: [t.origin_label, t.destination_label].filter(Boolean).join(" → ") || "Travel", detail: [t.transport_mode, t.notes].filter(Boolean).join(" · "),
+      departure: t.departs_at?.toISOString() ?? null, arrival: t.arrives_at?.toISOString() ?? null, status: t.booking_status })),
+  }));
+  const performingShows = shows.filter(s => s.participation !== "not_performing");
+  const closeShows = performingShows.map(show => {
+    const rows = entries.filter(e => e.currency === show.currency && entryShow(e, performingShows)?.id === show.id && !e.square?.review);
+    return { ...showCloseSummary(show, entries, performingShows), card: rows.some(e => e.kind === "merch_card") ? rows.filter(e => e.kind === "merch_card").reduce((n, e) => n + e.amount, 0) : null,
+      expenses: rows.filter(e => e.kind === "expense").reduce((n, e) => n + e.amount, 0) };
+  });
+  return { daily, shows: closeShows,
+    allowances: lines.filter(l => l.lock_status === "open").map(l => ({ id: l.id, name: l.name, currency: project.currency || "USD", remaining: Math.max(0, Math.round(((l.forecast_amount ?? l.planned_amount ?? l.amount) - (l.paid_amount ?? 0) - (l.committed_amount ?? 0)) * 100)) })),
+    spending: { paid: expenses.filter(e => e.currency === project.currency && e.paid === true).reduce((n, e) => n + e.amount, 0), due: expenses.filter(e => e.currency === project.currency && e.paid === false).reduce((n, e) => n + e.amount, 0), unknown: expenses.filter(e => e.paid === null).length },
+    project_id: project.id, title: project.name, as_of: now.toISOString(), today, timezone, money,
     next: next ? { id: next.id, title: next.title, date: next.start_date, time: next.starts_at?.toISOString() ?? null, timezone: next.timezone || timezone, address: next.address, notes: next.notes } : null,
     stays: stays.filter(s => s.check_in <= today && (s.check_out ? s.check_out > today : s.check_in === today)).map(s => ({ id: s.id, title: s.stop_name, address: s.address, status: s.booking_status, dates: [s.check_in, s.check_out].filter(Boolean).join(" – ") })),
     travel: travel.filter(t => t.start_date === today).map(t => ({ id: t.id, title: [t.origin_label, t.destination_label].filter(Boolean).join(" → ") || "Travel", detail: [t.transport_mode, t.departs_at?.toISOString(), t.notes].filter(Boolean).join(" · ") })),
