@@ -2,10 +2,12 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 
 export const tourEntrySchema = z.object({
-  kind: z.enum(["merch_card", "merch_cash", "merch_refund", "show_payment", "grant", "transfer", "cash_count", "expense"]),
+  kind: z.enum(["merch_card", "merch_cash", "merch_refund", "show_payment", "grant", "transfer", "cash_count", "expense", "show_close"]),
   amount: z.number().int().nonnegative().safe(), currency: z.enum(["USD", "CAD", "DKK", "EUR"]),
   date: z.iso.date().nullable(), show: z.string().default(""), person: z.string().default("Unassigned"),
   paid: z.boolean().nullable().default(null), account: z.string().default(""), source: z.string().min(1), note: z.string().default(""),
+  category: z.string().optional(), budget_line_id: z.string().optional(),
+  operation: z.string().optional(), closed_at: z.string().optional(),
   square: z.object({ merchantId: z.string(), paymentId: z.string(), orderId: z.string(), locationId: z.string(),
     createdAt: z.iso.datetime({ offset: true }), updatedAt: z.iso.datetime({ offset: true }),
     gross: z.number().int(), tax: z.number().int(), tip: z.number().int(), refunded: z.number().int(), fees: z.number().int().nullable(),
@@ -107,7 +109,7 @@ export function tourMoneySummary(entries: TourEntry[], shows: TourShow[], today:
     cash_counts: [...latestCounts.values()].map(e => ({ currency: e.currency, amount: e.amount, person: e.person, date: e.date })),
     attention: [
       "Forecast is provisional; missing cash, unrecorded expenses and merch production costs may change it.",
-      ...(entries.some(e => e.currency !== currency && !["cash_count", "transfer"].includes(e.kind)) ? ["Other-currency entries are kept separately and excluded from this forecast."] : []),
+      ...(entries.some(e => e.currency !== currency && !["cash_count", "transfer", "show_close"].includes(e.kind)) ? ["Other-currency entries are kept separately and excluded from this forecast."] : []),
       ...(contracted === null ? ["Show guarantees or currencies need reconciliation."] : []),
       ...(forecastCost === null ? ["No complete cost forecast is recorded."] : []),
       ...(!lastEntries.some(e => e.kind === "merch_cash") ? ["Cash merch for the last show is unrecorded."] : []),
