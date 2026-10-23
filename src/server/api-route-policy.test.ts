@@ -8,6 +8,7 @@ const MUTATION_EXPORT = /export const (?:(?:POST|PUT|PATCH|DELETE)\b|\{[^}]*\b(?
 const NAMED_CAPABILITY = /requireCapability\(locals, "[^"]+"\)/;
 
 const JUSTIFIED_EXCEPTIONS = new Map([
+  ["api/native/projects/[id]/tour/receipts.ts", "scoped native bearer PDF upload with budgets.mutate, fresh membership, tour ownership, bounded PDF input and server-only archive credentials"],
   ["api/native/projects/[id]/tour.ts", "scoped native bearer tour read and integrations.manage queue request with fresh membership and project ownership"],
   ["api/native/projects/[id]/tour/entries.ts", "scoped native bearer tour money save with fresh budgets.mutate membership, project ownership, idempotency, show revision and atomic audit"],
   ["api/native/data-quality/[id].ts", "scoped native bearer data-quality actions with fresh integrations.manage membership, revision and atomic audit"],

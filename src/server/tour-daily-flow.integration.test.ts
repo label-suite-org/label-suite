@@ -26,6 +26,7 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
   });
   afterAll(async () => {
     if (!sql) return;
+    await sql`delete from label_suite.tour_receipts where org_id=${org}`;
     await sql`delete from label_suite.tour_money_entries where org_id=${org}`;
     await sql`delete from label_suite.tour_show_details where org_id=${org}`;
     await sql`delete from label_suite.project_events where org_id=${org}`;
@@ -104,4 +105,21 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
     const [row] = await sql`select after_data from label_suite.audit_logs where request_id=${saved.request_id}`;
     await expect(service.saveTourDailyEntry(org, project, actor, row.after_data)).rejects.toThrow("voided");
   });
+  it("links receipt retries once and attaches rescans without changing the budget", async () => {
+    const receipt = randomUUID(), rescan = randomUUID();
+    await sql`insert into label_suite.tour_receipts(id,org_id,project_id,sha256,document_id,status) values (${receipt},${org},${project},${receipt},1234,'review'),(${rescan},${org},${project},${rescan},1235,'review')`;
+    const input = expense({receipt_id:receipt,budget_line_id:"",amount:7777,distinct_purchase:true});
+    const results = await Promise.all([service.saveTourDailyEntry(org,project,actor,input),service.saveTourDailyEntry(org,project,actor,{...input,request_id:randomUUID()})]);
+    expect(results[0].entry_id).toBe(results[1].entry_id);
+    const before = (await read())!.money.forecast_cost;
+    await expect(service.saveTourDailyEntry(org,project,actor,{...input,receipt_id:rescan,request_id:randomUUID(),distinct_purchase:false})).rejects.toThrow("recorded expense");
+    const attach = {...input,receipt_id:rescan,request_id:randomUUID(),existing_entry_id:results[0].entry_id,distinct_purchase:false};
+    const linked = await service.saveTourDailyEntry(org,project,actor,attach);
+    expect(linked.entry_id).toBe(results[0].entry_id);
+    expect((await read())!.money.forecast_cost).toBe(before);
+    expect((await sql`select count(*)::int n from label_suite.tour_receipts where entry_id=${linked.entry_id}`)[0].n).toBe(2);
+    await expect(service.saveTourDailyEntry('other-org',project,actor,input)).rejects.toThrow("not found");
+    await expect(service.saveTourDailyEntry(org,project,actor,{...input,receipt_id:randomUUID(),request_id:randomUUID()})).rejects.toThrow("not ready");
+  });
+
 });

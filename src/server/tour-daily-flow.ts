@@ -2,9 +2,10 @@ import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../lib/db";
-import { budget_projects, budget_line_items, project_events, tour_show_details, tour_money_entries } from "../db/schema";
+import { budget_projects, budget_line_items, project_events, tour_show_details, tour_money_entries, tour_receipts } from "../db/schema";
 import { entryShow, sourceID, tourEntrySchema, type TourEntry, type TourShow } from "./tour-money-core";
 import { writeAuditLog } from "./audit";
+import { receiptExpenseMatches } from "./tour-receipt-extraction";
 import { HttpError } from "./errors";
 
 const cents = z.number().int().min(0).max(100_000_000);
@@ -12,7 +13,8 @@ const currency = z.enum(["USD", "CAD", "EUR", "DKK"]);
 export const tourDailyMutation = z.discriminatedUnion("action", [
   z.object({ action: z.literal("expense"), request_id: z.uuid(), name: z.string().trim().min(1).max(160), amount: cents.refine(n => n > 0), currency,
     date: z.iso.date(), show_id: z.string().max(160).default(""), person: z.string().trim().min(1).max(120), paid: z.boolean(),
-    category: z.string().trim().min(1).max(80), budget_line_id: z.string().max(160).default(""), note: z.string().max(4000).default("") }).strict(),
+    category: z.string().trim().min(1).max(80), budget_line_id: z.string().max(160).default(""), note: z.string().max(4000).default(""),
+    receipt_id: z.uuid().optional(), existing_entry_id: z.string().min(1).max(160).optional(), distinct_purchase: z.boolean().optional() }).strict(),
   z.object({ action: z.literal("close_show"), request_id: z.uuid(), show_id: z.string().min(1).max(160), expected_revision: z.string().min(1).max(80),
     cash_total: cents.nullable(), payment_total: cents.nullable(), note: z.string().max(4000).default("") }).strict(),
 ]);
@@ -46,10 +48,28 @@ export async function saveTourDailyEntry(org: string, projectID: string, actor: 
     }
     let data: TourEntry;
     if (input.action === "expense") {
-      if (project.start_date && input.date < project.start_date || project.end_date && input.date > project.end_date) throw new HttpError("Choose a date within this tour", 400);
+      if (!input.receipt_id && (project.start_date && input.date < project.start_date || project.end_date && input.date > project.end_date)) throw new HttpError("Choose a date within this tour", 400);
       if (input.show_id) {
         const [event] = await tx.select().from(project_events).where(and(eq(project_events.org_id, org), eq(project_events.project_id, projectID), eq(project_events.id, input.show_id)));
         if (!event || event.status === "cancelled") throw new HttpError("Event is outside this tour or cancelled", 400);
+      }
+      if (!input.receipt_id && (input.existing_entry_id || input.distinct_purchase)) throw new HttpError("Receipt required", 400);
+      if (input.receipt_id) {
+        const [receipt] = await tx.select().from(tour_receipts).where(and(eq(tour_receipts.org_id, org), eq(tour_receipts.project_id, projectID), eq(tour_receipts.id, input.receipt_id))).for("update");
+        if (!receipt || !receipt.document_id || !["review", "saved"].includes(receipt.status)) throw new HttpError("Receipt is not ready for review", 409);
+        const entries = await tx.select().from(tour_money_entries).where(and(eq(tour_money_entries.org_id, org), eq(tour_money_entries.project_id, projectID), eq(tour_money_entries.voided, false)));
+        if (receipt.entry_id) {
+          if (!entries.some(e => e.id === receipt.entry_id)) throw new HttpError("The linked expense was voided. Review it in the workspace.", 409);
+          return { saved: true, request_id: input.request_id, entry_id: receipt.entry_id, repeated: true };
+        }
+        if (input.existing_entry_id) {
+          const existing = entries.find(e => e.id === input.existing_entry_id && e.data.kind === "expense");
+          if (!existing || existing.data.amount !== input.amount || existing.data.currency !== input.currency) throw new HttpError("Choose a recorded expense with the same total and currency", 409);
+          await tx.update(tour_receipts).set({ entry_id: existing.id, status: "saved" }).where(and(eq(tour_receipts.org_id, org), eq(tour_receipts.id, receipt.id)));
+          await writeAuditLog({ orgId: org, actorUserId: actor, action: "tour.receipt_link", entityType: "project", entityId: projectID, afterData: input, requestId: input.request_id }, tx);
+          return { saved: true, request_id: input.request_id, entry_id: existing.id, repeated: false };
+        }
+        if (receiptExpenseMatches(entries, input.amount, input.currency).length && !input.distinct_purchase) throw new HttpError("A recorded expense has this total. Attach the receipt to it, or confirm this is a separate purchase.", 409);
       }
       let lineID: string | undefined;
       // The project's budget has one currency. Other-currency expenses remain explicit ledger costs, never converted or mixed.
@@ -101,6 +121,7 @@ export async function saveTourDailyEntry(org: string, projectID: string, actor: 
     }
     const id = sourceID(`${org}:${source}`);
     await tx.insert(tour_money_entries).values({ id, org_id: org, project_id: projectID, source_key: source, data });
+    if (input.action === "expense" && input.receipt_id) await tx.update(tour_receipts).set({ entry_id: id, status: "saved" }).where(and(eq(tour_receipts.org_id, org), eq(tour_receipts.id, input.receipt_id)));
     await writeAuditLog({ orgId: org, actorUserId: actor, action: `tour.${input.action}`, entityType: "project", entityId: projectID, afterData: input, requestId: input.request_id }, tx);
     return { saved: true, request_id: input.request_id, entry_id: id, repeated: false };
   });

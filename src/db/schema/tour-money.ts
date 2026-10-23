@@ -40,3 +40,20 @@ export const tour_square_connections = schema.table("tour_square_connections", {
   uniqueIndex("tour_square_merchant_unique").on(table.org_id, table.merchant_id),
   check("tour_square_period_check", sql`${table.end_at} > ${table.begin_at}`),
 ]);
+
+// Receipt evidence is separate from money until reviewed and atomically linked.
+export const tour_receipts = schema.table("tour_receipts", {
+  id: text("id").primaryKey(),
+  org_id: text("org_id").notNull().references(() => orgs.id),
+  project_id: text("project_id").notNull().references(() => budget_projects.id),
+  sha256: text("sha256").notNull(),
+  task_id: text("task_id"),
+  document_id: integer("document_id"),
+  status: text("status").notNull().default("uploading"),
+  content: text("content").notNull().default(""),
+  error: text("error"),
+  entry_id: text("entry_id").references(() => tour_money_entries.id),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex("tour_receipt_hash_unique").on(t.org_id, t.sha256),
+  uniqueIndex("tour_receipt_document_unique").on(t.org_id, t.document_id),
+  index("tour_receipt_project_idx").on(t.org_id, t.project_id)]);
