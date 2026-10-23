@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import postgres, { type Sql } from "postgres";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const enabled = process.env.TOUR_DAILY_INTEGRATION === "1";
 const org = `tour-daily-${randomUUID()}`, actor = `${org}-actor`;
@@ -135,6 +135,32 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
       expect(resumed.id).toBe(id);
       expect(resumed.matches.map(m=>m.id)).toContain(entry.entry_id);
     } finally {
+      for (const [key,value] of Object.entries({PAPERLESS_ORG_ID:before.org,PAPERLESS_URL:before.url,PAPERLESS_TOKEN:before.token})) {
+        if(value===undefined) delete process.env[key]; else process.env[key]=value;
+      }
+    }
+  });
+
+  it("keeps a saved receipt saved when an older OCR request finishes", async () => {
+    const id=randomUUID(), task=randomUUID();
+    await sql`insert into label_suite.tour_receipts(id,org_id,project_id,sha256,task_id,status) values (${id},${org},${project},${id},${task},'processing')`;
+    const before={org:process.env.PAPERLESS_ORG_ID,url:process.env.PAPERLESS_URL,token:process.env.PAPERLESS_TOKEN};
+    Object.assign(process.env,{PAPERLESS_ORG_ID:org,PAPERLESS_URL:'https://archive.example.invalid',PAPERLESS_TOKEN:'fixture'});
+    let entry: string | undefined;
+    vi.stubGlobal('fetch',vi.fn(async (url: string) => {
+      if (url.includes('/api/tasks/')) return Response.json([{task_id:task,status:'SUCCESS',related_document:55667}]);
+      // Another request finishes OCR and the user saves while this document read is outstanding.
+      await sql`update label_suite.tour_receipts set status='review',document_id=55667 where id=${id}`;
+      const result=await service.saveTourDailyEntry(org,project,actor,expense({receipt_id:id,amount:7654,budget_line_id:'',distinct_purchase:true}));
+      entry=result.entry_id;
+      return Response.json({content:'TOTAL USD 76.54'});
+    }));
+    try {
+      const {getTourReceipt}=await import('./tour-receipts');
+      expect(await getTourReceipt(org,project,id)).toMatchObject({status:'saved'});
+      expect((await sql`select entry_id,status from label_suite.tour_receipts where id=${id}`)[0]).toEqual({entry_id:entry,status:'saved'});
+    } finally {
+      vi.unstubAllGlobals();
       for (const [key,value] of Object.entries({PAPERLESS_ORG_ID:before.org,PAPERLESS_URL:before.url,PAPERLESS_TOKEN:before.token})) {
         if(value===undefined) delete process.env[key]; else process.env[key]=value;
       }

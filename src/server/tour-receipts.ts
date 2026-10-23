@@ -79,17 +79,17 @@ export async function getTourReceipt(org: string, project: string, id: string) {
   if (!row) throw new HttpError('Receipt not found',404);
   if (row.status === 'processing') {
     const task = await archiveTask(org, row.id, row.task_id);
-    if (task && !row.task_id) await db.update(tour_receipts).set({task_id:task.task_id,error:null}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id)));
+    if (task && !row.task_id) await db.update(tour_receipts).set({task_id:task.task_id,error:null}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id),eq(tour_receipts.status,'processing')));
     if (task?.status === 'SUCCESS' && task.related_document) {
       const docID = z.coerce.number().int().positive().parse(task.related_document);
       const doc = z.object({content:z.string()}).parse(await paperless<unknown>(org,`/api/documents/${docID}/?fields=content`));
-      await db.update(tour_receipts).set({task_id:task.task_id,document_id:docID,status:'review',content:String(doc.content).slice(0,60000),error:null}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id)));
+      await db.update(tour_receipts).set({task_id:task.task_id,document_id:docID,status:'review',content:String(doc.content).slice(0,60000),error:null}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id),eq(tour_receipts.status,'processing')));
       return getTourReceipt(org,project,id);
     } else if (!task && Date.now()-row.created_at.getTime()>120000) {
-      await db.update(tour_receipts).set({status:'uploading',error:'The upload was not confirmed. Send the saved scan again.'}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id)));
+      await db.update(tour_receipts).set({status:'uploading',error:'The upload was not confirmed. Send the saved scan again.'}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id),eq(tour_receipts.status,'processing')));
       return getTourReceipt(org,project,id);
     } else if (task?.status === 'FAILURE') {
-      await db.update(tour_receipts).set({status:'error',error:'The archive could not process this receipt, or already has a copy. Review it in Paperless before trying another scan.'}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id)));
+      await db.update(tour_receipts).set({status:'error',error:'The archive could not process this receipt, or already has a copy. Review it in Paperless before trying another scan.'}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id),eq(tour_receipts.status,'processing')));
       return getTourReceipt(org,project,id);
     }
   }
