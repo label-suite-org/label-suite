@@ -78,6 +78,18 @@ describe("Spotify import middleware boundary", () => {
     process.env.PUBLIC_SITE_URL = "https://labels.example";
   });
 
+  it.each(["/drops/org-a/tour-news", "/fans/confirm?token=private", "/fans/unsubscribe?token=private"])("serves public fan route %s without selecting a browser workspace", async (path) => {
+    const { onRequest } = await import("./middleware");
+    const context = contextFor(new Request(`https://labels.example${path}`));
+    const next = vi.fn().mockResolvedValue(new Response("fan page"));
+    const response = await onRequest(context as never, next) as Response;
+    expect(next).toHaveBeenCalledOnce();
+    expect(authBoundary.getSession).not.toHaveBeenCalled();
+    expect(authBoundary.resolveActiveOrgForUser).not.toHaveBeenCalled();
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    expect(response.headers.get("Referrer-Policy")).toBe("no-referrer");
+  });
+
   it.each(["/native-sign-in", "/api/native/browser-sign-in"])("leaves %s authentication to the sign-in boundary", async (path) => {
     const { onRequest } = await import("./middleware");
     const context = contextFor(new Request(`https://labels.example${path}`, {

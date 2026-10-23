@@ -68,10 +68,19 @@ async function handleRequest(
   const path = context.url.pathname;
   const isLocalToolApi = path.startsWith("/api/local-tools/");
   const isNativeApi = path.startsWith("/api/native/");
-  if (path.startsWith("/api/") && !isLocalToolApi && !isNativeApi && isUnsafeMethod(context.request.method)) {
+  const isFanWebhook = /^\/api\/fans\/brevo\/[A-Za-z0-9_-]+$/.test(path);
+  if (path.startsWith("/api/") && !isFanWebhook && !isLocalToolApi && !isNativeApi && isUnsafeMethod(context.request.method)) {
     requireSameOrigin(context.request);
   }
   const isPublic = publicPaths.includes(path);
+  const isFanPublic = isFanWebhook || /^\/drops\/[A-Za-z0-9_-]+\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path)
+    || ["/fans/confirm", "/fans/unsubscribe", "/api/fans/signup", "/api/fans/confirm", "/api/fans/unsubscribe"].includes(path);
+  if (isFanPublic) {
+    const response = withPrivateCachePolicy(await next());
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
+  }
   const isPublicPressRoute = /^\/press\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path);
   const isAuthApi = path.startsWith("/api/auth");
   const isNativeSignIn = path === "/api/native/sign-in" || path === "/api/native/browser-sign-in" || path === "/native-sign-in";

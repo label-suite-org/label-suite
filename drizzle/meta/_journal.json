@@ -666,6 +666,20 @@
       "when": 1792728000000,
       "tag": "0102_tour_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792738000000,
+      "tag": "0103_fan_drops",
+      "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792739000000,
+      "tag": "0104_fan_messages",
+      "breakpoints": true
     }
   ]
 }

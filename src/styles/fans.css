@@ -1,0 +1,23 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; color: #17221f; background: #f3f5f1; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.fan-page { max-width: 680px; padding: 40px 24px 64px; margin: auto; }
+.fan-artwork { display: block; width: 100%; max-height: 440px; object-fit: cover; border-radius: 16px; }
+h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.1; letter-spacing: -.04em; margin: 16px 0; }
+p { line-height: 1.6; }
+.fan-description { white-space: pre-wrap; }
+.fan-form { padding: 24px; background: #fff; border: 1px solid #d7ded4; border-radius: 16px; margin-top: 24px; }
+label { display: block; margin: 0 0 18px; font-weight: 600; }
+label span, .fan-small { font-weight: 400; font-size: .9rem; }
+input:not([type=checkbox]), select { width: 100%; min-height: 48px; font: inherit; margin-top: 8px; padding: 10px 12px; border: 1px solid #849187; border-radius: 6px; background: transparent; color: inherit; }
+.fan-consent { display: flex; gap: 12px; align-items: flex-start; line-height: 1.5; }
+input[type=checkbox] { width: 20px; height: 20px; flex-shrink: 0; margin-top: 2px; }
+button, .fan-next { display: inline-block; min-height: 48px; padding: 12px 20px; font: inherit; font-weight: 600; background: #173c31; border: 0; border-radius: 8px; color: #fff; cursor: pointer; }
+button { width: 100%; } button:disabled { opacity: .55; cursor: default; }
+a { color: inherit; text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid #5489d5; outline-offset: 3px; }
+.fan-honeypot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.fan-shows { padding: 0; list-style: none; }
+.fan-shows li { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid #849187; }
+.fan-shows small { display: block; margin-top: 4px; }
+@media(prefers-color-scheme: dark) { :root { color: #ecf1e9; background: #121a16; } .fan-form { background: #1b2620; border-color: #38483d; } button, .fan-next { background: #c3e3cc; color: #15291b; } }

@@ -15,3 +15,5 @@ export * from "./artist-portal";
 export * from "./notifications";
 
 export * from "./tour-money";
+
+export * from "./fans";
