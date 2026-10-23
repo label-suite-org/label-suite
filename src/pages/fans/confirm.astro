@@ -1,0 +1,11 @@
+---
+import "../../styles/fans.css";
+import { FanForm } from "../../components/fans/FanForm";
+import { readFanToken } from "../../server/fan-drops-core";
+export const prerender = false;
+const token = Astro.url.searchParams.get("token") ?? "";
+let valid = true;
+try { readFanToken(token, "confirm"); } catch { valid = false; Astro.response.status = 400; }
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Confirm your email</title></head>
+<body><main class="fan-page"><h1>Confirm your email</h1>{valid ? <><p>Confirm to receive the artist’s updates and access your signup offer.</p><FanForm client:load action="confirm" token={token} /></> : <p>This link is invalid or expired. Return to the artist’s page and sign up again.</p>}</main></body></html>

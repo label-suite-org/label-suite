@@ -7,6 +7,7 @@ import { email_logs, email_templates, radio_stations } from "../db/schema";
 const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 export interface SendEmailInput {
+  signal?: AbortSignal;
   subject: string;
   htmlBody: string;
   toEmail: string;
@@ -46,6 +47,7 @@ export async function sendEmailViaBrevo(input: SendEmailInput): Promise<SendEmai
   };
 
   const res = await fetch(BREVO_API_URL, {
+    signal: input.signal,
     method: "POST",
     headers: {
       "Content-Type": "application/json",
