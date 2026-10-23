@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import postgres, { type Sql } from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -120,6 +120,25 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
     expect((await sql`select count(*)::int n from label_suite.tour_receipts where entry_id=${linked.entry_id}`)[0].n).toBe(2);
     await expect(service.saveTourDailyEntry('other-org',project,actor,input)).rejects.toThrow("not found");
     await expect(service.saveTourDailyEntry(org,project,actor,{...input,receipt_id:randomUUID(),request_id:randomUUID()})).rejects.toThrow("not ready");
+  });
+
+  it("returns current expense matches when an uploaded PDF resumes a ready receipt", async () => {
+    const entry = await service.saveTourDailyEntry(org,project,actor,expense({amount:5432,budget_line_id:""}));
+    const id=randomUUID(),pdf=new TextEncoder().encode('%PDF-fixture-duplicate');
+    const hash=createHash('sha256').update(pdf).digest('hex');
+    await sql`insert into label_suite.tour_receipts(id,org_id,project_id,sha256,document_id,status,content) values (${id},${org},${project},${hash},54321,'review','TOTAL USD 54.32')`;
+    const before={org:process.env.PAPERLESS_ORG_ID,url:process.env.PAPERLESS_URL,token:process.env.PAPERLESS_TOKEN};
+    Object.assign(process.env,{PAPERLESS_ORG_ID:org,PAPERLESS_URL:'https://archive.example.invalid',PAPERLESS_TOKEN:'fixture'});
+    try {
+      const {uploadTourReceipt}=await import('./tour-receipts');
+      const resumed=await uploadTourReceipt(org,project,randomUUID(),pdf);
+      expect(resumed.id).toBe(id);
+      expect(resumed.matches.map(m=>m.id)).toContain(entry.entry_id);
+    } finally {
+      for (const [key,value] of Object.entries({PAPERLESS_ORG_ID:before.org,PAPERLESS_URL:before.url,PAPERLESS_TOKEN:before.token})) {
+        if(value===undefined) delete process.env[key]; else process.env[key]=value;
+      }
+    }
   });
 
 });
