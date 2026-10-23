@@ -96,6 +96,12 @@ private struct FanDropEditor: View {
                     TextField("Description", text: $draft.content.description, axis: .vertical).lineLimit(3...8)
                     TextField("Link name, e.g. new-music", text: $draft.slug).textInputAutocapitalization(.never).autocorrectionDisabled()
                     TextField("Artwork URL (optional)", text: optionalText($draft.content.artwork_url)).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    if let artwork = home.releases.first(where: { $0.id == draft.release_id })?.cover_art_url, artwork.hasPrefix("https://") {
+                        Button("Use release artwork") { draft.content.artwork_url = artwork }
+                    }
+                    if let artwork = home.artists.first(where: { $0.id == draft.artist_id })?.image_url, artwork.hasPrefix("https://") {
+                        Button("Use artist artwork") { draft.content.artwork_url = artwork }
+                    }
                     TextField("Privacy policy URL", text: $draft.content.privacy_url).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                 }
                 Section("After email confirmation") {

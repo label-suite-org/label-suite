@@ -10,8 +10,8 @@ struct BackendFansHome: Decodable {
     let broadcast_enabled: Bool
     let public_base_url: String
 }
-struct FanArtistChoice: Decodable, Identifiable { let id: String; let name: String }
-struct FanReleaseChoice: Decodable, Identifiable { let id: String; let artist_id: String?; let title: String }
+struct FanArtistChoice: Decodable, Identifiable { let id: String; let name: String; let image_url: String? }
+struct FanReleaseChoice: Decodable, Identifiable { let id: String; let artist_id: String?; let title: String; let cover_art_url: String? }
 struct FanShowChoice: Decodable, Identifiable { let id: String; let artist_id: String?; let title: String; let start_date: String?; let city: String? }
 struct FanDropShow: Codable, Equatable { var event_id: String; var ticket_url: String? }
 struct FanDropContent: Codable, Equatable {

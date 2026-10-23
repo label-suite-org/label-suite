@@ -34,8 +34,8 @@ export const GET: APIRoute = async ({ request }) => {
       }
       const orgId = actor.workspace.org.id;
       const scope = params.get("scope_artist") ? fanId.parse(params.get("scope_artist")) : undefined;
-      return { artists: await db.select({ id: artists.id, name: artists.name }).from(artists).where(and(eq(artists.org_id, orgId), scope ? eq(artists.id, scope) : undefined)).orderBy(asc(artists.name)).limit(500),
-        releases: await db.select({ id: releases.id, artist_id: releases.artist_id, title: releases.title }).from(releases).where(and(eq(releases.org_id, orgId), scope ? eq(releases.artist_id, scope) : undefined)).orderBy(asc(releases.title)).limit(500),
+      return { artists: await db.select({ id: artists.id, name: artists.name, image_url: artists.image_url }).from(artists).where(and(eq(artists.org_id, orgId), scope ? eq(artists.id, scope) : undefined)).orderBy(asc(artists.name)).limit(500),
+        releases: await db.select({ id: releases.id, artist_id: releases.artist_id, title: releases.title, cover_art_url: releases.cover_art_url }).from(releases).where(and(eq(releases.org_id, orgId), scope ? eq(releases.artist_id, scope) : undefined)).orderBy(asc(releases.title)).limit(500),
         shows: await db.select({ id: project_events.id, artist_id: project_events.artist_id, title: project_events.title, start_date: project_events.start_date, city: project_events.city }).from(project_events).where(and(eq(project_events.org_id, orgId), scope ? eq(project_events.artist_id, scope) : undefined)).orderBy(asc(project_events.start_date)).limit(500),
         public_base_url: canonicalAppOrigin(),
         drops: (await listFanDrops(orgId, scope)).map(drop => ({ ...drop, public_url: new URL(publicDropPath(orgId, drop.slug), canonicalAppOrigin()).toString() })), messages: await listFanMessages(orgId, scope), email_enabled: fanEmailEnabled(), broadcast_enabled: process.env.FAN_BROADCAST_ENABLED === "true" && process.env.FAN_BREVO_ORG_ID === actor.workspace.org.id };
