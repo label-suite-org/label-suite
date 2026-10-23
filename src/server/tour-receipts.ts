@@ -50,6 +50,12 @@ export async function uploadTourReceipt(org: string, project: string, id: string
   const claimed = await db.update(tour_receipts).set({status:'processing'}).where(and(eq(tour_receipts.id,row.id),eq(tour_receipts.org_id,org),eq(tour_receipts.status,'uploading'))).returning();
   if (!claimed.length) return view(row);
   try {
+    // Reconcile an archive upload whose database transaction or HTTP acknowledgement was lost.
+    const existing = await archiveTask(org, row.id, null);
+    if (existing) {
+      await db.update(tour_receipts).set({task_id:existing.task_id,error:null}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,row.id)));
+      return getTourReceipt(org,project,row.id);
+    }
     const form = new FormData(); form.set('document', new Blob([Buffer.from(bytes)], {type:'application/pdf'}), `labelsuite-${id}.pdf`);
     form.set('title', `Tour receipt ${id}`);
     const task = z.uuid().parse(await paperless<unknown>(org, '/api/documents/post_document/', {method:'POST',body:form}));
@@ -61,14 +67,18 @@ export async function uploadTourReceipt(org: string, project: string, id: string
   return getTourReceipt(org,project,row.id);
 }
 const archiveTaskSchema = z.object({task_id:z.string(),task_file_name:z.string().nullable().optional(),status:z.string(),related_document:z.union([z.string(),z.number()]).nullable().optional()});
+async function archiveTask(org: string, id: string, taskID: string | null) {
+  const query = taskID ? `task_id=${encodeURIComponent(taskID)}` : `name=${encodeURIComponent(`labelsuite-${id}.pdf`)}`;
+  const tasks = z.union([z.array(archiveTaskSchema),z.object({results:z.array(archiveTaskSchema)})]).parse(await paperless<unknown>(org,`/api/tasks/?${query}&page_size=20`));
+  return (Array.isArray(tasks) ? tasks : tasks.results).find(t => taskID ? t.task_id===taskID : t.task_file_name===`labelsuite-${id}.pdf`);
+}
+
 export async function getTourReceipt(org: string, project: string, id: string) {
   await tour(org,project);
   const [row] = await db.select().from(tour_receipts).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.project_id,project),eq(tour_receipts.id,id)));
   if (!row) throw new HttpError('Receipt not found',404);
   if (row.status === 'processing') {
-    const query = row.task_id ? `task_id=${encodeURIComponent(row.task_id)}` : `name=${encodeURIComponent(`labelsuite-${row.id}.pdf`)}`;
-    const tasks = z.union([z.array(archiveTaskSchema),z.object({results:z.array(archiveTaskSchema)})]).parse(await paperless<unknown>(org,`/api/tasks/?${query}&page_size=20`));
-    const task = (Array.isArray(tasks) ? tasks : tasks.results).find(t => row.task_id ? t.task_id===row.task_id : t.task_file_name===`labelsuite-${row.id}.pdf`);
+    const task = await archiveTask(org, row.id, row.task_id);
     if (task && !row.task_id) await db.update(tour_receipts).set({task_id:task.task_id,error:null}).where(and(eq(tour_receipts.org_id,org),eq(tour_receipts.id,id)));
     if (task?.status === 'SUCCESS' && task.related_document) {
       const docID = z.coerce.number().int().positive().parse(task.related_document);
