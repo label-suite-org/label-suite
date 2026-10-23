@@ -45,10 +45,10 @@ export async function uploadTourReceipt(org: string, project: string, id: string
   await db.insert(tour_receipts).values({id, org_id: org, project_id: project, sha256: hash}).onConflictDoNothing();
   const [row] = await db.select().from(tour_receipts).where(and(eq(tour_receipts.org_id, org), eq(tour_receipts.sha256, hash)));
   if (!row || row.project_id !== project) throw new HttpError('This receipt is already assigned to another tour. Review it before adding a cost.', 409);
-  if (row.id !== id || row.task_id || row.document_id) return view(row);
+  if (row.id !== id || row.task_id || row.document_id) return getTourReceipt(org,project,row.id);
   // Claim once; retries inspect the persistent task rather than uploading the same receipt again.
   const claimed = await db.update(tour_receipts).set({status:'processing'}).where(and(eq(tour_receipts.id,row.id),eq(tour_receipts.org_id,org),eq(tour_receipts.status,'uploading'))).returning();
-  if (!claimed.length) return view(row);
+  if (!claimed.length) return getTourReceipt(org,project,row.id);
   try {
     // Reconcile an archive upload whose database transaction or HTTP acknowledgement was lost.
     const existing = await archiveTask(org, row.id, null);
