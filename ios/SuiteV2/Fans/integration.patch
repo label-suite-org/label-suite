@@ -3,7 +3,7 @@
 @@ -1796,6 +1796,10 @@
                            queryItems: cursor.map { [URLQueryItem(name: "cursor", value: $0)] } ?? [])
      }
- 
+
 +    func fanDrops<Response: Decodable>(action: String? = nil, input: [String: Any] = [:], query: [URLQueryItem] = [], workspaceID: String, token: String) async throws -> Response {
 +        try await request(path: "/api/native/fan-drops", method: action == nil ? "GET" : "POST", body: action.map { ["action": $0, "input": input] }, token: token, workspaceID: workspaceID, queryItems: query)
 +    }
@@ -14,7 +14,7 @@
 @@ -2461,6 +2465,11 @@
      var canMutateGrants: Bool { selectedWorkspace?.capabilities["fundraising.mutate"] == true }
      var canAttachGrantDocuments: Bool { selectedWorkspace?.capabilities["grant_documents.mutate"] == true }
- 
+
 +    func fanDrops<Response: Decodable>(action: String? = nil, input: [String: Any] = [:], query: [URLQueryItem] = []) async throws -> Response {
 +        if action != nil && !canMutateOperations { throw BackendError.forbidden("Fan management requires operator access.") }
 +        return try await readWorkspace { workspaceID, token in try await client.fanDrops(action: action, input: input, query: query, workspaceID: workspaceID, token: token) }
@@ -27,7 +27,7 @@
 +++ b/Suite-v2/LocalBackendViews.swift
 @@ -195,6 +195,7 @@
              }
- 
+
              Section("Canonical records") {
 +                NavigationLink("Fans & Drops") { BackendFanDropsView() }
                  NavigationLink("Campaigns & outreach") { BackendCampaignsView() }
