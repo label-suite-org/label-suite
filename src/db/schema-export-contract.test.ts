@@ -15,6 +15,7 @@ import {
 } from "./schema";
 
 const EXPECTED_TABLE_EXPORTS = [
+  "fan_drops", "fans", "fan_subscriptions", "fan_signups", "fan_rate_limits", "fan_messages", "fan_activity",
   "CAMPAIGN_DRAFT_STATUSES",
   "CAMPAIGN_RESEARCH_STATUSES",
   "CAMPAIGN_SUGGESTION_STATUSES",

@@ -1,3 +1,5 @@
+import { dispatchFanMessage } from "../fan-messages";
+import { dispatchFanConfirmation } from "../fan-drops";
 import { syncTourSquare } from "../tour-square-sync";
 import { syncCalendar } from "../calendar-sync";
 import { runValidationSweep } from "../../lib/readiness";
@@ -6,6 +8,14 @@ import { collectNativeNotifications } from "../native-notification-collection";
 import { dispatchNativeNotifications } from "../native-notification-delivery";
 
 export const jobHandlers: JobHandlerRegistry = {
+  fan_message: async (job, context) => {
+    if (job.schemaVersion !== 1 || typeof job.payload.messageId !== "string") throw new Error("Invalid fan message job");
+    return dispatchFanMessage(job.orgId, job.payload.messageId, context.signal);
+  },
+  fan_confirmation: async (job, context) => {
+    if (job.schemaVersion !== 1 || typeof job.payload.signupId !== "string") throw new Error("Invalid fan confirmation job");
+    return dispatchFanConfirmation(job.orgId, job.payload.signupId, context.signal);
+  },
   tour_square_sync: async (job, context) => {
     if (job.schemaVersion !== 1 || typeof job.payload.projectId !== "string") throw new Error("Invalid tour Square sync job");
     return syncTourSquare(job.orgId, job.payload.projectId, context.signal);

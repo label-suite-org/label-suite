@@ -1,0 +1,21 @@
+---
+import "../../../styles/fans.css";
+import { runWithDatabaseContext } from "../../../lib/db";
+import { getPublicFanDrop } from "../../../server/fan-drops";
+import { fanEmailEnabled, fanId } from "../../../server/fan-drops-core";
+import { FanForm } from "../../../components/fans/FanForm";
+export const prerender = false;
+const parsed = fanId.safeParse(Astro.params.org);
+if (!parsed.success || !Astro.params.slug) return new Response("Not found", { status: 404 });
+const org = parsed.data; const slug = Astro.params.slug;
+const drop = await runWithDatabaseContext({ userId: "fan-public", orgId: org }, () => getPublicFanDrop(org, slug));
+if (!drop?.published || !drop.published_revision) return new Response("Not found", { status: 404 });
+const page = drop.published;
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>{page.title} · {page.artist_name}</title><meta name="description" content={page.description.slice(0, 200)} /></head>
+<body><main class="fan-page">
+  {page.artwork_url && <img class="fan-artwork" src={page.artwork_url} alt={`${page.artist_name} — ${page.title}`} />}
+  <p>{page.artist_name}</p><h1>{page.title}</h1><p class="fan-description">{page.description}</p>
+  {!!page.shows.length && <ul class="fan-shows">{page.shows.map(show => <li><div><strong>{show.title}</strong><small>{[show.start_date, show.city, show.venue].filter(Boolean).join(" · ")}</small></div>{show.ticket_url && <a href={show.ticket_url} rel="noreferrer">Tickets</a>}</li>)}</ul>}
+  <FanForm client:load action="signup" org={org} slug={slug} revision={drop.published_revision} page={page} enabled={fanEmailEnabled()} />
+</main></body></html>

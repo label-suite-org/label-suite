@@ -1,0 +1,11 @@
+---
+import "../../styles/fans.css";
+import { FanForm } from "../../components/fans/FanForm";
+import { readFanToken } from "../../server/fan-drops-core";
+export const prerender = false;
+const token = Astro.url.searchParams.get("token") ?? "";
+let valid = true;
+try { readFanToken(token, "unsubscribe"); } catch { valid = false; Astro.response.status = 400; }
+---
+<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Unsubscribe</title></head>
+<body><main class="fan-page"><h1>Unsubscribe</h1>{valid ? <><p>Stop email updates from this artist. This won’t change your subscriptions to other artists.</p><FanForm client:load action="unsubscribe" token={token} /></> : <p>This unsubscribe link is unavailable. Contact the sender using the email’s reply address.</p>}</main></body></html>
