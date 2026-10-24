@@ -74,7 +74,7 @@ async function handleRequest(
   }
   const isPublic = publicPaths.includes(path);
   const isFanPublic = isFanWebhook || /^\/drops\/[A-Za-z0-9_-]+\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path)
-    || ["/fans/confirm", "/fans/unsubscribe", "/api/fans/signup", "/api/fans/confirm", "/api/fans/unsubscribe"].includes(path);
+    || ["/fans/privacy", "/fans/confirm", "/fans/unsubscribe", "/api/fans/signup", "/api/fans/confirm", "/api/fans/unsubscribe"].includes(path);
   if (isFanPublic) {
     const response = withPrivateCachePolicy(await next());
     response.headers.set("Referrer-Policy", "no-referrer");
