@@ -21,6 +21,7 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     return context(() => service.publishFanDrop(org, { id: draft.id, expected_revision: draft.revision, publish: true }));
   }
   async function signup(page: Awaited<ReturnType<typeof drop>>, email: string) {
+    vi.stubEnv("FAN_ALLOWED_EMAIL", email);
     return context(() => service.signupToFanDrop(org, page.slug, { email, consent: true, published_revision: page.published_revision, city: "Denver", name: "Fan" }, "127.0.0.1"));
   }
   async function latest(email: string) {
@@ -231,7 +232,7 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     const pendingPage = await drop("pending-owner-restriction"); await signup(pendingPage, `pending-${suffix}@example.test`);
     const pending = await latest(`pending-${suffix}@example.test`);
     vi.stubEnv("FAN_ALLOWED_EMAIL", owner);
-    await expect(signup(page, `new-${suffix}@example.test`)).rejects.toThrow("only");
+    await expect(context(() => service.signupToFanDrop(org, page.slug, { email: `new-${suffix}@example.test`, consent: true, published_revision: page.published_revision }, "127.0.0.1"))).rejects.toThrow("only");
     expect((await context(() => service.fanAudience(org, { artist_id: artist }))).map(row => row.email)).toEqual([owner]);
     const provider = vi.fn(); vi.stubGlobal("fetch", provider);
     await service.dispatchFanConfirmation(org, pending.id); expect(provider).not.toHaveBeenCalled();

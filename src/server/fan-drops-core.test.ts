@@ -43,5 +43,9 @@ it("fails closed for malformed pilot configuration and limits exact recipients a
   expect(() => requireFanRecipient("org-a", "owner@example.test")).not.toThrow();
   expect(() => requireFanRecipient("org-a", "owner+other@example.test")).toThrow("only");
   expect(() => requireFanRecipient("org-b", "owner@example.test")).toThrow("only");
+  vi.stubEnv("FAN_ALLOWED_EMAIL", undefined);
+  expect(() => requireFanRecipient("org-a", "owner@example.test")).toThrow("not configured");
+  vi.stubEnv("FAN_EMAIL_ENABLED", "true");
+  expect(() => requireFanEmail()).toThrow("not configured");
   vi.stubEnv("FAN_ALLOWED_EMAIL", ""); expect(() => fanAllowedEmail()).toThrow("not configured");
 });

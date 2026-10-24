@@ -71,11 +71,13 @@ export function fanAllowedEmail() {
 }
 export function requireFanRecipient(orgId: string, email: string) {
   const allowed = fanAllowedEmail();
-  if (allowed && (process.env.FAN_BREVO_ORG_ID !== orgId || email.toLowerCase() !== allowed)) throw new HttpError("This pilot sends only to its configured owner address", 403);
+  if (!allowed) throw new HttpError("Fan pilot recipient is not configured", 503);
+  if (process.env.FAN_BREVO_ORG_ID !== orgId || email.toLowerCase() !== allowed) throw new HttpError("This pilot sends only to its configured owner address", 403);
 }
 export function fanEmailEnabled() { return process.env.FAN_EMAIL_ENABLED === "true"; }
 export function requireFanEmail() {
   if (!fanEmailEnabled()) throw new HttpError("Email signup is not available yet", 503);
   tokenSecret();
+  if (!fanAllowedEmail()) throw new HttpError("Fan pilot recipient is not configured", 503);
   if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL) throw new HttpError("Email signup is not configured", 503);
 }

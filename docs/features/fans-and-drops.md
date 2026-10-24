@@ -28,7 +28,7 @@ Initial bounds: 500 recipients per campaign; 100 most recent Drops/messages; 500
 
 ## Owner-only delivery pilot
 
-Set `FAN_ALLOWED_EMAIL` to the owner's exact address before enabling the fan flags. Signup rejects other recipients; audience review, scheduling and dispatch exclude them, and pending confirmations recheck the restriction before contacting the provider. The configured `FAN_BREVO_ORG_ID` also bounds this pilot. Empty or malformed recipient configuration fails closed. Removing the restriction is a separate live-audience activation decision.
+Set `FAN_ALLOWED_EMAIL` to the owner's exact address before enabling the fan flags. Signup rejects other recipients; audience review, scheduling and dispatch exclude them, and pending confirmations recheck the restriction before contacting the provider. The configured `FAN_BREVO_ORG_ID` also bounds this pilot. Missing, empty or malformed recipient configuration blocks all sending. Wider audiences require a separately reviewed implementation and activation decision.
 
 The native **Send test to me** action is available only to a workspace owner whose authenticated account email matches the configured address. It snapshots the saved draft into a separate message/job, retaining the original draft. There is one test per saved revision: duplicate taps, concurrent requests and retries return the same test. Edit and save a new revision for another test. The worker creates a Brevo draft with no audience or schedule and calls `sendTest` with exactly one explicit address. Tests appear in message history and may be cancelled before preparation. `submitted` means provider acceptance, not inbox delivery; uncertain outcomes require review and never resend automatically.
 
