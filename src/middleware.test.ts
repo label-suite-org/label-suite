@@ -78,7 +78,7 @@ describe("Spotify import middleware boundary", () => {
     process.env.PUBLIC_SITE_URL = "https://labels.example";
   });
 
-  it.each(["/drops/org-a/tour-news", "/fans/confirm?token=private", "/fans/unsubscribe?token=private"])("serves public fan route %s without selecting a browser workspace", async (path) => {
+  it.each(["/drops/org-a/tour-news", "/fans/privacy", "/fans/confirm?token=private", "/fans/unsubscribe?token=private"])("serves public fan route %s without selecting a browser workspace", async (path) => {
     const { onRequest } = await import("./middleware");
     const context = contextFor(new Request(`https://labels.example${path}`));
     const next = vi.fn().mockResolvedValue(new Response("fan page"));
