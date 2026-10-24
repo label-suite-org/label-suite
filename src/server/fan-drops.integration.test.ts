@@ -45,7 +45,7 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     await admin.query(`insert into label_suite.orgs(id,name,slug) values ($1,'Fan fixture',$1),($2,'Other fixture',$2)`, [org, otherOrg]);
     await admin.query(`insert into label_suite.artists(id,org_id,name) values($1,$2,'Fixture Artist'),($3,$2,'Second Artist')`, [artist, org, otherArtist]);
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.unstubAllGlobals(); delete process.env.FAN_ALLOWED_EMAIL; });
   afterAll(async () => { await database?.pool.end(); await admin?.end(); vi.unstubAllEnvs(); });
 
   it("publishes only the approved projection and keeps subsequent draft edits private", async () => {
@@ -194,6 +194,60 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     const [row] = (await admin.query("select status,recipient_count from label_suite.fan_messages where id=$1", [scheduled.id])).rows;
     expect(row).toEqual({ status: "cancelled", recipient_count: 0 });
     expect(fetch.mock.calls.some(([url]) => url.endsWith("/sendNow"))).toBe(false);
+  });
+
+  it("queues one immutable owner test per revision, sends only to that owner, and does not resend unknown outcomes", async () => {
+    const email = `owner-${suffix}@example.test`, userId = `owner-${suffix}`;
+    await admin.query(`insert into label_suite."user"(id,name,email) values($1,'Owner',$2)`, [userId, email]);
+    vi.stubEnv("FAN_ALLOWED_EMAIL", email);
+    const draft = await context(() => messages.saveFanMessage(org, { audience: { artist_id: artist }, content: { subject: "Owner preview", body: "Only the owner", link_url: null, link_label: "More" } }));
+    const input = { id: draft.id, expected_revision: draft.revision };
+    await expect(context(() => messages.testFanMessage(org, input, "somebody-else"))).rejects.toThrow("configured pilot owner");
+    await expect(context(() => messages.testFanMessage(org, { ...input, emailTo: ["other@example.test"] }, userId))).rejects.toThrow();
+    const [first, retry] = await Promise.all([context(() => messages.testFanMessage(org, input, userId)), context(() => messages.testFanMessage(org, input, userId))]);
+    expect(first.id).toBe(retry.id); expect(first.test_recipient).toBe(email);
+    expect((await admin.query("select count(*) from label_suite.job_runs where org_id=$1 and idempotency_key=$2", [org, first.id])).rows[0].count).toBe("1");
+    expect((await context(() => messages.listFanMessages(org))).find(row => row.id === draft.id)?.status).toBe("draft");
+    const provider = vi.fn(async (url: string, options: RequestInit) => {
+      const body = JSON.parse(options.body as string);
+      if (url.endsWith("/emailCampaigns")) { expect(body).not.toHaveProperty("recipients"); expect(body).not.toHaveProperty("scheduledAt"); return Response.json({ id: 9021 }); }
+      expect(url).toContain("/9021/sendTest"); expect(body).toEqual({ emailTo: [email] }); return new Response(null, { status: 204 });
+    }); vi.stubGlobal("fetch", provider);
+    expect(await messages.dispatchFanMessage(org, first.id)).toEqual({ submitted: true });
+    expect(await messages.dispatchFanMessage(org, first.id)).toEqual({ skipped: true }); expect(provider).toHaveBeenCalledTimes(2);
+    const next = await context(() => messages.saveFanMessage(org, { ...input, audience: draft.audience, content: { ...draft.content, body: "Another revision" } }));
+    const test = await context(() => messages.testFanMessage(org, { id: next.id, expected_revision: next.revision }, userId));
+    provider.mockImplementation(async (url: string) => { if (url.endsWith("/emailCampaigns")) return Response.json({ id: 9022 }); throw new Error("Provider accepted but response lost"); });
+    expect(await messages.dispatchFanMessage(org, test.id)).toEqual({ review_required: true, stage: "submit_test" });
+    expect(await messages.dispatchFanMessage(org, test.id)).toEqual({ skipped: true });
+    expect(provider).toHaveBeenCalledTimes(4);
+  });
+  it("restricts signup, pending confirmations and confirmed campaign audiences to the pilot address", async () => {
+    const page = await drop("owner-restriction"), owner = `allowed-${suffix}@example.test`, other = `excluded-${suffix}@example.test`;
+    await signup(page, owner); await signup(page, other);
+    const ownerSignup = await latest(owner), otherSignup = await latest(other);
+    await service.confirmFanSignup(core.fanToken("confirm", org, ownerSignup.id, ownerSignup.expires_at.getTime()));
+    await service.confirmFanSignup(core.fanToken("confirm", org, otherSignup.id, otherSignup.expires_at.getTime()));
+    const pendingPage = await drop("pending-owner-restriction"); await signup(pendingPage, `pending-${suffix}@example.test`);
+    const pending = await latest(`pending-${suffix}@example.test`);
+    vi.stubEnv("FAN_ALLOWED_EMAIL", owner);
+    await expect(signup(page, `new-${suffix}@example.test`)).rejects.toThrow("only");
+    expect((await context(() => service.fanAudience(org, { artist_id: artist }))).map(row => row.email)).toEqual([owner]);
+    const provider = vi.fn(); vi.stubGlobal("fetch", provider);
+    await service.dispatchFanConfirmation(org, pending.id); expect(provider).not.toHaveBeenCalled();
+    const draft = await context(() => messages.saveFanMessage(org, { audience: { artist_id: artist }, content: { subject: "Pilot schedule", body: "Owner only", link_url: null, link_label: "More" } }));
+    const preview = await context(() => messages.previewFanMessage(org, { id: draft.id, expected_revision: draft.revision }));
+    const scheduled = await context(() => messages.scheduleFanMessage(org, { id: draft.id, expected_revision: draft.revision, preview_hash: preview.preview_hash, scheduled_at: new Date(Date.now()+60000).toISOString() }));
+    expect(scheduled.recipient_count).toBe(1);
+    await admin.query("update label_suite.fan_messages set scheduled_at=now()-interval '1 minute' where id=$1", [scheduled.id]);
+    provider.mockImplementation(async (url: string, options: RequestInit) => {
+      if(url.endsWith("/contacts/lists")) return Response.json({ id: 9023 });
+      if(url.includes("/contacts/")) { expect(decodeURIComponent(url)).toContain(owner); return new Response(null, { status: 404 }); }
+      if(url.endsWith("/contacts")) { expect(JSON.parse(options.body as string).email).toBe(owner); return Response.json({ id: 9024 }); }
+      if(url.endsWith("/emailCampaigns")) return Response.json({ id: 9025 });
+      expect(url).toContain("/9025/sendNow"); return new Response(null, { status: 204 });
+    });
+    expect(await messages.dispatchFanMessage(org, scheduled.id)).toEqual({ submitted: true });
   });
 
 });

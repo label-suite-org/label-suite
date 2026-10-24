@@ -15,6 +15,9 @@ struct BackendFanDropsView: View {
     var body: some View {
         List {
             if loadedContext == store.grantContextID, let home {
+                if let recipient = home.allowed_email {
+                    Section("Owner-only pilot") { Text("All emails are restricted to \(recipient).").font(.callout) }
+                }
                 Section("Drops") {
                     ForEach(home.drops) { drop in NavigationLink(drop.content.title) { FanDropEditor(home: home, drop: drop, context: loadedContext) } }
                     Button("Create Drop", systemImage: "plus") { newDrop = true }.disabled(!store.canMutateOperations || home.artists.isEmpty)
@@ -26,7 +29,7 @@ struct BackendFanDropsView: View {
                 Section("Messages") {
                     ForEach(home.messages) { message in
                         NavigationLink { FanMessageEditor(home: home, message: message, context: loadedContext) } label: {
-                            VStack(alignment: .leading) { Text(message.content.subject); Text(message.status).font(.caption).foregroundStyle(.secondary) }
+                            VStack(alignment: .leading) { Text(message.content.subject); Text(message.test_recipient == nil ? message.status : "Test · \(message.status)").font(.caption).foregroundStyle(.secondary) }
                         }
                     }
                     Button("Draft email", systemImage: "square.and.pencil") { newMessage = true }.disabled(!store.canMutateOperations || home.artists.isEmpty)

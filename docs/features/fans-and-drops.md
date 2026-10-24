@@ -26,9 +26,15 @@ Cancellation is available for draft/scheduled messages. Preparation is the cutof
 
 Initial bounds: 500 recipients per campaign; 100 most recent Drops/messages; 500 choices per catalogue type; 1,001 fans in the native list/export; 100 signups and 100 events per fan history. Windows are labelled in the UI. Increase them with pagination/throughput evidence when a real audience requires it.
 
+## Owner-only delivery pilot
+
+Set `FAN_ALLOWED_EMAIL` to the owner's exact address before enabling the fan flags. Signup rejects other recipients; audience review, scheduling and dispatch exclude them, and pending confirmations recheck the restriction before contacting the provider. The configured `FAN_BREVO_ORG_ID` also bounds this pilot. Empty or malformed recipient configuration fails closed. Removing the restriction is a separate live-audience activation decision.
+
+The native **Send test to me** action is available only to a workspace owner whose authenticated account email matches the configured address. It snapshots the saved draft into a separate message/job, retaining the original draft. There is one test per saved revision: duplicate taps, concurrent requests and retries return the same test. Edit and save a new revision for another test. The worker creates a Brevo draft with no audience or schedule and calls `sendTest` with exactly one explicit address. Tests appear in message history and may be cancelled before preparation. `submitted` means provider acceptance, not inbox delivery; uncertain outcomes require review and never resend automatically.
+
 ## Configuration and activation
 
-Existing dependencies only: Astro/React, Postgres/Drizzle, the jobs worker and Brevo. No new production package. Migrations `0103` and `0104` are additive, use forced tenant RLS and enforce same-org references. Apply with the existing reviewed migration path; never drop the new tables as a rollback after collecting data.
+Existing dependencies only: Astro/React, Postgres/Drizzle, the jobs worker and Brevo. No new production package. Migrations `0103`, `0104` and `0105` are additive, use forced tenant RLS and enforce same-org references. Apply with the existing reviewed migration path; never drop the new tables as a rollback after collecting data.
 
 Required existing settings: `DATABASE_URL`, `PUBLIC_SITE_URL`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`.
 

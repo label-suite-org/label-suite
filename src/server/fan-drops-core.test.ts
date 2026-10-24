@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fanToken, readFanToken, fanSignupSchema, saveDropSchema, requireFanEmail } from "./fan-drops-core";
+import { fanToken, readFanToken, fanSignupSchema, saveDropSchema, requireFanEmail, fanAllowedEmail, requireFanRecipient } from "./fan-drops-core";
 import { readFanJson } from "./fan-request";
 beforeEach(() => vi.stubEnv("FAN_TOKEN_SECRET", "fixture-only-key-not-used-in-production-1234"));
 afterEach(() => vi.unstubAllEnvs());
@@ -35,4 +35,13 @@ describe("fan subscription trust boundaries", () => {
     const request = new Request("https://artist.example/api/fans/signup", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "x".repeat(40000) }) });
     await expect(readFanJson(request)).rejects.toMatchObject({ status: 413 });
   });
+});
+
+it("fails closed for malformed pilot configuration and limits exact recipients and workspace", () => {
+  vi.stubEnv("FAN_ALLOWED_EMAIL", " Owner@Example.test "); vi.stubEnv("FAN_BREVO_ORG_ID", "org-a");
+  expect(fanAllowedEmail()).toBe("owner@example.test");
+  expect(() => requireFanRecipient("org-a", "owner@example.test")).not.toThrow();
+  expect(() => requireFanRecipient("org-a", "owner+other@example.test")).toThrow("only");
+  expect(() => requireFanRecipient("org-b", "owner@example.test")).toThrow("only");
+  vi.stubEnv("FAN_ALLOWED_EMAIL", ""); expect(() => fanAllowedEmail()).toThrow("not configured");
 });

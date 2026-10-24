@@ -8,6 +8,7 @@ struct FanMessageEditor: View {
     @State private var draft: FanMessageDraft
     @State private var baseline: FanMessageDraft
     @State private var saved: BackendFanMessage?
+    @State private var testMessage: BackendFanMessage?
     @State private var preview: BackendFanPreview?
     @State private var scheduledAt = Date.now.addingTimeInterval(3600)
     @State private var error: String?
@@ -19,6 +20,7 @@ struct FanMessageEditor: View {
     init(home: BackendFansHome, message: BackendFanMessage?, context: String) {
         self.home = home; self.context = context
         let value = FanMessageDraft(message: message, artistID: home.artists.first?.id ?? "")
+        _testMessage = State(initialValue: message.flatMap { saved in home.messages.first { $0.id == "test-\(saved.id)-\(saved.revision)" } })
         _draft = State(initialValue: value); _baseline = State(initialValue: value); _saved = State(initialValue: message)
     }
     private var dirty: Bool { draft != baseline }
@@ -27,6 +29,7 @@ struct FanMessageEditor: View {
     var body: some View {
         Form {
             if current {
+                if let recipient = home.allowed_email { Text("Owner-only pilot: emails go only to \(recipient).").font(.callout) }
                 Section("Audience") {
                     Picker("Artist", selection: $draft.audience.artist_id) { ForEach(home.artists) { Text($0.name).tag($0.id) } }
                     Picker("Signed up through", selection: optionalFanText($draft.audience.drop_id)) { Text("Any Drop").tag(""); ForEach(dropChoices) { Text($0.content.title).tag($0.id) } }
@@ -44,6 +47,7 @@ struct FanMessageEditor: View {
                 Section {
                     if editable { Button("Save draft") { Task { await command("message_save", input: draft.input) } }.disabled(!dirty && saved != nil) }
                     if let saved {
+                        if let recipient = saved.test_recipient { LabeledContent("Test recipient", value: recipient) }
                         LabeledContent("Status", value: saved.status)
                         LabeledContent("Recipients", value: saved.recipient_count.formatted())
                         if let date = saved.scheduled_at { LabeledContent("Scheduled", value: date.formatted(date: .abbreviated, time: .shortened)) }
@@ -52,6 +56,17 @@ struct FanMessageEditor: View {
                         if ["submitted", "sent", "review"].contains(saved.status) { Button("Refresh provider status") { Task { await command("message_reconcile", input: revisionInput) } } }
                         if ["draft", "scheduled"].contains(saved.status) { Button("Cancel message", role: .destructive) { cancelConfirmation = true }.disabled(dirty || store.selectedWorkspace?.role != "owner") }
                         Button("Reload saved message") { Task { await reload() } }.disabled(dirty)
+                    }
+                }
+                if saved?.status == "draft", let recipient = home.test_recipient {
+                    Section("Test email") {
+                        Text("Send the saved email only to \(recipient). Your draft stays editable.").font(.caption)
+                        Button("Send test to me", systemImage: "paperplane") { Task { await sendTest() } }
+                            .disabled(dirty || !home.broadcast_enabled || testMessage != nil || store.selectedWorkspace?.role != "owner")
+                        if let testMessage {
+                            Text("Test: \(testMessage.status). One test per saved revision; edit and save a new revision to send another.").font(.caption)
+                            Button("Refresh test status") { Task { await reload() } }
+                        }
                     }
                 }
                 if saved?.status == "draft" {
@@ -91,12 +106,20 @@ struct FanMessageEditor: View {
     }
     private var revisionInput: [String: Any] { ["id": saved?.id ?? "", "expected_revision": saved?.revision ?? 0] }
     private func choices() { dropChoices = home.drops.filter { $0.artist_id == draft.audience.artist_id } }
-    private func accept(_ result: BackendFanMessage) { saved = result; draft = FanMessageDraft(message: result, artistID: result.audience.artist_id); baseline = draft; preview = nil }
+    private func accept(_ result: BackendFanMessage) { saved = result; draft = FanMessageDraft(message: result, artistID: result.audience.artist_id); baseline = draft; preview = nil; testMessage = nil }
     private func command(_ action: String, input: [String: Any]) async {
         guard current, !busy else { return }; busy = true; error = nil; defer { busy = false }
         do { let result: BackendFanMessage = try await store.fanDrops(action: action, input: input); guard current else { return }; accept(result) }
         catch is CancellationError { }
         catch { if current { self.error = error.localizedDescription; preview = nil } }
+    }
+    private func sendTest() async {
+        guard current, !busy, !dirty else { return }; busy = true; error = nil; defer { busy = false }
+        do {
+            let result: BackendFanMessage = try await store.fanDrops(action: "message_test", input: revisionInput)
+            guard current else { return }; testMessage = result
+        } catch is CancellationError { }
+        catch { if current { self.error = error.localizedDescription + " Retry uses the same saved revision and will not queue a second test." } }
     }
     private func review() async {
         guard current, !busy, !dirty else { return }; busy = true; error = nil; defer { busy = false }
@@ -106,7 +129,7 @@ struct FanMessageEditor: View {
     }
     private func reload() async {
         guard current, !busy, !dirty, let saved else { return }; busy = true; error = nil; defer { busy = false }
-        do { let result: BackendFansHome = try await store.fanDrops(); guard current else { return }; if let message = result.messages.first(where: { $0.id == saved.id }) { accept(message) } else { error = "Message is outside the current list. Return to Fans & Drops and reload." } }
+        do { let result: BackendFansHome = try await store.fanDrops(); guard current else { return }; if let message = result.messages.first(where: { $0.id == saved.id }) { accept(message); testMessage = result.messages.first { $0.id == "test-\(message.id)-\(message.revision)" } } else { error = "Message is outside the current list. Return to Fans & Drops and reload." } }
         catch is CancellationError { }
         catch { if current { self.error = error.localizedDescription } }
     }

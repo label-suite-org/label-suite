@@ -57,6 +57,7 @@ export const fan_messages = schema.table("fan_messages", {
   content: jsonb("content").$type<import("../../server/fan-messages-core").FanMessageContent>().notNull(),
   status: text("status").notNull().default("draft"), scheduled_at: timestamp("scheduled_at", { withTimezone: true }),
   recipient_ids: jsonb("recipient_ids").$type<string[]>().notNull().default([]), recipient_count: integer("recipient_count").notNull().default(0),
+  test_recipient: text("test_recipient"),
   provider_list_id: integer("provider_list_id"), provider_campaign_id: integer("provider_campaign_id"),
   report: jsonb("report").$type<import("../../server/fan-messages-core").FanMessageReport>(), failure_code: text("failure_code"),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

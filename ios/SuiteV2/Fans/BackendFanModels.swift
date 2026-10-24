@@ -9,6 +9,8 @@ struct BackendFansHome: Decodable {
     let email_enabled: Bool
     let broadcast_enabled: Bool
     let public_base_url: String
+    let allowed_email: String?
+    let test_recipient: String?
 }
 struct FanArtistChoice: Decodable, Identifiable { let id: String; let name: String; let image_url: String? }
 struct FanReleaseChoice: Decodable, Identifiable { let id: String; let artist_id: String?; let title: String; let cover_art_url: String? }
@@ -47,6 +49,7 @@ struct FanMessageContent: Codable, Equatable { var subject = ""; var body = ""; 
 struct BackendFanReport: Decodable { let sent: Int; let delivered: Int; let uniqueClicks: Int; let hardBounces: Int; let softBounces: Int; let complaints: Int; let unsubscriptions: Int }
 struct BackendFanMessage: Decodable, Identifiable {
     let id: String; let revision: Int; let audience: FanAudienceRule; let content: FanMessageContent
+    let test_recipient: String?
     let status: String; let scheduled_at: Date?; let recipient_count: Int; let failure_code: String?; let report: BackendFanReport?
 }
 struct FanMessageDraft: Equatable {

@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { artists, releases, project_events, fan_drops, fans, fan_subscriptions, fan_signups, fan_rate_limits, job_runs } from "../db/schema";
 import { db, runWithDatabaseContext } from "../lib/db";
 import { ConflictError, HttpError, NotFoundError } from "./errors";
-import { saveDropSchema, publishDropSchema, fanSignupSchema, fanAudienceSchema, fanRateKey, fanToken, readFanToken, requireFanEmail, type PublishedDrop } from "./fan-drops-core";
+import { saveDropSchema, publishDropSchema, fanSignupSchema, fanAudienceSchema, fanRateKey, fanToken, readFanToken, requireFanEmail, fanAllowedEmail, requireFanRecipient, type PublishedDrop } from "./fan-drops-core";
 import { canonicalAppOrigin } from "./request-security";
 import { escapeEmailHtml, sendEmailViaBrevo } from "./email";
 
@@ -73,6 +73,7 @@ export async function signupToFanDrop(orgId: string, slug: string, raw: unknown,
   const result = { accepted: true, message: "If eligible, you will receive a confirmation email. Check your inbox." };
   if (input.website) return result;
   requireFanEmail();
+  requireFanRecipient(orgId, input.email);
   const [drop] = await db.select().from(fan_drops).where(and(eq(fan_drops.org_id, orgId), eq(fan_drops.slug, slug), isNotNull(fan_drops.published))).for("share");
   if (!drop?.published || !drop.published_revision) throw new NotFoundError("Drop not found");
   if (input.published_revision !== drop.published_revision) throw new ConflictError("This page changed. Reload before signing up.");
@@ -128,6 +129,8 @@ export async function unsubscribeFan(token: string) {
 export async function fanAudience(orgId: string, raw: unknown) {
   const input = fanAudienceSchema.parse(raw);
   const conditions = [eq(fan_subscriptions.org_id, orgId), eq(fans.org_id, orgId), eq(fan_subscriptions.artist_id, input.artist_id), eq(fan_subscriptions.status, "confirmed"), eq(fans.provider_suppressed, false)];
+  const allowed = fanAllowedEmail();
+  if (allowed) { requireFanRecipient(orgId, allowed); conditions.push(eq(fans.email, allowed)); }
   if (input.city) conditions.push(sql`lower(${fan_subscriptions.city}) = lower(${input.city})`);
   if (input.tag) conditions.push(sql`${fan_subscriptions.tags} @> ${JSON.stringify([input.tag])}::jsonb`);
   if (input.drop_id) conditions.push(sql`exists (select 1 from ${fan_signups} where ${fan_signups.org_id} = ${orgId} and ${fan_signups.subscription_id} = ${fan_subscriptions.id} and ${fan_signups.drop_id} = ${input.drop_id} and ${fan_signups.confirmed_at} is not null)`);
@@ -152,6 +155,7 @@ export async function dispatchFanConfirmation(orgId: string, signupId: string, s
   if (!prepared) return { skipped: true };
   let status: "submitted" | "failed" | "unknown" = "unknown";
   try {
+    requireFanRecipient(orgId, prepared.email);
     const token = fanToken("confirm", orgId, signupId, prepared.signup.expires_at.getTime());
     const url = new URL("/fans/confirm", canonicalAppOrigin()); url.searchParams.set("token", token);
     const unsubscribe = new URL("/fans/unsubscribe", canonicalAppOrigin());

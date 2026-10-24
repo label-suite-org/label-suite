@@ -62,6 +62,17 @@ export function readFanToken(token: string, purpose: "confirm" | "unsubscribe", 
   return result.data;
 }
 export function fanRateKey(value: string) { return createHmac("sha256", tokenSecret()).update(value).digest("hex"); }
+export function fanAllowedEmail() {
+  const value = process.env.FAN_ALLOWED_EMAIL;
+  if (value === undefined) return null;
+  const parsed = z.email().safeParse(value.trim().toLowerCase());
+  if (!parsed.success) throw new HttpError("Fan pilot recipient is not configured", 503);
+  return parsed.data;
+}
+export function requireFanRecipient(orgId: string, email: string) {
+  const allowed = fanAllowedEmail();
+  if (allowed && (process.env.FAN_BREVO_ORG_ID !== orgId || email.toLowerCase() !== allowed)) throw new HttpError("This pilot sends only to its configured owner address", 403);
+}
 export function fanEmailEnabled() { return process.env.FAN_EMAIL_ENABLED === "true"; }
 export function requireFanEmail() {
   if (!fanEmailEnabled()) throw new HttpError("Email signup is not available yet", 503);
