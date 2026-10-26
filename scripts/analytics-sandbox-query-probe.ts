@@ -31,7 +31,7 @@ const [tracks, sources, cities, quality, playlists, command] = await Promise.all
   listAnalyticsCommandCenter(orgId),
 ]);
 
-if (tracks.length !== 5 || tracks.some((row) => row.combinedStreams <= 0)) {
+if (tracks.length !== 5 || tracks.some((row) => (row.combinedStreams ?? 0) <= 0)) {
   throw new Error("Analytics sandbox query probe expected five growth rows with combinedStreams > 0.");
 }
 if (!sources.spotify.length || !sources.apple.length || [...sources.spotify, ...sources.apple].some((row) => row.source === "Unknown")) {

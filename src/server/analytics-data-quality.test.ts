@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { addImportedFileCounts, analyticsDuplicateReviewSchema, assertAnalyticsDuplicateReviewCurrent, countAnalyticsIngestionFailuresSinceLastSuccess, deriveReportingThrough, evaluateAnalyticsIngestionServiceHealth, evaluateAnalyticsIngestionServiceStatus, findAnalyticsDuplicateCandidates, getAnalyticsIngestionServiceHealthFromProbe, getAnalyticsIngestionServiceStatusFromProbe, isAnalyticsEvidenceComplete, isAnalyticsEvidencePartial, isAnalyticsIngestionStale, parseAnalyticsRunCompleteness, resolveAnalyticsFreshness, type AnalyticsEvidenceRow } from "./analytics-data-quality";
+import { evaluateAnalyticsProviderIntegrity, addImportedFileCounts, analyticsDuplicateReviewSchema, assertAnalyticsDuplicateReviewCurrent, countAnalyticsIngestionFailuresSinceLastSuccess, deriveReportingThrough, evaluateAnalyticsIngestionServiceHealth, evaluateAnalyticsIngestionServiceStatus, findAnalyticsDuplicateCandidates, getAnalyticsIngestionServiceHealthFromProbe, getAnalyticsIngestionServiceStatusFromProbe, isAnalyticsEvidenceComplete, isAnalyticsEvidencePartial, isAnalyticsIngestionStale, parseAnalyticsRunCompleteness, resolveAnalyticsFreshness, type AnalyticsEvidenceRow } from "./analytics-data-quality";
 import { HttpError } from "./errors";
 
 function row(input: Partial<AnalyticsEvidenceRow> & Pick<AnalyticsEvidenceRow, "id">): AnalyticsEvidenceRow {
@@ -345,4 +345,20 @@ it("clears historical failures after a successful run but retains the current fa
     { status: "failed", completedAt: "2026-07-29T12:01:00Z" },
     { status: "failed", completedAt: "2026-07-29T12:02:00Z" },
   ], latestSuccess)).toBe(2);
+});
+
+
+describe("provider reconciliation", () => {
+  const filters = { providerFilterState: { artist: "Fixture Artist", track: "Recording A", dateRange: "14 Days", aggregation: "Daily" } };
+  const catalogue = { widgetKey: "tracks-by-growth-rate", trackId: null, metrics: { apple_streams: 20 }, dimensions: {}, rawRow: {}, requestedDateRange: "14 Days", requestedAggregation: "Daily" };
+  const daily = { ...catalogue, widgetKey: "apple-streams-source", trackId: "recording-id", metrics: { streams: 75 }, dimensions: { _col0: "2026-07-01" } };
+  it("detects a daily recording exceeding the entire reported catalogue without a title join", () => {
+    expect(evaluateAnalyticsProviderIntegrity([catalogue, daily], filters)).toMatchObject({ status: "conflicting", unmatchedCatalogueRows: 1, conflicts: [{ platform: "apple", reportedCatalogueSum: 20, dailyTrackSum: 75, difference: 55 }], reporting: expect.arrayContaining([{ widgetKey: "apple-streams-source", from: "2026-07-01", through: "2026-07-01" }]) });
+  });
+  it("does not compare incompatible windows or invent a zero for missing metrics", () => {
+    for (const other of [{ ...daily, requestedDateRange: "30 Days" }, { ...daily, metrics: { streams: null } }]) {
+      expect(evaluateAnalyticsProviderIntegrity([catalogue, other], filters)).toMatchObject({ status: "unverified", conflicts: [] });
+    }
+    expect(evaluateAnalyticsProviderIntegrity([catalogue, daily], {})).toMatchObject({ status: "unverified", track: null, conflicts: [] });
+  });
 });

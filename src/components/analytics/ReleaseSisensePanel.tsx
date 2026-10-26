@@ -114,7 +114,7 @@ function TopCountriesCard({ data }: { data: NonNullable<ReleaseSisenseSection["t
   return (
     <Card
       title="Top 5 countries"
-      windowLabel={`Share of ${formatAnalyticsNumber(data.totalStreams)} window-total streams (cumulative window, not all-time) · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
+      windowLabel={`Share of ${formatAnalyticsNumber(data.totalStreams)} window-total streams (reporting-period window, not all-time) · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
     >
       <div aria-hidden="true" className="h-56 w-full" style={{ minWidth: 1, minHeight: 1 }}>
         <ResponsiveContainer width="100%" height="100%" debounce={50}>
@@ -159,7 +159,7 @@ function SuperfanReachCard({ data }: { data: NonNullable<ReleaseSisenseSection["
   return (
     <Card
       title="Superfan reach"
-      windowLabel={`Cumulative window total — not a daily snapshot · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
+      windowLabel={`Reporting-period window total — not a daily snapshot · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
     >
       <div className="flex items-baseline gap-3">
         <p className="text-4xl font-semibold tabular-nums">{formatAnalyticsNumber(data.superfans)}</p>

@@ -1,3 +1,4 @@
+import type { AnalyticsProviderIntegrity } from "./analytics-data-quality";
 export type AnalyticsPlatform = "spotify" | "apple";
 
 export interface AnalyticsCommandFilter {
@@ -35,11 +36,11 @@ export interface CommandTrackRow {
   id: string;
   trackTitle: string;
   primaryArtist: string | null;
-  combinedStreams: number;
-  spotifyStreams: number;
-  appleStreams: number;
+  combinedStreams: number | null;
+  spotifyStreams: number | null;
+  appleStreams: number | null;
   streamsGrowth: number | null;
-  combinedViews: number;
+  combinedViews: number | null;
   viewsGrowth: number | null;
 }
 
@@ -85,6 +86,7 @@ export interface CommandRunRow {
 }
 
 export interface BuildAnalyticsCommandCenterInput {
+  providerIntegrity?: AnalyticsProviderIntegrity;
   dailySources: CommandDailySourceRow[];
   tracks: CommandTrackRow[];
   cities: CommandCityRow[];
@@ -103,8 +105,8 @@ export interface BuildAnalyticsCommandCenterInput {
 
 export interface AnalyticsTrendPoint {
   date: string;
-  spotify: number;
-  apple: number;
+  spotify: number | null;
+  apple: number | null;
   total: number;
   cumulative: number;
 }
@@ -157,14 +159,15 @@ export interface AnalyticsCommandPeriodSummary {
 }
 
 export interface AnalyticsCommandCenter {
+  providerIntegrity?: AnalyticsProviderIntegrity;
   defaultPeriod: AnalyticsPeriodKey;
   dataWindow: { from: string | null; to: string | null };
   periods: AnalyticsCommandPeriodSummary[];
   catalog: {
-    totalStreams: number;
-    spotifyStreams: number;
-    appleStreams: number;
-    views: number;
+    totalStreams: number | null;
+    spotifyStreams: number | null;
+    appleStreams: number | null;
+    views: number | null;
     trackCount: number;
     growingTracks: number;
     decliningTracks: number;
@@ -212,11 +215,11 @@ export function buildAnalyticsCommandCenter(input: BuildAnalyticsCommandCenterIn
   const windowTo = allDates[allDates.length - 1] ?? null;
 
   const periods = PERIODS.map((period) => buildPeriod(period, dailyRows, windowFrom, windowTo, input));
-  const tracks = [...input.tracks].sort((a, b) => b.combinedStreams - a.combinedStreams);
+  const tracks = [...input.tracks].sort((a, b) => safeNumber(b.combinedStreams) - safeNumber(a.combinedStreams));
   const growthValues = tracks.map((track) => track.streamsGrowth).filter((value): value is number => value !== null);
-  const totalStreams = tracks.reduce((sum, track) => sum + safeNumber(track.combinedStreams), 0);
+  const totalStreams = sumReported(tracks.map(track => track.combinedStreams));
   const topMover = [...tracks]
-    .filter((track) => track.streamsGrowth !== null && track.combinedStreams >= 500)
+    .filter((track) => track.streamsGrowth !== null && (track.combinedStreams ?? 0) >= 500)
     .sort((a, b) => (b.streamsGrowth ?? -Infinity) - (a.streamsGrowth ?? -Infinity))[0] ?? null;
 
   const topCities = input.cities
@@ -233,20 +236,21 @@ export function buildAnalyticsCommandCenter(input: BuildAnalyticsCommandCenterIn
     .sort((a, b) => timestamp(b.completedAt) - timestamp(a.completedAt))[0] ?? null;
 
   return {
+    providerIntegrity: input.providerIntegrity,
     defaultPeriod: "30d",
     dataWindow: { from: windowFrom, to: windowTo },
-    periods,
+    periods: input.providerIntegrity ? periods.map(period => ({ ...period, changePct: null, insights: [] })) : periods,
     catalog: {
-      totalStreams,
-      spotifyStreams: tracks.reduce((sum, track) => sum + safeNumber(track.spotifyStreams), 0),
-      appleStreams: tracks.reduce((sum, track) => sum + safeNumber(track.appleStreams), 0),
-      views: tracks.reduce((sum, track) => sum + safeNumber(track.combinedViews), 0),
+      totalStreams: input.providerIntegrity ? null : totalStreams,
+      spotifyStreams: input.providerIntegrity ? null : sumReported(tracks.map(track => track.spotifyStreams)),
+      appleStreams: input.providerIntegrity ? null : sumReported(tracks.map(track => track.appleStreams)),
+      views: input.providerIntegrity ? null : sumReported(tracks.map(track => track.combinedViews)),
       trackCount: tracks.length,
       growingTracks: growthValues.filter((value) => value > 0).length,
       decliningTracks: growthValues.filter((value) => value < 0).length,
       avgGrowth: growthValues.length ? growthValues.reduce((sum, value) => sum + value, 0) / growthValues.length : null,
       topTracks: tracks.slice(0, 10),
-      topMover,
+      topMover: input.providerIntegrity ? null : topMover,
     },
     markets: {
       topCities,
@@ -314,10 +318,10 @@ function buildPeriod(
   if (period.days !== null && from) {
     const previousTo = shiftIsoDate(from, -1);
     const previousFrom = shiftIsoDate(previousTo, -(period.days - 1));
-    previousStreamTotal = rows
+    const previousRows = rows
       .filter((row): row is NormalizedDailySourceRow & { date: string } => row.isValid && Boolean(row.date))
-      .filter((row) => row.date >= previousFrom && row.date <= previousTo)
-      .reduce((sum, row) => sum + row.streams, 0);
+      .filter((row) => row.date >= previousFrom && row.date <= previousTo);
+    previousStreamTotal = previousRows.length ? previousRows.reduce((sum, row) => sum + row.streams, 0) : null;
   }
 
   const sourceMap = new Map<string, AnalyticsSourceMixRow>();
@@ -355,9 +359,9 @@ function buildPeriod(
 function buildDailyTrend(rows: NormalizedDailySourceRow[]): AnalyticsTrendPoint[] {
   const byDate = new Map<string, AnalyticsTrendPoint>();
   for (const row of rows.filter(hasDate)) {
-    const point = byDate.get(row.date) ?? { date: row.date, spotify: 0, apple: 0, total: 0, cumulative: 0 };
-    if (row.platform === "apple") point.apple += row.streams;
-    else point.spotify += row.streams;
+    const point = byDate.get(row.date) ?? { date: row.date, spotify: null, apple: null, total: 0, cumulative: 0 };
+    if (row.platform === "apple") point.apple = (point.apple ?? 0) + row.streams;
+    else point.spotify = (point.spotify ?? 0) + row.streams;
     point.total += row.streams;
     byDate.set(row.date, point);
   }
@@ -380,7 +384,7 @@ function buildInsights({
   input: BuildAnalyticsCommandCenterInput;
 }): AnalyticsInsightCard[] {
   const topMover = [...input.tracks]
-    .filter((track) => track.streamsGrowth !== null && track.combinedStreams >= 500)
+    .filter((track) => track.streamsGrowth !== null && (track.combinedStreams ?? 0) >= 500)
     .sort((a, b) => (b.streamsGrowth ?? -Infinity) - (a.streamsGrowth ?? -Infinity))[0] ?? null;
   const topCity = input.cities.filter(isActionableCity).sort((a, b) => b.streams - a.streams)[0] ?? null;
   const topPlaylist = [...input.playlists].sort((a, b) => safeNumber(b.metrics.streams) - safeNumber(a.metrics.streams))[0] ?? null;
@@ -401,7 +405,7 @@ function buildInsights({
       source: "tracks",
       title: topMover?.trackTitle ?? "No clear mover yet",
       metric: topMover?.streamsGrowth === null || !topMover ? "—" : signedPercent(topMover.streamsGrowth),
-      detail: topMover ? `${topMover.primaryArtist ?? "Unknown artist"} · ${formatCompact(topMover.combinedStreams)} cumulative streams.` : "Import growth fields or period track rows to rank movers.",
+      detail: topMover ? `${topMover.primaryArtist ?? "Unknown artist"} · ${formatCompact(topMover.combinedStreams)} reported-period streams.` : "Import growth fields or period track rows to rank movers.",
       action: topMover ? "Decide if this deserves content, pitch, or ad support." : "Connect growth data before prioritising tracks.",
       tone: topMover && (topMover.streamsGrowth ?? 0) > 0 ? "good" : "neutral",
     },
@@ -514,7 +518,8 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function formatCompact(value: number): string {
+function formatCompact(value: number | null): string {
+  if (value === null) return "—";
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 
@@ -825,4 +830,8 @@ export function buildReleaseCockpit(input: BuildReleaseCockpitInput): ReleaseCoc
       .sort((a, b) => b.combinedStreams - a.combinedStreams)
       .slice(0, 10),
   };
+}
+
+export function sumReported(values: readonly (number | null)[]): number | null {
+  return !values.length || values.some(value => value === null) ? null : values.reduce<number>((sum, value) => sum + value!, 0);
 }

@@ -29,8 +29,8 @@ export default function TracksByGrowthTable({ rows }: Props) {
     );
   }
 
-  const totalStreams = rows.reduce((s, r) => s + (r.combinedStreams ?? 0), 0);
-  const totalViews = rows.reduce((s, r) => s + (r.combinedViews ?? 0), 0);
+  const totalStreams = rows.some(r => r.combinedStreams === null) ? null : rows.reduce((s, r) => s + r.combinedStreams!, 0);
+  const totalViews = rows.some(r => r.combinedViews === null) ? null : rows.reduce((s, r) => s + r.combinedViews!, 0);
   const growthValues = rows.map((r) => r.streamsGrowth).filter((v): v is number => v !== null);
   const growingTracks = growthValues.filter((v) => v > 0).length;
   const decliningTracks = growthValues.filter((v) => v < 0).length;
@@ -41,12 +41,12 @@ export default function TracksByGrowthTable({ rows }: Props) {
   return (
     <section className="space-y-4">
       <p className="text-xs text-[var(--muted-foreground)]">
-        Cumulative track totals from the imported Sisense CSV. Growth rates are the Sisense-provided fields, not recalculated locally.
+        Unverified reporting-period rows from the imported Sisense CSV. These sums cover displayed rows only, not a complete artist catalogue or lifetime. Missing values are shown as —. Growth is the provider’s average change between aggregation periods within its selected range.
       </p>
       {/* Summary strip — the primary scan target */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <SummaryCard label="Streams" value={formatAnalyticsNumber(totalStreams)} />
-        <SummaryCard label="Views" value={formatAnalyticsNumber(totalViews)} />
+        <SummaryCard label="Reported row sum · streams" value={formatAnalyticsNumber(totalStreams)} />
+        <SummaryCard label="Reported row sum · views" value={formatAnalyticsNumber(totalViews)} />
         <SummaryCard
           label="Avg growth"
           value={<GrowthCell value={avgGrowth} />}

@@ -91,10 +91,10 @@ describe("analytics command center core", () => {
     expect(command.defaultPeriod).toBe("30d");
     expect(command.dataWindow).toEqual({ from: "2026-06-01", to: "2026-07-05" });
     expect(last7.streamTotal).toBe(150);
-    expect(last7.previousStreamTotal).toBe(0);
+    expect(last7.previousStreamTotal).toBeNull();
     expect(last7.dailyTrend).toEqual([
-      { date: "2026-07-04", spotify: 100, apple: 0, total: 100, cumulative: 100 },
-      { date: "2026-07-05", spotify: 0, apple: 50, total: 50, cumulative: 150 },
+      { date: "2026-07-04", spotify: 100, apple: null, total: 100, cumulative: 100 },
+      { date: "2026-07-05", spotify: null, apple: 50, total: 50, cumulative: 150 },
     ]);
     expect(last7.topSource).toMatchObject({ source: "radio", platform: "spotify", streams: 100 });
   });
@@ -208,4 +208,21 @@ it("keeps unknown geo buckets out of actionable market rankings", () => {
   expect(command.markets.topCity?.city).toBe("New York");
   expect(command.markets.topCities.map((row) => row.city)).not.toContain("Unknown");
   expect(command.periods[0]?.insights.find((insight) => insight.label === "Market")?.title).toBe("New York");
+});
+
+
+it("withholds unverified catalogue totals and recommendations while retaining reported rows", () => {
+  const providerIntegrity = { status: "conflicting" as const, artist: "Fixture artist", track: "Fixture recording", dateRange: "14 Days", aggregation: "Daily", unmatchedCatalogueRows: 1, conflicts: [], reporting: [] };
+  const result = buildAnalyticsCommandCenter({ ...baseInput, providerIntegrity, dailySources: [{ date: "2026-07-01", platform: "apple", source: "library", streams: 30 }] });
+  expect(result.catalog).toMatchObject({ totalStreams: null, spotifyStreams: null, appleStreams: null, views: null, topMover: null });
+  expect(result.catalog.topTracks).toHaveLength(2);
+  expect(result.periods.every(period => period.insights.length === 0)).toBe(true);
+  expect(result.providerIntegrity).toEqual(providerIntegrity);
+});
+
+it("keeps unknown platform counts distinct from measured zero", () => {
+  const result = buildAnalyticsCommandCenter({ ...baseInput, tracks: [{ ...baseInput.tracks[0], appleStreams: null, spotifyStreams: 0 }], dailySources: [] });
+  expect(result.catalog.appleStreams).toBeNull();
+  expect(result.catalog.spotifyStreams).toBe(0);
+  expect(result.catalog.topTracks[0].appleStreams).toBeNull();
 });

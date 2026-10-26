@@ -50,6 +50,7 @@ export async function getNativeAnalytics(orgId: string, raw: unknown, now = new 
       periods: command.periods.map(({ insights: _insights, ...period }) => period),
       catalog: { ...command.catalog, completeness: "Top 100 track snapshot rows; not a complete catalog total" },
       sources,
+      provider_integrity: command.providerIntegrity ?? null,
       workspace_ingestion: { scope: "workspace", source: "sisense", ...quality.health },
       available_artists: command.availableArtists, available_releases: command.availableReleases,
       import_handoff: { href: `/analytics?${query}`, label: "Open in Label Suite Web", explanation: "Complex imports and source reconciliation require the web workspace. No native import is performed." },

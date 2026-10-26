@@ -201,7 +201,7 @@ export default function SisenseTrackSnapshotImport({ artists, latestImports }: P
           Dated Sisense track snapshot import
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Import one cumulative Tracks by Growth Rate snapshot. The dates describe the reporting context used by Sisense; they are not a stream-period total.
+          Import one reporting-period Tracks by Growth Rate snapshot. The dates describe the reporting context used by Sisense; they are not a lifetime total.
         </p>
       </div>
 

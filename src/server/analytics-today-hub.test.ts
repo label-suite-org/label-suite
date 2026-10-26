@@ -94,3 +94,10 @@ it("keeps never-imported workspaces quiet but surfaces failed or incomplete impo
   const populated = { ...command, dataHealth: { ...command.dataHealth, totalRows: 1 } };
   expect(buildTodayHub(populated, { ...report, evidence: { ...report.evidence, partial: true } }).cards).toContainEqual(expect.objectContaining({ detail: expect.stringContaining("truncated") }));
 });
+
+
+it("withholds Today opportunities when provider recording coverage is unverified", () => {
+  const result = buildTodayHub({ ...command, providerIntegrity: { status: "unverified", artist: null, track: null, dateRange: null, aggregation: null, unmatchedCatalogueRows: 1, conflicts: [], reporting: [] } }, unavailableAnalyticsDataQualityReport());
+  expect(result.cards).toHaveLength(1);
+  expect(result.cards[0]).toMatchObject({ key: "analytics-data-health", title: "Music statistics need reconciliation" });
+});

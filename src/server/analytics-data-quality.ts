@@ -22,7 +22,17 @@ export interface AnalyticsIngestionHealth { lastSuccessfulRunAt: Date | null; so
 export interface AnalyticsSourceSummary { source: string; widgetKey: string; requestedDateRange: string | null; requestedAggregation: string | null; imported: number; raw: number; linked: number; unmatched: number; lastSeenAt: Date | null; }
 export interface AnalyticsRawFileProvenance { id: string; source: string; widgetKey: string; fileName: string; sha256: string; byteSize: number; rowCount: number; requestedDateRange: string | null; requestedAggregation: string | null; storageBucket: string | null; storageKey: string | null; storageStatus: string; storageUploadedAt: Date | null; }
 export interface AnalyticsCurrentImportRun { id: string; mode: string; completedAt: Date | null; requestedDateRange: string | null; requestedAggregation: string | null; expectedWidgetKeys: string[]; downloadedWidgetKeys: string[]; observedEmptyWidgets: Array<{ key: string; reason: string }>; skippedWidgets: Array<{ key: string; reason: string }>; rawFiles: AnalyticsRawFileProvenance[]; }
-export interface AnalyticsDataQualityReport { health: AnalyticsIngestionHealth; currentRun: AnalyticsCurrentImportRun | null; evidence: { limit: number; returnedRows: number; partial: boolean; version: string; complete: boolean }; sources: AnalyticsSourceSummary[]; candidates: AnalyticsDuplicateCandidate[]; compatibility?: "schema_unavailable"; }
+export interface AnalyticsProviderIntegrity {
+  status: "unverified" | "conflicting";
+  artist: string | null;
+  track: string | null;
+  dateRange: string | null;
+  aggregation: string | null;
+  unmatchedCatalogueRows: number;
+  conflicts: Array<{ platform: string; reportedCatalogueSum: number; dailyTrackSum: number; difference: number }>;
+  reporting: Array<{ widgetKey: string; from: string | null; through: string | null }>;
+}
+export interface AnalyticsDataQualityReport { health: AnalyticsIngestionHealth; currentRun: AnalyticsCurrentImportRun | null; providerIntegrity?: AnalyticsProviderIntegrity; evidence: { limit: number; returnedRows: number; partial: boolean; version: string; complete: boolean }; sources: AnalyticsSourceSummary[]; candidates: AnalyticsDuplicateCandidate[]; compatibility?: "schema_unavailable"; }
 
 const STALE_AFTER_MS = ANALYTICS_IMPORT_STALE_AFTER_HOURS * 60 * 60 * 1_000;
 const EVIDENCE_BATCH_SIZE = 1_000;
@@ -33,7 +43,32 @@ const reportingPeriodFields = new Set(["col0", "date", "day", "week", "month", "
 const evidenceKeys = { sourceId: ["source_id", "sourceid", "id", "track_id", "recording_id"], isrc: ["isrc", "track_isrc", "recording_isrc"], artist: ["primary_artist", "artist", "artist_name", "main_artist"], title: ["track_title", "track", "track_name", "title", "song"] } as const;
 const SISENSE_OBSERVED_EMPTY_REASON = "Query returned no matching rows.";
 export const analyticsDuplicateReviewSchema = z.object({ candidateKey: z.string().min(1).max(500), evidenceVersion: z.string().length(64), disposition: z.enum(["keep_separate", "link_same_record", "source_error"]), reason: z.string().trim().max(2_000).nullable().optional() });
-type EvidenceDbRow = { id: string; source: string; widgetKey: string; dimensions: Record<string, string | null>; rawRow: Record<string, string | null>; requestedAggregation: string; requestedDateRange: string; trackId: string | null; rowHash: string; lastSeenRunId: string | null; lastSeenAt: Date | null };
+type EvidenceDbRow = { id: string; source: string; widgetKey: string; dimensions: Record<string, string | null>; metrics: Record<string, number | null>; rawRow: Record<string, string | null>; requestedAggregation: string; requestedDateRange: string; trackId: string | null; rowHash: string; lastSeenRunId: string | null; lastSeenAt: Date | null };
+
+/** Acquisition completeness does not establish recording coverage or provider accuracy. */
+export function evaluateAnalyticsProviderIntegrity(rows: readonly Pick<EvidenceDbRow, "widgetKey" | "trackId" | "metrics" | "dimensions" | "rawRow" | "requestedDateRange" | "requestedAggregation">[], metadata: unknown): AnalyticsProviderIntegrity {
+  const filters = (metadata && typeof metadata === "object" ? (metadata as Record<string, unknown>).providerFilterState : null) as Record<string, unknown> | null;
+  const field = (key: string) => typeof filters?.[key] === "string" ? filters[key] as string : null;
+  const catalogue = rows.filter(row => row.widgetKey === "tracks-by-growth-rate");
+  const conflicts: AnalyticsProviderIntegrity["conflicts"] = [];
+  const reporting: AnalyticsProviderIntegrity["reporting"] = [];
+  for (const platform of ["spotify", "apple"]) {
+    const widgetKey = `${platform}-streams-source`;
+    const daily = rows.filter(row => row.widgetKey === widgetKey);
+    const dates = daily.map(row => deriveReportingThrough([row])).filter((date): date is Date => date !== null).map(date => date.toISOString().slice(0, 10)).sort();
+    reporting.push({ widgetKey, from: dates[0] ?? null, through: dates.at(-1) ?? null });
+    // Compare only this import's matching filter grain; never join recordings by title.
+    if (!daily.length || !catalogue.length || !field("dateRange") || !field("track")
+      || [...daily, ...catalogue].some(row => row.requestedDateRange !== field("dateRange") || row.requestedAggregation !== "Daily")) continue;
+    const knownCatalogue = catalogue.map(row => row.metrics[`${platform}_streams`]).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+    const knownDaily = daily.map(row => row.metrics.streams);
+    if (!knownCatalogue.length || knownDaily.some(value => typeof value !== "number" || !Number.isFinite(value))) continue;
+    const reportedCatalogueSum = knownCatalogue.reduce((sum, value) => sum + value, 0);
+    const dailyTrackSum = knownDaily.reduce<number>((sum, value) => sum + value!, 0);
+    if (dailyTrackSum > reportedCatalogueSum) conflicts.push({ platform, reportedCatalogueSum, dailyTrackSum, difference: dailyTrackSum - reportedCatalogueSum });
+  }
+  return { status: conflicts.length ? "conflicting" : "unverified", artist: field("artist"), track: field("track"), dateRange: field("dateRange"), aggregation: field("aggregation"), unmatchedCatalogueRows: catalogue.filter(row => !row.trackId).length, conflicts, reporting };
+}
 type RunCompletenessMetadata = { version?: number; expectedWidgetKeys?: unknown; downloadedWidgetKeys?: unknown; observedEmptyWidgets?: unknown; skippedWidgets?: unknown; state?: unknown };
 type ReviewDbRow = { candidateKey: string; disposition: string; reason: string | null; reviewedBy: string; reviewedAt: Date | null };
 
@@ -109,7 +144,7 @@ async function queryAnalyticsDataQuality(tx: any, orgId: string, now: Date): Pro
   let cursor: string | null = null;
   let reachedTerminalBatch = false;
   while (latestRun) {
-    const batch = await tx.select({ id: analytics_metric_rows.id, source: analytics_metric_rows.source, widgetKey: analytics_metric_rows.widget_key, dimensions: analytics_metric_rows.dimensions, rawRow: analytics_metric_rows.raw_row, requestedAggregation: analytics_metric_rows.requested_aggregation, requestedDateRange: analytics_metric_rows.requested_date_range, trackId: analytics_metric_rows.track_id, rowHash: analytics_metric_rows.row_hash, lastSeenRunId: analytics_metric_rows.last_seen_run_id, lastSeenAt: analytics_metric_rows.last_seen_at })
+    const batch = await tx.select({ id: analytics_metric_rows.id, source: analytics_metric_rows.source, widgetKey: analytics_metric_rows.widget_key, dimensions: analytics_metric_rows.dimensions, metrics: analytics_metric_rows.metrics, rawRow: analytics_metric_rows.raw_row, requestedAggregation: analytics_metric_rows.requested_aggregation, requestedDateRange: analytics_metric_rows.requested_date_range, trackId: analytics_metric_rows.track_id, rowHash: analytics_metric_rows.row_hash, lastSeenRunId: analytics_metric_rows.last_seen_run_id, lastSeenAt: analytics_metric_rows.last_seen_at })
       .from(analytics_metric_rows).where(cursor ? and(evidenceWhere, gt(analytics_metric_rows.id, cursor)) : evidenceWhere).orderBy(asc(analytics_metric_rows.id)).limit(EVIDENCE_BATCH_SIZE) as EvidenceDbRow[];
     rows.push(...batch);
     if (batch.length < EVIDENCE_BATCH_SIZE) { reachedTerminalBatch = true; break; }
@@ -136,7 +171,7 @@ async function queryAnalyticsDataQuality(tx: any, orgId: string, now: Date): Pro
   const stale = freshness.stale || failedRuns >= REPEATED_INGESTION_FAILURES;
   const currentRun = latestRun ? { id: latestRun.id, mode: latestRun.mode, completedAt: dateOrNull(latestRun.completedAt), requestedDateRange: latestRun.requestedDateRange, requestedAggregation: latestRun.requestedAggregation, expectedWidgetKeys: completeness.expectedWidgetKeys, downloadedWidgetKeys: completeness.downloadedWidgetKeys, observedEmptyWidgets: completeness.observedEmptyWidgets, skippedWidgets: completeness.skippedWidgets, rawFiles: files.map((file) => ({ ...file, byteSize: Number(file.byteSize ?? 0), rowCount: Number(file.rowCount ?? 0), storageUploadedAt: dateOrNull(file.storageUploadedAt) })).sort((a, b) => a.fileName.localeCompare(b.fileName)) } : null;
   const reviewableCandidates = evidenceComplete ? candidates : [];
-  const report = { health: { lastSuccessfulRunAt, sourceObservedAt: freshness.sourceObservedAt, reportingThrough, freshnessBasis: freshness.freshnessBasis, coverage: completeness.coverage, stale, failedRuns, unreviewedDuplicateCandidates: reviewableCandidates.filter((candidate) => candidate.disposition === "unreviewed").length, degradedReasons: analyticsDegradedReasons({ ...freshness, failedRuns }) }, currentRun, evidence: { limit: EVIDENCE_BATCH_SIZE, returnedRows: rows.length, partial: Boolean(latestRun) && !evidenceComplete, complete: evidenceComplete, version }, sources: [...sourceMap.values()].sort((a, b) => a.source.localeCompare(b.source) || a.widgetKey.localeCompare(b.widgetKey) || (a.requestedAggregation ?? "").localeCompare(b.requestedAggregation ?? "") || (a.requestedDateRange ?? "").localeCompare(b.requestedDateRange ?? "")), candidates: reviewableCandidates };
+  const report = { providerIntegrity: latestRun ? evaluateAnalyticsProviderIntegrity(rows, latestRun.metadata) : undefined, health: { lastSuccessfulRunAt, sourceObservedAt: freshness.sourceObservedAt, reportingThrough, freshnessBasis: freshness.freshnessBasis, coverage: completeness.coverage, stale, failedRuns, unreviewedDuplicateCandidates: reviewableCandidates.filter((candidate) => candidate.disposition === "unreviewed").length, degradedReasons: analyticsDegradedReasons({ ...freshness, failedRuns }) }, currentRun, evidence: { limit: EVIDENCE_BATCH_SIZE, returnedRows: rows.length, partial: Boolean(latestRun) && !evidenceComplete, complete: evidenceComplete, version }, sources: [...sourceMap.values()].sort((a, b) => a.source.localeCompare(b.source) || a.widgetKey.localeCompare(b.widgetKey) || (a.requestedAggregation ?? "").localeCompare(b.requestedAggregation ?? "") || (a.requestedDateRange ?? "").localeCompare(b.requestedDateRange ?? "")), candidates: reviewableCandidates };
   return report;
 }
 

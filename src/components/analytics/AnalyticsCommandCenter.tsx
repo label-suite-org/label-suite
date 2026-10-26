@@ -23,6 +23,7 @@ import {
   type AnalyticsSection,
 } from "../../lib/analytics-workspace";
 
+import ProviderIntegrityNotice from "./ProviderIntegrityNotice";
 import { Button } from "@/components/ui/button";
 type CommandCenterSection = Extract<
   AnalyticsSection,
@@ -79,13 +80,13 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
     sourceWidgetKeys: ["csv-daily-source-mix", "spotify-streams-source", "apple-streams-source"],
     sourceLabel: "Sisense daily source mix",
     reportingLabel: reportingWindow,
-    scopeLabel: "Scope: selected-period trend",
+    scopeLabel: command.providerIntegrity ? `Scope: selected recording ${command.providerIntegrity.track ?? "unknown"}` : "Scope: selected-period trend",
   });
   const trackTotalsMeta = buildReportingMeta({
     command,
     sourceWidgetKeys: ["csv-track-totals", "tracks-by-growth-rate"],
     sourceLabel: "Sisense track totals",
-    reportingLabel: allHistoryReportingLabel,
+    reportingLabel: command.providerIntegrity ? `Provider export: ${command.providerIntegrity.dateRange ?? "unknown period"}` : allHistoryReportingLabel,
     scopeLabel: command.activeFilters.artistId || command.activeFilters.releaseId
       ? "Scope: selected artist/release filters"
       : "Scope: catalogue-wide",
@@ -94,28 +95,28 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
     command,
     sourceWidgetKeys: ["csv-geo-superfans", "spotify-superfans-active-streams-city"],
     sourceLabel: "Sisense geo superfans",
-    reportingLabel: allHistoryReportingLabel,
-    scopeLabel: "Scope: catalogue-wide until linked imports exist",
+    reportingLabel: command.providerIntegrity ? `Provider export: ${command.providerIntegrity.dateRange ?? "unknown period"}` : allHistoryReportingLabel,
+    scopeLabel: "Scope: reported rows only; completeness is unverified",
   });
   const playlistMeta = buildReportingMeta({
     command,
     sourceWidgetKeys: ["csv-playlists", "spotify-playlist-listings"],
     sourceLabel: "Sisense playlists",
-    reportingLabel: allHistoryReportingLabel,
-    scopeLabel: "Scope: catalogue-wide until linked imports exist",
+    reportingLabel: command.providerIntegrity ? `Provider export: ${command.providerIntegrity.dateRange ?? "unknown period"}` : allHistoryReportingLabel,
+    scopeLabel: "Scope: reported rows only; completeness is unverified",
   });
   const shazamMeta = buildReportingMeta({
     command,
     sourceWidgetKeys: ["csv-shazams-city", "shazams-city"],
     sourceLabel: "Sisense shazams by city",
-    reportingLabel: allHistoryReportingLabel,
-    scopeLabel: "Scope: catalogue-wide",
+    reportingLabel: command.providerIntegrity ? `Provider export: ${command.providerIntegrity.dateRange ?? "unknown period"}` : allHistoryReportingLabel,
+    scopeLabel: "Scope: selected recording, reported cities only; not worldwide",
   });
   const requestedPlatformWidgetKeys = command.activeFilters.platforms?.length
     ? command.activeFilters.platforms.map((platform) => platform === "apple" ? "apple-streams-source" : "spotify-streams-source")
     : ["spotify-streams-source", "apple-streams-source"];
-  const dailySourceAvailability = sourceAvailability(command, [["csv-daily-source-mix"], requestedPlatformWidgetKeys]);
-  const trackTotalsAvailability = sourceAvailability(command, [["csv-track-totals"], ["tracks-by-growth-rate"]]);
+  const dailySourceAvailability = ["empty", "invalid"].includes(selectedPeriod.trendState.kind) ? { available: false as const, reason: "No valid daily observations in this period." } : sourceAvailability(command, [["csv-daily-source-mix"], requestedPlatformWidgetKeys]);
+  const trackTotalsAvailability = command.providerIntegrity ? { available: false as const, reason: "Artist totals are unverified; inspect reported rows in Data Health." } : sourceAvailability(command, [["csv-track-totals"], ["tracks-by-growth-rate"]]);
   const geoAvailability = sourceAvailability(command, [["csv-geo-superfans"], ["spotify-superfans-active-streams-city"]]);
   const insightAvailability = {
     daily: dailySourceAvailability,
@@ -131,6 +132,7 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
       : "Catalogue combined streams";
   return (
     <section className="space-y-8">
+      {command.providerIntegrity && <ProviderIntegrityNotice integrity={command.providerIntegrity} />}
       <div className="space-y-7 border-b border-[var(--border)] pb-7">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
@@ -189,7 +191,7 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
         {section === "overview" && (
           <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <HeroMetric
-              label="Selected-period combined streams"
+              label={command.providerIntegrity ? "Selected recording · reported daily streams" : "Selected-period combined streams"}
               value={dailySourceAvailability.available ? formatNumber(selectedPeriod.streamTotal) : "Unavailable"}
               delta={dailySourceAvailability.available ? selectedPeriod.changePct : null}
               meta={dailySourceAvailability.available ? dailySourceMeta : [dailySourceAvailability.reason, ...dailySourceMeta]}
@@ -230,7 +232,7 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
       {section === "overview" && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {availableInsights.map((insight) => <InsightCard key={insight.label} insight={insight} />)}
-          {availableInsights.length === 0 && <p className="text-sm text-muted-foreground">Recommendations will appear when current source data is available.</p>}
+          {availableInsights.length === 0 && <p className="text-sm text-muted-foreground">Recommendations require current, reconciled source data and verified recording coverage.</p>}
         </div>
       )}
 
@@ -239,15 +241,15 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
           <Panel
             title="Daily streams trend"
             eyebrow={periodWindow(selectedPeriod)}
-            description="Spotify and Apple combined. Use this to spot momentum instead of reading raw rows."
+            description="Reported Spotify and Apple daily streams for the exported recording scope. Gaps and differing provider cutoffs can make this sum incomplete."
             metadata={dailySourceMeta}
           >
             <TrendChart period={selectedPeriod} />
           </Panel>
           <Panel
-            title="Catalogue movers"
-            eyebrow="Prioritise tracks"
-            description="Sort by stream base first, then growth. These are candidates for content, ads, or playlist pitching."
+            title="Reported catalogue rows (unverified)"
+            eyebrow="Source evidence"
+            description="Provider-reported counts and growth within the export window. Recording coverage and provider agreement are unverified."
             metadata={trackTotalsMeta}
           >
             <CatalogueMovers rows={command.catalog.topTracks} />
@@ -258,8 +260,8 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
       {section === "audience" && (
         <div className="grid gap-6 xl:grid-cols-2">
           <Panel
-            title="Markets to act on"
-            eyebrow="Geo opportunity"
+            title="Reported cities"
+            eyebrow="Partial geographic coverage"
             description="Cities with the strongest stream/superfan concentration."
             metadata={geoMeta}
           >
@@ -331,7 +333,7 @@ function DataFreshnessBanner({ command }: { command: AnalyticsCommandCenter }) {
           <span>Stale after {ANALYTICS_IMPORT_STALE_AFTER_HOURS} hours</span>
         </div>
         {stale ? (
-          <p className={`mt-1 text-xs ${secondaryTextClass}`}>Track totals use the selected scope; source, market, and playlist aggregates remain catalogue-wide until imported rows carry object links.</p>
+          <p className={`mt-1 text-xs ${secondaryTextClass}`}>These exports use different recording and artist scopes. Review the source scope and reporting dates before comparing figures.</p>
         ) : null}
       </div>
       {stale ? (
@@ -820,7 +822,8 @@ function maxLastSeenAt(values: Array<string | Date | null>): string | null {
   return new Date(Math.max(...timestamps)).toISOString();
 }
 
-function formatNumber(value: number): string {
+function formatNumber(value: number | null): string {
+  if (value === null) return "—";
   return NUMBER_FORMAT.format(value);
 }
 

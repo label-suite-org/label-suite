@@ -185,7 +185,7 @@ function SuperfansByCityCard({ data }: { data: NonNullable<ArtistSisenseSection[
   return (
     <Card
       title="Superfans by city — top 10"
-      windowLabel={`Cumulative window total, not a daily snapshot · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
+      windowLabel={`Reporting-period window total, not a daily snapshot · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
     >
       <div className="h-72 w-full" style={{ minWidth: 1, minHeight: 1 }}>
         <ResponsiveContainer width="100%" height="100%" debounce={50}>
@@ -225,7 +225,7 @@ function DemographicsCard({ data }: { data: NonNullable<ArtistSisenseSection["de
   return (
     <Card
       title="Demographics — gender × age"
-      windowLabel={`Streams per segment · cumulative window total · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
+      windowLabel={`Streams per segment · reporting-period window total · synced ${data.asOf ? formatAnalyticsDate(data.asOf) : "—"}`}
     >
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">

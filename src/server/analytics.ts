@@ -58,15 +58,15 @@ export interface AnalyticsTrackGrowthRow {
   primaryArtist: string | null;
   appTrackTitle: string | null;
   releaseTitle: string | null;
-  combinedStreams: number;
-  spotifyStreams: number;
-  appleStreams: number;
-  amazonStreams: number;
-  pandoraStreams: number;
+  combinedStreams: number | null;
+  spotifyStreams: number | null;
+  appleStreams: number | null;
+  amazonStreams: number | null;
+  pandoraStreams: number | null;
   streamsGrowth: number | null;
-  youtubeViews: number;
-  tiktokViews: number;
-  combinedViews: number;
+  youtubeViews: number | null;
+  tiktokViews: number | null;
+  combinedViews: number | null;
   viewsGrowth: number | null;
   lastSeenAt: Date | string | null;
 }
@@ -1486,6 +1486,7 @@ export async function listAnalyticsCommandCenter(
     playlists,
     shazams,
     runHistory,
+    quality,
   ] = await Promise.all([
     listAnalyticsTotals(orgId),
     listFilteredTracksByGrowth(orgId, 100, effectiveFilter),
@@ -1493,9 +1494,11 @@ export async function listAnalyticsCommandCenter(
     listAnalyticsWidgetRows(orgId, "spotify-playlist-listings", 100, effectiveFilter),
     listAnalyticsWidgetRows(orgId, "shazams-city", 50, effectiveFilter),
     listAnalyticsRunHistory(orgId, 30),
+    listAnalyticsDataQuality(orgId),
   ]);
 
   return buildAnalyticsCommandCenter({
+    providerIntegrity: quality.providerIntegrity,
     dailySources,
     tracks: tracksByGrowth,
     cities,
@@ -1572,17 +1575,7 @@ export async function listFilteredTracksByGrowth(
     );
     if (workspace.latest) return workspace.latest.rows
       .filter((row) => !filter.releaseId || row.releaseId === filter.releaseId)
-      .slice(0, limit)
-      .map((row) => ({
-        ...row,
-        spotifyStreams: row.spotifyStreams ?? 0,
-        appleStreams: row.appleStreams ?? 0,
-        amazonStreams: row.amazonStreams ?? 0,
-        pandoraStreams: row.pandoraStreams ?? 0,
-        youtubeViews: row.youtubeViews ?? 0,
-        tiktokViews: row.tiktokViews ?? 0,
-        combinedViews: row.combinedViews ?? 0,
-      }));
+      .slice(0, limit);
   }
 
   if (!filter?.artistId && !filter?.releaseId) {
@@ -1637,15 +1630,15 @@ export async function listFilteredTracksByGrowth(
     primaryArtist: row.primaryArtist,
     appTrackTitle: null,
     releaseTitle: null,
-    combinedStreams: Number(row.combinedStreams ?? 0),
-    spotifyStreams: Number(row.spotifyStreams ?? 0),
-    appleStreams: Number(row.appleStreams ?? 0),
-    amazonStreams: Number(row.amazonStreams ?? 0),
-    pandoraStreams: Number(row.pandoraStreams ?? 0),
+    combinedStreams: row.combinedStreams == null ? null : Number(row.combinedStreams),
+    spotifyStreams: row.spotifyStreams == null ? null : Number(row.spotifyStreams),
+    appleStreams: row.appleStreams == null ? null : Number(row.appleStreams),
+    amazonStreams: row.amazonStreams == null ? null : Number(row.amazonStreams),
+    pandoraStreams: row.pandoraStreams == null ? null : Number(row.pandoraStreams),
     streamsGrowth: row.streamsGrowth === null ? null : Number(row.streamsGrowth),
-    youtubeViews: Number(row.youtubeViews ?? 0),
-    tiktokViews: Number(row.tiktokViews ?? 0),
-    combinedViews: Number(row.combinedViews ?? 0),
+    youtubeViews: row.youtubeViews == null ? null : Number(row.youtubeViews),
+    tiktokViews: row.tiktokViews == null ? null : Number(row.tiktokViews),
+    combinedViews: row.combinedViews == null ? null : Number(row.combinedViews),
     viewsGrowth: row.viewsGrowth === null ? null : Number(row.viewsGrowth),
     lastSeenAt: toDate(row.lastSeenAt),
   }));
@@ -1678,15 +1671,15 @@ export async function listFilteredTracksByGrowth(
     primaryArtist: row.dimensions.primary_artist ?? null,
     appTrackTitle: row.trackTitle,
     releaseTitle: row.releaseTitle,
-    combinedStreams: numberMetric(row.metrics, "combined_streams"),
-    spotifyStreams: numberMetric(row.metrics, "spotify_streams"),
-    appleStreams: numberMetric(row.metrics, "apple_streams"),
-    amazonStreams: numberMetric(row.metrics, "amazon_streams"),
-    pandoraStreams: numberMetric(row.metrics, "pandora_streams"),
+    combinedStreams: nullableNumberMetric(row.metrics, "combined_streams"),
+    spotifyStreams: nullableNumberMetric(row.metrics, "spotify_streams"),
+    appleStreams: nullableNumberMetric(row.metrics, "apple_streams"),
+    amazonStreams: nullableNumberMetric(row.metrics, "amazon_streams"),
+    pandoraStreams: nullableNumberMetric(row.metrics, "pandora_streams"),
     streamsGrowth: nullableNumberMetric(row.metrics, "streams_growth"),
-    youtubeViews: numberMetric(row.metrics, "youtube_views"),
-    tiktokViews: numberMetric(row.metrics, "tiktok_views"),
-    combinedViews: numberMetric(row.metrics, "combined_views"),
+    youtubeViews: nullableNumberMetric(row.metrics, "youtube_views"),
+    tiktokViews: nullableNumberMetric(row.metrics, "tiktok_views"),
+    combinedViews: nullableNumberMetric(row.metrics, "combined_views"),
     viewsGrowth: nullableNumberMetric(row.metrics, "views_growth"),
     lastSeenAt: toDate(row.lastSeenAt),
   }));
@@ -1757,15 +1750,15 @@ export async function listAnalyticsTracksByGrowth(
       primaryArtist: row.primaryArtist,
       appTrackTitle: null,
       releaseTitle: null,
-      combinedStreams: Number(row.combinedStreams ?? 0),
-      spotifyStreams: Number(row.spotifyStreams ?? 0),
-      appleStreams: Number(row.appleStreams ?? 0),
-      amazonStreams: Number(row.amazonStreams ?? 0),
-      pandoraStreams: Number(row.pandoraStreams ?? 0),
+      combinedStreams: row.combinedStreams == null ? null : Number(row.combinedStreams),
+      spotifyStreams: row.spotifyStreams == null ? null : Number(row.spotifyStreams),
+      appleStreams: row.appleStreams == null ? null : Number(row.appleStreams),
+      amazonStreams: row.amazonStreams == null ? null : Number(row.amazonStreams),
+      pandoraStreams: row.pandoraStreams == null ? null : Number(row.pandoraStreams),
       streamsGrowth: row.streamsGrowth === null ? null : Number(row.streamsGrowth),
-      youtubeViews: Number(row.youtubeViews ?? 0),
-      tiktokViews: Number(row.tiktokViews ?? 0),
-      combinedViews: Number(row.combinedViews ?? 0),
+      youtubeViews: row.youtubeViews == null ? null : Number(row.youtubeViews),
+      tiktokViews: row.tiktokViews == null ? null : Number(row.tiktokViews),
+      combinedViews: row.combinedViews == null ? null : Number(row.combinedViews),
       viewsGrowth: row.viewsGrowth === null ? null : Number(row.viewsGrowth),
       lastSeenAt: toDate(row.lastSeenAt),
     }));
@@ -1802,15 +1795,15 @@ export async function listAnalyticsTracksByGrowth(
     primaryArtist: row.dimensions.primary_artist ?? null,
     appTrackTitle: row.trackTitle,
     releaseTitle: row.releaseTitle,
-    combinedStreams: numberMetric(row.metrics, "combined_streams"),
-    spotifyStreams: numberMetric(row.metrics, "spotify_streams"),
-    appleStreams: numberMetric(row.metrics, "apple_streams"),
-    amazonStreams: numberMetric(row.metrics, "amazon_streams"),
-    pandoraStreams: numberMetric(row.metrics, "pandora_streams"),
+    combinedStreams: nullableNumberMetric(row.metrics, "combined_streams"),
+    spotifyStreams: nullableNumberMetric(row.metrics, "spotify_streams"),
+    appleStreams: nullableNumberMetric(row.metrics, "apple_streams"),
+    amazonStreams: nullableNumberMetric(row.metrics, "amazon_streams"),
+    pandoraStreams: nullableNumberMetric(row.metrics, "pandora_streams"),
     streamsGrowth: nullableNumberMetric(row.metrics, "streams_growth"),
-    youtubeViews: numberMetric(row.metrics, "youtube_views"),
-    tiktokViews: numberMetric(row.metrics, "tiktok_views"),
-    combinedViews: numberMetric(row.metrics, "combined_views"),
+    youtubeViews: nullableNumberMetric(row.metrics, "youtube_views"),
+    tiktokViews: nullableNumberMetric(row.metrics, "tiktok_views"),
+    combinedViews: nullableNumberMetric(row.metrics, "combined_views"),
     viewsGrowth: nullableNumberMetric(row.metrics, "views_growth"),
     lastSeenAt: toDate(row.lastSeenAt),
   }));
@@ -2298,6 +2291,10 @@ export async function listTodayHub(orgId: string): Promise<TodayHubData> {
 export function buildTodayHub(command: AnalyticsCommandCenter, ingestion: AnalyticsDataQualityReport): TodayHubData {
   const period = command.periods.find((p) => p.key === "30d") ?? command.periods[0];
   const cards: TodayHubCard[] = [];
+  if (command.providerIntegrity) return {
+    cards: [{ key: "analytics-data-health", title: "Music statistics need reconciliation", detail: "The shared provider export has unverified recording coverage. Artist totals and recommendations are unavailable until reconciled; inspect the reported rows and scope in Data Health.", metric: null, tone: "watch", linkUrl: "/analytics?section=data-health#analytics-data-health", linkLabel: "Review source limitations" }],
+    dataHealth: { lastSeenAt: command.dataHealth.lastSeenAt, totalRows: command.dataHealth.totalRows, totalWidgets: command.dataHealth.totalWidgets, evidencePartial: ingestion.evidence.partial },
+  };
 
   // 1. "What changed overnight?" — momentum + top mover
   const momentumInsight = period.insights.find((i) => i.label === "Momentum");
@@ -2321,7 +2318,7 @@ export function buildTodayHub(command: AnalyticsCommandCenter, ingestion: Analyt
       title: `Top mover: ${moverInsight.title}`,
       detail: command.catalog.topMover.primaryArtist
         ? `${command.catalog.topMover.primaryArtist} · ${formatCompact(command.catalog.topMover.combinedStreams)} streams`
-        : `${formatCompact(command.catalog.topMover.combinedStreams)} cumulative streams`,
+        : `${formatCompact(command.catalog.topMover.combinedStreams)} reporting-period streams`,
       metric: moverInsight.metric,
       tone: moverInsight.tone,
       linkUrl: "/analytics",
@@ -2417,7 +2414,8 @@ function signedPercent(value: number): string {
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
 }
 
-function formatCompact(value: number): string {
+function formatCompact(value: number | null): string {
+  if (value === null) return "—";
   return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 }
 

@@ -78,16 +78,16 @@ export default function DatedTrackSnapshotTable({
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <SummaryFact label="Unique tracks" value={`${latest.uniqueTrackCount} unique tracks`} />
-        <SummaryFact label="Cumulative streams" value={formatAnalyticsNumber(latest.cumulativeStreams)} />
+        <SummaryFact label="Reporting-period streams" value={formatAnalyticsNumber(latest.cumulativeStreams)} />
         <SummaryFact
-          label="Cumulative views"
+          label="Reporting-period views"
           value={formatOptionalCount(latest.cumulativeViews)}
         />
         <SummaryFact label="Imported" value={formatImportedAt(latest.importedAt)} />
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Growth is the provider-reported comparison between dated snapshots; it is not recalculated by Label Suite.
+        Growth is the provider-reported average change between aggregation periods in the provider-selected range; it is not recalculated by Label Suite.
       </p>
 
       <CurrentRowsTable
@@ -186,7 +186,7 @@ function CurrentRowsTable({
             <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Apple</th>
             <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Amazon</th>
             <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Pandora</th>
-            {heading("combinedStreams", "Cumulative streams", "right")}
+            {heading("combinedStreams", "Reporting-period streams", "right")}
             {heading("streamsGrowth", "Stream growth", "right")}
             {heading("combinedViews", "Combined views", "right")}
             <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">View growth</th>

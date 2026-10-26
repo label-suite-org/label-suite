@@ -119,13 +119,13 @@ afterEach(() => {
 });
 
 describe("DatedTrackSnapshotTable", () => {
-  it("presents the latest dated snapshot as cumulative provider evidence", async () => {
+  it("presents the latest dated snapshot as reporting-period provider evidence", async () => {
     const { container, root } = await renderTable();
     try {
       expect(container.querySelector("h2")?.textContent).toBe("Latest dated track snapshot");
       expect(container.textContent).toContain("2 unique tracks");
-      expect(container.textContent).toContain("Cumulative streams");
-      expect(container.textContent).toContain("Cumulative views");
+      expect(container.textContent).toContain("Reporting-period streams");
+      expect(container.textContent).toContain("Reporting-period views");
       expect(container.textContent).toContain("1,500");
       expect(container.textContent).toContain("2026-08-01 to 2026-08-08 · Daily");
       expect(container.textContent).toContain("Reporting through 2026-08-08");
@@ -146,7 +146,7 @@ describe("DatedTrackSnapshotTable", () => {
     const { container, root } = await renderTable(snapshot);
     try {
       expect(container.textContent).toContain(
-        "Growth is the provider-reported comparison between dated snapshots",
+        "Growth is the provider-reported average change between aggregation periods in the provider-selected range",
       );
       const table = container.querySelector("table");
       expect(table?.querySelector("caption")?.textContent).toContain("Current Sisense track snapshot");
@@ -259,7 +259,7 @@ describe("DatedTrackSnapshotTable", () => {
         "Matched 2 · Unmatched 0 · Ambiguous 0 · Exact duplicates 1",
       );
       expect(disclosures[0].textContent).toContain("Additional earlier snapshots are not shown on this page");
-      expect(disclosures[0].textContent).not.toContain("Cumulative streams");
+      expect(disclosures[0].textContent).not.toContain("Reporting-period streams");
 
       expect(disclosures[1].querySelector("summary")?.textContent).toContain("Undated legacy records · 95 records");
       expect(disclosures[1].textContent).toContain(
@@ -313,7 +313,7 @@ describe("DatedTrackSnapshotTable", () => {
     try {
       expect(container.textContent).toContain("120 unique tracks");
       expect(container.textContent).toContain("Showing 2 of 120 unique tracks in this table");
-      expect(container.textContent).toContain("Cumulative views1,500");
+      expect(container.textContent).toContain("Reporting-period views1,500");
       expect(container.textContent).not.toContain("Full-snapshot total is not available from this row page");
 
       const table = container.querySelector("table");
