@@ -1,6 +1,8 @@
 ---
 import "../../styles/fans.css";
+import { fanPublicArtistId, fanPostalAddress } from "../../server/fan-drops-core";
 export const prerender = false;
+const publicSignup = Boolean(fanPublicArtistId());
 ---
 <!doctype html>
 <html lang="en">
@@ -14,10 +16,11 @@ export const prerender = false;
     <main class="fan-page">
       <p>True Nature · Label Suite</p>
       <h1>Fan email privacy</h1>
-      <p>Updated 24 October 2026. This notice covers the True Blue owner-only signup and email pilot in Label Suite. Signup and delivery are restricted to the configured owner address. It does not cover other True Nature websites or signup forms.</p>
+      <p>Updated 26 October 2026. {publicSignup ? "This notice covers True Blue email signup and updates in Label Suite." : "This notice covers the True Blue owner-only signup and email pilot in Label Suite. Public signup is closed; signup and delivery are restricted to the configured owner address."} It does not cover other True Nature websites or signup forms.</p>
 
       <h2>Who is responsible</h2>
-      <p>True Nature is responsible for this pilot’s personal data. For privacy questions or requests, email <a href="mailto:malthe@truenature.online">malthe@truenature.online</a>.</p>
+      <p>True Nature is responsible for this service’s personal data. For privacy questions or requests, email <a href="mailto:malthe@truenature.online">malthe@truenature.online</a>.</p>
+      {publicSignup && <p class="fan-description">Postal address: {fanPostalAddress()}</p>}
 
       <h2>What we collect and why</h2>
       <p>We use your email address to confirm your signup and send the artist updates you request. Your name and city are optional. If you choose a show, we record that selection and its city. We also record the artist, signup page and version, consent wording, signup and confirmation times, unsubscribe status, and any audience tags added by the label.</p>
@@ -25,20 +28,20 @@ export const prerender = false;
       <p>To operate and protect the service, we keep delivery records, failures and complaints, and use a keyed hash of your IP address and email for signup rate limits. Our hosting and network providers also process ordinary connection data, such as IP addresses. These operations and keeping evidence of consent and opt-outs serve our legitimate interests in reliable delivery, preventing abuse and respecting your choices (Article 6(1)(f)).</p>
 
       <h2>Email activity</h2>
-      <p>Brevo delivers the emails and can report delivery, opens, link clicks, bounces, complaints and unsubscribes. Emails may contain tracking pixels and tracked links. Label Suite records the activity type and time against the subscription and email campaign to check this pilot’s operation. An open is not proof that you read an email. We do not make automated decisions with legal or similarly significant effects from this activity.</p>
+      <p>Brevo delivers the emails and can report delivery, opens, link clicks, bounces, complaints and unsubscribes. Emails may contain tracking pixels and tracked links. Label Suite records the activity type and time against the subscription and email campaign to check delivery and engagement. An open is not proof that you read an email. We do not make automated decisions with legal or similarly significant effects from this activity.</p>
 
       <h2>Who processes the data</h2>
       <p>Authorised True Nature workspace operators can access signup and delivery records in Label Suite. Brevo processes contact details and email delivery on our behalf. Cloudflare provides network delivery and security for this website. We do not sell the pilot data or add your signup to an unrelated artist’s list.</p>
       <p>Brevo describes its database hosting as within the EU. Providers and their subprocessors may also process data outside the EEA under their applicable transfer arrangements. See <a href="https://www.brevo.com/legal/termsofuse/">Brevo’s data-processing terms</a>, its <a href="https://help.brevo.com/hc/en-us/articles/360001005510-Data-storage-location">storage information</a>, and <a href="https://www.cloudflare.com/cloudflare-customer-dpa/">Cloudflare’s data-processing and transfer terms</a>. Contact us for information about the arrangements applicable to this pilot.</p>
 
       <h2>How long records are kept</h2>
-      <p>We keep the test subscription and activity while the owner is using this pilot to verify signup, scheduling and delivery. At the end of the pilot, or on a deletion request, we review and remove personal records that are no longer needed. This is a manual process; expiry of a confirmation link after 24 hours does not automatically erase the signup record.</p>
+      {publicSignup ? <p>We keep your confirmed subscription while you want updates. We review records every three months: unconfirmed signups older than 30 days and email activity older than 12 months are removed unless needed to resolve a current request or delivery issue. These are manual reviews; expiry of a confirmation link after 24 hours does not automatically erase the signup record.</p> : <p>We keep the test subscription and activity while the owner is using this pilot to verify signup, scheduling and delivery. At the end of the pilot, or on a deletion request, we review and remove personal records that are no longer needed. This is a manual process; expiry of a confirmation link after 24 hours does not automatically erase the signup record.</p>}
       <p>Unsubscribing stops future updates; it does not erase past delivery or consent records. We retain only the consent evidence and minimum suppression information needed to demonstrate and honour your choices or resolve an outstanding delivery issue. Recovery copies are kept separately for recovery and are not used for marketing. Contact us about how a deletion request affects retained backups.</p>
 
       <h2>Your choices and rights</h2>
       <p>The confirmation flow provides an artist-specific unsubscribe link. Campaign emails contain a Brevo unsubscribe link that stops email updates sent by this label across its Brevo account. Withdrawal does not change the lawfulness of processing before withdrawal.</p>
       <p>You can ask us to access, correct or delete your data, restrict processing, provide a portable copy, or object to processing based on legitimate interests. Contact <a href="mailto:malthe@truenature.online">malthe@truenature.online</a>. You can also complain to the <a href="https://www.datatilsynet.dk/english/contact-us">Danish Data Protection Agency</a> or your local data-protection authority.</p>
-      <p>This pilot notice must be reviewed before signup is opened to a wider fan audience.</p>
+      {!publicSignup && <p>This pilot notice must be reviewed before signup is opened to a wider fan audience.</p>}
     </main>
   </body>
 </html>

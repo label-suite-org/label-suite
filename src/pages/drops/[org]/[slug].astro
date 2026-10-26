@@ -2,7 +2,7 @@
 import "../../../styles/fans.css";
 import { runWithDatabaseContext } from "../../../lib/db";
 import { getPublicFanDrop } from "../../../server/fan-drops";
-import { fanEmailEnabled, fanId } from "../../../server/fan-drops-core";
+import { fanEmailEnabled, fanId, fanPublicArtistId } from "../../../server/fan-drops-core";
 import { FanForm } from "../../../components/fans/FanForm";
 export const prerender = false;
 const parsed = fanId.safeParse(Astro.params.org);
@@ -16,6 +16,7 @@ const page = drop.published;
 <body><main class="fan-page">
   {page.artwork_url && <img class="fan-artwork" src={page.artwork_url} alt={`${page.artist_name} — ${page.title}`} />}
   <p>{page.artist_name}</p><h1>{page.title}</h1><p class="fan-description">{page.description}</p>
+  {!fanPublicArtistId() && <p>Public signup has not opened. This page currently accepts only the owner’s test address.</p>}
   {!!page.shows.length && <ul class="fan-shows">{page.shows.map(show => <li><div><strong>{show.title}</strong><small>{[show.start_date, show.city, show.venue].filter(Boolean).join(" · ")}</small></div>{show.ticket_url && <a href={show.ticket_url} rel="noreferrer">Tickets</a>}</li>)}</ul>}
   <FanForm client:load action="signup" org={org} slug={slug} revision={drop.published_revision} page={page} enabled={fanEmailEnabled()} />
 </main></body></html>
