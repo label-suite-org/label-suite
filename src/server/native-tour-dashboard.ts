@@ -1,3 +1,4 @@
+import { tourCostDetails } from "./tour-costs";
 import { savedTourBudget } from "./tour-budget-plan";
 import { and, eq, asc, inArray } from "drizzle-orm";
 import { db } from "../lib/db";
@@ -58,7 +59,7 @@ export async function getNativeTourDashboard(org: string, projectID: string, now
       expenses: rows.filter(e => e.kind === "expense").reduce((n, e) => n + e.amount, 0) };
   });
   const budgetPlan = details[0]?.budget_plan ? savedTourBudget.parse(details[0].budget_plan) : null;
-  return { budget_plan: budgetPlan, daily, shows: closeShows,
+  return { costs: tourCostDetails(lines, ledger, project.currency || "USD"), budget_plan: budgetPlan, daily, shows: closeShows,
     allowances: lines.filter(l => l.lock_status === "open").map(l => ({ id: l.id, name: l.name, currency: project.currency || "USD", remaining: Math.max(0, Math.round(((l.forecast_amount ?? l.planned_amount ?? l.amount) - (l.paid_amount ?? 0) - (l.committed_amount ?? 0)) * 100)) })),
     spending: { paid: expenses.filter(e => e.currency === project.currency && e.paid === true).reduce((n, e) => n + e.amount, 0), due: expenses.filter(e => e.currency === project.currency && e.paid === false).reduce((n, e) => n + e.amount, 0), unknown: expenses.filter(e => e.paid === null).length },
     project_id: project.id, title: project.name, as_of: now.toISOString(), today, timezone, money,

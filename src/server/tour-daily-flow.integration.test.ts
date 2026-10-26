@@ -115,6 +115,40 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
     expect((await read())!.shows[0]).toMatchObject({ cash: 4000, received: 30000 });
   });
 
+  it("edits costs in place with revision conflicts, retries, assignment, and forecast reconciliation", async () => {
+    const { saveTourCost } = await import("./tour-costs");
+    const view = (await read())!;
+    const item = view.costs.expenses.find(e => e.currency === "USD" && e.paid === false)!;
+    const input = { action: "expense", request_id: randomUUID(), id: item.id, expected_revision: item.revision,
+      name: "Corrected fuel", amount: 2500, currency: "USD", paid: true, person: "Tour member", date: null, note: "Corrected receipt", budget_line_id: allowance };
+    const beforeCount = (await sql`select count(*)::int as n from label_suite.tour_money_entries where org_id=${org}`)[0].n;
+    const responses = await Promise.all([saveTourCost(org, project, actor, input), saveTourCost(org, project, actor, input)]);
+    expect(responses.map(r => r.repeated).sort()).toEqual([false, true]);
+    expect((await sql`select count(*)::int as n from label_suite.tour_money_entries where org_id=${org}`)[0].n).toBe(beforeCount);
+    expect((await sql`select count(*)::int as n from label_suite.audit_logs where request_id=${input.request_id}`)[0].n).toBe(1);
+    const fresh = (await read())!;
+    expect(fresh.money.forecast_cost).toBe(10000); // standalone forecast moved into existing allowance
+    expect(fresh.spending).toEqual({ paid: 3734, due: 0, unknown: 0 });
+    expect(fresh.costs.expenses.find(e => e.id === item.id)).toMatchObject({ name: "Corrected fuel", amount: 2500, paid: true, budget_line_id: allowance, source: item.source });
+    expect(fresh.costs.estimates.find(e => e.id === allowance)).toMatchObject({ total: 10000, recorded: 3734, remaining: 6266 });
+    await expect(saveTourCost(org, project, actor, { ...input, amount: 5000 })).rejects.toThrow("different values");
+    await expect(saveTourCost(org, project, actor, { ...input, request_id: randomUUID() })).rejects.toThrow("changed");
+    await expect(saveTourCost("other-org", project, actor, input)).rejects.toThrow("not found");
+    const line = fresh.costs.estimates.find(e => e.id === allowance)!;
+    const estimate = { action: "estimate", request_id: randomUUID(), id: line.id, expected_revision: line.revision, currency: "USD", name: "Fuel allowance", forecast: 2000 };
+    await saveTourCost(org, project, actor, estimate);
+    expect((await read())!.money.forecast_cost).toBe(3734); // actual costs floor the forecast
+    await expect(saveTourCost(org, project, actor, { ...estimate, request_id: randomUUID() })).rejects.toThrow("changed");
+    const current = (await read())!.costs.estimates.find(e => e.id === allowance)!;
+    await saveTourCost(org, project, actor, { ...estimate, request_id: randomUUID(), expected_revision: current.revision, forecast: 10000 });
+    const expenseNow = (await read())!.costs.expenses.find(e => e.id === item.id)!;
+    await expect(saveTourCost(org, project, actor, { ...input, request_id: randomUUID(), expected_revision: expenseNow.revision, budget_line_id: "other-tour-line" })).rejects.toThrow("outside this tour");
+    await sql`update label_suite.budget_line_items set lock_status='locked' where id=${allowance}`;
+    await expect(saveTourCost(org, project, actor, { ...input, request_id: randomUUID(), expected_revision: expenseNow.revision })).rejects.toThrow("requires approval");
+    expect((await read())!.spending).toEqual(fresh.spending);
+    await sql`update label_suite.budget_line_items set lock_status='open' where id=${allowance}`;
+  });
+
   it("rolls back locked allowances and refuses to resurrect voided retries", async () => {
     await sql`update label_suite.budget_line_items set lock_status='locked' where id=${allowance}`;
     const input = expense();
