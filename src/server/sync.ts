@@ -66,7 +66,7 @@ export async function syncOptions(orgId: string) {
       .where(eq(documents.org_id, orgId))
       .orderBy(asc(documents.name)),
     db
-      .select({ id: media_assets.id, label: media_assets.asset_name })
+      .select({ id: media_assets.id, label: media_assets.asset_name, file_link: media_assets.file_link })
       .from(media_assets)
       .where(eq(media_assets.org_id, orgId))
       .orderBy(asc(media_assets.asset_name)),

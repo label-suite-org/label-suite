@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { resolveFileUrl } from "../../lib/storage-client";
+import { openExternalUrl } from "../../lib/external-url";
 import {
   syncDraft,
   syncFee,
@@ -243,7 +245,7 @@ function formValue(record: RecordData): SyncSave {
 }
 export function SyncEditor({
   initial,
-  options,
+  options: initialOptions,
   artistId = "",
   releaseId = "",
 }: {
@@ -253,6 +255,8 @@ export function SyncEditor({
   releaseId?: string;
 }) {
   const [record, setRecord] = useState(initial);
+  const [options, setOptions] = useState(initialOptions);
+  const [assetBusy, setAssetBusy] = useState(false);
   const [form, setForm] = useState<SyncSave>(() =>
     initial
       ? formValue(initial)
@@ -285,6 +289,43 @@ export function SyncEditor({
   });
   function detail(key: SyncField, value: string) {
     setForm((f) => ({ ...f, details: { ...f.details, [key]: value } }));
+  }
+  async function refreshAssets() {
+    setAssetBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/sync");
+      const data = await response.json();
+      if (!response.ok)
+        throw new Error(data.error || "Could not refresh media assets");
+      setOptions((current) => ({ ...current, assets: data.options.assets }));
+      setNotice("Media assets refreshed. Your deal edits are unchanged.");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAssetBusy(false);
+    }
+  }
+  async function openAsset() {
+    setAssetBusy(true);
+    setError("");
+    try {
+      const asset = options.assets.find((item) => item.id === form.asset_id);
+      if (!asset?.file_link)
+        throw new Error(
+          "This asset has no file. Add one in the media library, then refresh media assets.",
+        );
+      const url = await resolveFileUrl(asset.file_link);
+      if (!openExternalUrl(url))
+        throw new Error(
+          "This asset does not have a valid HTTP or HTTPS file link. Update it in the media library.",
+        );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setAssetBusy(false);
+    }
   }
   async function mutate(action: "save" | "receipt") {
     setBusy(true);
@@ -446,12 +487,42 @@ export function SyncEditor({
               (v) => setForm({ ...form, contact_id: v }),
               options.contacts,
             )}
-            {select(
-              "Linked media asset",
-              form.asset_id,
-              (v) => setForm({ ...form, asset_id: v }),
-              options.assets,
-            )}
+            <div className="space-y-2 sm:col-span-2">
+              {select(
+                "Linked media asset",
+                form.asset_id,
+                (v) => setForm({ ...form, asset_id: v }),
+                options.assets,
+              )}
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <Button
+                  type="button"
+                  disabled={assetBusy || !form.asset_id}
+                  onClick={() => void openAsset()}
+                >
+                  Open selected file
+                </Button>
+                <a
+                  href="/media-assets"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  Add or manage media assets (new tab)
+                </a>
+                <Button
+                  type="button"
+                  disabled={assetBusy}
+                  onClick={() => void refreshAssets()}
+                >
+                  {assetBusy ? "Loading…" : "Refresh media assets"}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Linking a file does not confirm approval or delivery. Record the
+                exact delivered version and acknowledgement under Delivery.
+              </p>
+            </div>
           </section>
           <section className="rounded-xl border p-5">
             <h2 className="mb-3 font-semibold">Next action</h2>

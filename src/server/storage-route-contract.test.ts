@@ -175,6 +175,42 @@ describe("storage route compatibility contract", () => {
     expect(denied.status).toBe(403);
   });
 
+  it("accepts a 52 MB media file while retaining the document ceiling", async () => {
+    const { POST } = await import("../pages/api/storage/upload");
+    const form = new FormData();
+    form.set("key", "media-assets/instrumental.wav");
+    form.set("file", new File([new Uint8Array(52_000_000)], "instrumental.wav", { type: "audio/wav" }));
+    const request = new Request("https://labels.example/api/storage/upload?kind=media-asset", {
+      method: "POST", headers: { origin: "https://labels.example" }, body: form,
+    });
+    const response = await POST({ request, locals: { orgId: "org-1", membershipRole: "operator" } } as never);
+    expect(response.status).toBe(200);
+    expect(storage.uploadStorageObject.mock.calls[0][0].body.byteLength).toBe(52_000_000);
+    const document = await POST({ request: uploadRequest(form), locals: { orgId: "org-1", membershipRole: "operator" } } as never);
+    expect(document.status).toBe(413);
+    expect(storage.uploadStorageObject).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects unauthorized, oversized or misrouted media uploads", async () => {
+    const { POST } = await import("../pages/api/storage/upload");
+    const url = "https://labels.example/api/storage/upload?kind=media-asset";
+    const deniedRequest = new Request(url, { method: "POST", headers: { origin: "https://labels.example" }, body: "untrusted" });
+    const denied = await POST({ request: deniedRequest, locals: { orgId: "org-1", membershipRole: "fundraiser" } } as never);
+    expect(denied.status).toBe(403);
+    expect(deniedRequest.bodyUsed).toBe(false);
+    const oversized = new Request(url, { method: "POST", headers: { origin: "https://labels.example", "content-length": String(102 * 1024 * 1024) }, body: "small" });
+    expect((await POST({ request: oversized, locals: { orgId: "org-1", membershipRole: "operator" } } as never)).status).toBe(413);
+    for (const context of [false, true]) {
+      const form = new FormData();
+      form.set("key", context ? "media-assets/file.pdf" : "documents/file.pdf");
+      if (context) form.set("context", JSON.stringify({ type: "grant_application", id: "app-1" }));
+      form.set("file", new File(["test"], "file.pdf"));
+      const request = new Request(url, { method: "POST", headers: { origin: "https://labels.example" }, body: form });
+      expect((await POST({ request, locals: { orgId: "org-1", membershipRole: "owner" } } as never)).status).toBe(400);
+    }
+    expect(storage.uploadStorageObject).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["cross-origin", "https://attacker.example", "owner"],
     ["missing capability", "https://labels.example", "member"],

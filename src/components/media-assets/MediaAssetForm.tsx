@@ -227,6 +227,7 @@ export function MediaAssetForm({
             />
             <span>{file ? `${file.name} (${Math.round(file.size / 1024)} KB)` : "Choose file or drop here later"}</span>
           </label>
+          <p className="mt-1 text-xs text-muted-foreground">Maximum file size: 100 MB.</p>
         </div>
         <div>
           <label htmlFor={`${formId}-upload-date`} className="block text-sm font-medium text-foreground mb-1">Upload date</label>

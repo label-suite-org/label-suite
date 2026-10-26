@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { updateWork, updateWorkSchema } from "./works";
 import { createRole, updateRole } from "./roles";
 import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import { works, tracks, releases, roles, contacts, artists, radio_stations, contact_organizations, organizations, media_asset_files } from "../db/schema";
@@ -28,7 +29,7 @@ export async function listNativeWorks(orgId: string, raw: unknown) {
 export async function getNativeWork(orgId: string, workId: string) {
   const [work] = await db.select({
     id: works.id, title: works.title, isrc: works.isrc, iswc: works.iswc,
-    genre: works.genre, duration: works.duration,
+    genre: works.genre, duration: works.duration, audio_url: works.audio_url,
     revision: sql<string>`${works.updated_at}::text`,
   }).from(works).where(and(eq(works.org_id, orgId), eq(works.id, workId))).limit(1);
   if (!work) throw new NotFoundError("Work not found");
@@ -104,4 +105,11 @@ export async function listNativeRolePeople(orgId: string, workId: string, query:
     .where(and(eq(contact_organizations.org_id, orgId), inArray(contact_organizations.contact_id, items.map((person) => person.id))))
     .orderBy(asc(organizations.name), asc(organizations.id)) : [];
   return { items: items.map((person) => ({ ...person, organizations: affiliations.filter((item) => item.contact_id === person.id).map(({ id, name }) => ({ id, name })) })), next_cursor: people.length > 25 ? items.at(-1)!.id : null };
+}
+
+export const nativeWorkUpdateSchema = updateWorkSchema.omit({ id: true }).extend({ expected_revision: z.string().trim().min(1) }).strict()
+  .refine(input => Object.keys(input).some(key => key !== "expected_revision"), "Change at least one Work field");
+export async function updateNativeWork(orgId: string, workId: string, raw: unknown, actorUserId: string) {
+  const { expected_revision, ...fields } = nativeWorkUpdateSchema.parse(raw);
+  return updateWork(orgId, { ...fields, id: workId }, actorUserId, expected_revision);
 }

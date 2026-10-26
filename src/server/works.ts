@@ -1,5 +1,11 @@
-import { and, asc, eq, sql } from "drizzle-orm";
-import { artists, contacts, roles, tracks, works } from "../db/schema";
+import { z } from "zod";
+import { ConflictError, NotFoundError } from "./errors";
+import { hasOwn, idSchema, nullableInteger, nullableText } from "./validation";
+import { normalizeIsrcValue, assertIsrcAvailableForWork } from "../lib/isrc";
+import { persistTrackReadiness, persistReleaseReadiness } from "../lib/readiness";
+import { recordAuditEvent } from "./integrations";
+import { and, asc, eq, getTableColumns, sql } from "drizzle-orm";
+import { artists, contacts, orgs, roles, tracks, works } from "../db/schema";
 import { db } from "../lib/db";
 
 export type WorkPriorityRow = {
@@ -242,4 +248,66 @@ export async function getWorkDetail(orgId: string, id: string) {
     contacts: contactRows,
     tracks: trackRows,
   };
+}
+
+export const createWorkSchema = z.object({
+  title: z.string().trim().min(1), isrc: nullableText, iswc: nullableText,
+  audio_url: nullableText, duration: nullableInteger({ min: 0 }), genre: nullableText,
+});
+export const updateWorkSchema = createWorkSchema.partial().extend({ id: idSchema });
+
+function workMutationError(error: unknown): never {
+  if ((error as { cause?: { code?: string }; code?: string }).cause?.code === "23505" || (error as { code?: string }).code === "23505") {
+    throw new ConflictError("This Work identifier is already assigned in the workspace");
+  }
+  throw error;
+}
+
+export async function createWork(orgId: string, raw: unknown, actorUserId: string | null) {
+  const input = createWorkSchema.parse(raw);
+  try { return await db.transaction(async tx => {
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
+    const id = crypto.randomUUID(), isrc = normalizeIsrcValue(input.isrc);
+    if (isrc) await assertIsrcAvailableForWork(tx, orgId, isrc, id);
+    const [saved] = await tx.insert(works).values({ ...input, id, org_id: orgId, isrc }).returning();
+    await recordAuditEvent(orgId, { actor_user_id: actorUserId, event_type: "work.created", object_type: "work", object_id: id,
+      before: null, after: saved as unknown as Record<string, unknown> }, tx);
+    return { id, ok: true };
+  }); } catch (error) { workMutationError(error); }
+}
+
+export async function updateWork(orgId: string, raw: unknown, actorUserId: string | null, expectedRevision?: string) {
+  const input = updateWorkSchema.parse(raw);
+  try { return await db.transaction(async tx => {
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
+    const [before] = await tx.select({ ...getTableColumns(works), revision: sql<string>`${works.updated_at}::text` })
+      .from(works).where(and(eq(works.id, input.id), eq(works.org_id, orgId))).for("update");
+    if (!before) throw new NotFoundError("Work not found");
+    if (expectedRevision && before.revision !== expectedRevision) throw new ConflictError("Work changed. Refresh before saving.");
+    const { id, ...fields } = input;
+    if (hasOwn(fields, "isrc")) {
+      fields.isrc = normalizeIsrcValue(fields.isrc);
+      if (fields.isrc) await assertIsrcAvailableForWork(tx, orgId, fields.isrc, id);
+    }
+    const [saved] = await tx.update(works).set({ ...fields,
+      updated_at: sql`greatest(clock_timestamp(), ${before.revision}::timestamp + interval '1 microsecond')`,
+    }).where(and(eq(works.id, id), eq(works.org_id, orgId))).returning({ ...getTableColumns(works), revision: sql<string>`${works.updated_at}::text` });
+    // Work is the canonical ISRC identity; preserve each Track's audio and other overrides.
+    if (hasOwn(fields, "isrc")) {
+      const linked = await tx.select({ id: tracks.id, release_id: tracks.release_id, revision: sql<string>`${tracks.updated_at}::text` })
+        .from(tracks).where(and(eq(tracks.work_id, id), eq(tracks.org_id, orgId))).orderBy(asc(tracks.id)).for("update");
+      for (const track of linked) {
+        await tx.update(tracks).set({ isrc: fields.isrc }).where(and(eq(tracks.id, track.id), eq(tracks.org_id, orgId)));
+        await persistTrackReadiness(track.id, tx, orgId);
+        await tx.update(tracks).set({ updated_at: sql`greatest(clock_timestamp(), ${track.revision}::timestamp + interval '1 microsecond')` })
+          .where(and(eq(tracks.id, track.id), eq(tracks.org_id, orgId)));
+      }
+      for (const releaseId of [...new Set(linked.flatMap(track => track.release_id ? [track.release_id] : []))].sort()) {
+        await persistReleaseReadiness(releaseId, tx, orgId);
+      }
+    }
+    await recordAuditEvent(orgId, { actor_user_id: actorUserId, event_type: "work.updated", object_type: "work", object_id: id,
+      before: before as unknown as Record<string, unknown>, after: saved as unknown as Record<string, unknown> }, tx);
+    return { id, ok: true, revision: saved.revision };
+  }); } catch (error) { workMutationError(error); }
 }
