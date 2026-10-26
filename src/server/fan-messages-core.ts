@@ -10,8 +10,9 @@ export const messageContentSchema = z.object({
   link_label: z.string().trim().min(1).max(80).default("Read more"),
 }).strict();
 export type FanMessageContent = z.infer<typeof messageContentSchema>;
-export const saveFanMessageSchema = z.object({ id: fanId.optional(), expected_revision: z.number().int().positive().optional(), audience: fanAudienceSchema, content: messageContentSchema }).strict()
-  .refine(value => Boolean(value.id) === Boolean(value.expected_revision), "Existing messages require a revision");
+export const saveFanMessageSchema = z.object({ id: fanId.optional(), expected_revision: z.number().int().positive().optional(), creation_id: z.uuid().optional(), audience: fanAudienceSchema, content: messageContentSchema }).strict()
+  .refine(value => Boolean(value.id) === Boolean(value.expected_revision), "Existing messages require a revision")
+  .refine(value => !value.creation_id || !value.id, "Creation identity is only valid for a new message");
 export const messageRevisionSchema = z.object({ id: fanId, expected_revision: z.number().int().positive() }).strict();
 export const scheduleFanMessageSchema = messageRevisionSchema.extend({ scheduled_at: z.iso.datetime({ offset: true }), preview_hash: z.string().length(64) });
 export function fanPreviewHash(id: string, revision: number, audience: { id: string; email: string }[]) {

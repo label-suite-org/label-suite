@@ -1,10 +1,10 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ actor: vi.fn(), context: vi.fn(), save: vi.fn(), publish: vi.fn(), audience: vi.fn(), messageSave: vi.fn(), schedule: vi.fn(), test: vi.fn() }));
+const mocks = vi.hoisted(() => ({ actor: vi.fn(), context: vi.fn(), save: vi.fn(), publish: vi.fn(), audience: vi.fn(), messageSave: vi.fn(), messageGet: vi.fn(), schedule: vi.fn(), test: vi.fn() }));
 vi.mock("../../../server/audit", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("../../../lib/native-workspace", () => ({ resolveNativeActor: mocks.actor }));
 vi.mock("../../../lib/db", () => ({ db: {}, runWithDatabaseContext: mocks.context }));
 vi.mock("../../../server/fan-drops", () => ({ listFanDrops: vi.fn(), saveFanDrop: mocks.save, publishFanDrop: mocks.publish, fanAudience: mocks.audience, publicDropPath: vi.fn() }));
-vi.mock("../../../server/fan-messages", () => ({ listFanMessages: vi.fn(), saveFanMessage: mocks.messageSave, previewFanMessage: vi.fn(), scheduleFanMessage: mocks.schedule, cancelFanMessage: vi.fn(), reconcileFanMessage: vi.fn(), testFanMessage: mocks.test, fanTestRecipient: vi.fn() }));
+vi.mock("../../../server/fan-messages", () => ({ getFanMessage: mocks.messageGet, listFanMessages: vi.fn(), saveFanMessage: mocks.messageSave, previewFanMessage: vi.fn(), scheduleFanMessage: mocks.schedule, cancelFanMessage: vi.fn(), reconcileFanMessage: vi.fn(), testFanMessage: mocks.test, fanTestRecipient: vi.fn() }));
 vi.mock("../../../server/fan-feedback", () => ({ listFans: vi.fn(), fanHistory: vi.fn(), tagFan: vi.fn() }));
 import { GET, POST } from "./fan-drops";
 const actor = (role: string) => ({ userId: "operator-a", workspace: { role, org: { id: "org-a" } } });
@@ -35,4 +35,13 @@ it("routes owner tests with the authenticated identity and never an arbitrary re
   mocks.actor.mockResolvedValue(actor("owner")); mocks.test.mockResolvedValue({ id: "test-a", status: "scheduled" });
   expect((await POST(context({ action: "message_test", input: { id: "message-a", expected_revision: 1 } }))).status).toBe(200);
   expect(mocks.test).toHaveBeenCalledWith("org-a", { id: "message-a", expected_revision: 1 }, "operator-a");
+});
+
+it("retrieves an exact message only in the authenticated workspace and without a mutation", async () => {
+  mocks.messageGet.mockResolvedValue({ id: "message-a", status: "draft" });
+  const response = await GET({ request: new Request("https://suite.test/api/native/fan-drops?workspaceId=foreign&message_id=message-a") } as never);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ id: "message-a", status: "draft" });
+  expect(mocks.messageGet).toHaveBeenCalledWith("org-a", "message-a");
+  expect(mocks.messageSave).not.toHaveBeenCalled(); expect(mocks.schedule).not.toHaveBeenCalled();
 });

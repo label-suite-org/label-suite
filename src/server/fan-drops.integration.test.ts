@@ -49,6 +49,33 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
   afterEach(() => { vi.unstubAllGlobals(); delete process.env.FAN_ALLOWED_EMAIL; });
   afterAll(async () => { await database?.pool.end(); await admin?.end(); vi.unstubAllEnvs(); });
 
+  it("retries a new message concurrently without duplicates and rejects changed or cross-state retries", async () => {
+    const creation_id = crypto.randomUUID();
+    const input = { creation_id, audience: { artist_id: artist }, content: { subject: "Stable draft", body: "Private draft only", link_url: null, link_label: "More" } };
+    const send = vi.fn(); vi.stubGlobal("fetch", send);
+    const result = await Promise.all([context(() => messages.saveFanMessage(org, input)), context(() => messages.saveFanMessage(org, input))]);
+    expect(result.map(row => row.id)).toEqual([creation_id, creation_id]);
+    expect((await admin.query("select count(*)::int as count from label_suite.fan_messages where id=$1", [creation_id])).rows[0].count).toBe(1);
+    expect((await context(() => messages.getFanMessage(org, creation_id))).content).toEqual(input.content);
+    expect(await context(() => messages.getFanMessage(org, creation_id))).not.toHaveProperty("recipient_ids");
+    await expect(context(() => messages.saveFanMessage(org, { ...input, content: { ...input.content, body: "Different" } }))).rejects.toMatchObject({ status: 409 });
+    await context(() => messages.saveFanMessage(org, { id: creation_id, expected_revision: 1, audience: input.audience, content: input.content }));
+    await expect(context(() => messages.saveFanMessage(org, input))).rejects.toMatchObject({ status: 409 });
+    await admin.query("update label_suite.fan_messages set revision=1,status='scheduled' where id=$1", [creation_id]);
+    await expect(context(() => messages.saveFanMessage(org, input))).rejects.toMatchObject({ status: 409 });
+    expect((await admin.query("select count(*)::int as count from label_suite.job_runs where payload->>'messageId'=$1", [creation_id])).rows[0].count).toBe(0);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("does not adopt a foreign message identity or disclose it through exact lookup", async () => {
+    const foreignArtist = `foreign-message-artist-${suffix}`, creation_id = crypto.randomUUID();
+    await admin.query("insert into label_suite.artists(id,org_id,name) values($1,$2,'Foreign message artist')", [foreignArtist, otherOrg]);
+    const input = { creation_id, audience: { artist_id: foreignArtist }, content: { subject: "Foreign draft", body: "Private", link_url: null } };
+    await context(() => messages.saveFanMessage(otherOrg, input), otherOrg);
+    await expect(context(() => messages.saveFanMessage(org, { ...input, audience: { artist_id: artist } }))).rejects.toMatchObject({ status: 409 });
+    await expect(context(() => messages.getFanMessage(org, creation_id))).rejects.toMatchObject({ status: 404 });
+  });
+
   it("publishes only the approved projection and keeps subsequent draft edits private", async () => {
     const page = await drop("publication");
     const changed = await context(() => service.saveFanDrop(org, { id: page.id, expected_revision: page.revision, artist_id: artist, release_id: null, slug: page.slug, content: { ...content, title: "Private next announcement" } }));
