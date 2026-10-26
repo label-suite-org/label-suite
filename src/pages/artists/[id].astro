@@ -47,6 +47,7 @@ const sisense = artist ? await getArtistSisenseSection(orgId, id) : null;
 <AppLayout>
   {!artist ? <p class="text-muted-foreground">Artist not found.</p> : (
     <div class="space-y-8">
+      {canMutate && <a href={`/sync?artist=${encodeURIComponent(id)}`} class="text-sm underline">Sync deals</a>}
       <ArtistWorkspace
         client:load
         artist={artist}
