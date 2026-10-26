@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isDeepStrictEqual } from "node:util";
+import { recordAuditEvent } from "./integrations";
 import { and, asc, eq, sql } from "drizzle-orm";
 import {
   artists,
@@ -288,24 +290,25 @@ export async function deleteOrganization(orgId: string, input: DeleteOrganizatio
   return { ok: true };
 }
 
-export async function createContactOrganization(orgId: string, input: CreateContactOrganizationInput) {
+export async function createContactOrganization(orgId: string, input: CreateContactOrganizationInput, actorUserId?: string) {
   const id = input.id ?? crypto.randomUUID();
-  await assertContactAndOrganizationInOrg(orgId, input.contact_id, input.organization_id);
-
-  await db.insert(contact_organizations).values({
-    id,
-    org_id: orgId,
-    contact_id: input.contact_id,
-    organization_id: input.organization_id,
-    title: input.title ?? null,
-    department: input.department ?? null,
-    relationship_type: input.relationship_type ?? null,
-    is_primary: input.is_primary ?? false,
-    source: "manual",
-    confidence: 1,
-  }).onConflictDoNothing({ target: contact_organizations.id });
-
-  return { id, ok: true };
+  const values = { id, org_id: orgId, contact_id: input.contact_id, organization_id: input.organization_id,
+    title: input.title ?? null, department: input.department ?? null, relationship_type: input.relationship_type ?? null,
+    is_primary: input.is_primary ?? false, source: "manual", confidence: 1 };
+  return db.transaction(async tx => {
+    await assertContactAndOrganizationInOrg(orgId, input.contact_id, input.organization_id, tx);
+    const [inserted] = await tx.insert(contact_organizations).values(values).onConflictDoNothing().returning();
+    if (!inserted) {
+      const [existing] = await tx.select({ row: contact_organizations, initial: sql<boolean>`${contact_organizations.updated_at} = ${contact_organizations.created_at}` })
+        .from(contact_organizations).where(and(eq(contact_organizations.id, id), eq(contact_organizations.org_id, orgId))).limit(1);
+      if (!existing?.initial || Object.entries(values).some(([key, value]) => !isDeepStrictEqual(existing.row[key as keyof typeof existing.row], value))) {
+        throw new ConflictError("Affiliation identity or person/organisation pair already exists; reload before reviewing changes");
+      }
+    } else if (actorUserId) {
+      await recordAuditEvent(orgId, { actor_user_id: actorUserId, event_type: "contact.affiliation_created", object_type: "contact_organization", object_id: id, after: inserted }, tx);
+    }
+    return { id, ok: true };
+  });
 }
 
 export async function updateContactOrganization(orgId: string, input: UpdateContactOrganizationInput) {
@@ -412,10 +415,11 @@ async function assertContactAndOrganizationInOrg(
   orgId: string,
   contactId: string,
   organizationId: string,
+  client: Pick<typeof db, "select"> = db,
 ) {
   const [, organizationRow] = await Promise.all([
-    assertPersonContactInOrg(db, orgId, contactId),
-    db
+    assertPersonContactInOrg(client, orgId, contactId),
+    client
       .select({ id: organizations.id })
       .from(organizations)
       .where(and(eq(organizations.id, organizationId), eq(organizations.org_id, orgId)))

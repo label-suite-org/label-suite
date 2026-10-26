@@ -8,6 +8,9 @@ const MUTATION_EXPORT = /export const (?:(?:POST|PUT|PATCH|DELETE)\b|\{[^}]*\b(?
 const NAMED_CAPABILITY = /requireCapability\(locals, "[^"]+"\)/;
 
 const JUSTIFIED_EXCEPTIONS = new Map([
+  ["api/native/contacts/[id]/affiliations.ts", "scoped native person affiliations with contacts.mutate, stable creation identity, exact revisions and atomic actor audit"],
+  ["api/native/campaigns.ts", "scoped native bearer campaign creation with operations.mutate, stable identity and atomic audit"],
+  ["api/native/campaigns/[id]/plan.ts", "scoped native bearer plan update with operations.mutate, exact revision, rich-document preservation and atomic audit"],
   ["api/native/sync/index.ts", "fresh native bearer membership and operations.mutate for reads and writes; request-scoped tenant isolation and revision checks"],
   ["api/native/fan-drops.ts", "fresh native bearer workspace membership; owner/operator drafts and fan reads, owner-only publication/schedule/cancel; exact revisions and tenant RLS"],
   ["api/fans/signup.ts", "same-origin bounded public intake for an explicitly published Drop, explicit consent, durable rate limits and email verification"],
@@ -41,9 +44,11 @@ const JUSTIFIED_EXCEPTIONS = new Map([
   ["api/native/artists.ts", "scoped native bearer Artist creation with operations.mutate"],
   ["api/native/releases.ts", "scoped native bearer Release creation with operations.mutate, stable identity and atomic audit"],
   ["api/native/artists/[id].ts", "scoped native bearer Artist update with operations.mutate"],
+  ["api/native/artists/[id]/bio.ts", "scoped native bearer biography review with fresh operations.mutate membership, exact source hash, rich-document preservation and atomic audit"],
   ["api/native/tracks/[trackId].ts", "scoped native bearer standalone Track update with operations.mutate, null Release context and exact revision"],
   ["api/native/releases/[id]/tracks/[trackId].ts", "scoped native bearer Track update with operations.mutate and exact revision"],
   ["api/native/releases/[id].ts", "scoped native bearer Release update with operations.mutate and explicit revision"],
+  ["api/native/tasks.ts", "scoped native bearer Task creation with operations.mutate, stable identity and atomic actor audit"],
   ["api/native/tasks/[id].ts", "scoped native bearer Task actions with operations.mutate"],
   ["api/native/campaign-leads/[id]/preparation.ts", "scoped native bearer preparation mutation"],
   ["api/native/campaign-leads/[id]/drafts/[draftId].ts", "scoped native bearer plain draft mutation"],

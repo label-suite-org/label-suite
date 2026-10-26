@@ -23,11 +23,12 @@ export interface PublishedDrop {
   shows: { id: string; title: string; city: string | null; venue: string | null; starts_at: string | null; start_date: string | null; timezone: string | null; ticket_url: string | null }[];
 }
 export const saveDropSchema = z.object({
-  id: fanId.optional(), expected_revision: z.number().int().positive().optional(),
+  id: fanId.optional(), expected_revision: z.number().int().positive().optional(), creation_id: z.uuid().optional(),
   artist_id: fanId, release_id: fanId.nullable(),
   slug: z.string().min(3).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
   content: dropContentSchema,
-}).strict().refine(value => Boolean(value.id) === Boolean(value.expected_revision), "Existing Drops require a revision");
+}).strict().refine(value => Boolean(value.id) === Boolean(value.expected_revision), "Existing Drops require a revision")
+  .refine(value => !value.creation_id || !value.id, "Creation identity is only valid for a new Drop");
 export const publishDropSchema = z.object({ id: fanId, expected_revision: z.number().int().positive(), publish: z.boolean() }).strict();
 export const fanSignupSchema = z.object({
   email: z.string().trim().email().max(254).transform(value => value.toLowerCase()),

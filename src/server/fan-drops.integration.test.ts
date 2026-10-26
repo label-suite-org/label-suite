@@ -76,6 +76,45 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     await expect(context(() => messages.getFanMessage(org, creation_id))).rejects.toMatchObject({ status: 404 });
   });
 
+  it("retries a new Drop concurrently with normalized input, then rejects changed or published identities", async () => {
+    const creation_id = crypto.randomUUID();
+    const input = { creation_id, artist_id: artist, release_id: null, slug: `stable-drop-${suffix}`,
+      content: { ...content, title: " Stable new Drop " } };
+    const send = vi.fn(); vi.stubGlobal("fetch", send);
+    const result = await Promise.all([context(() => service.saveFanDrop(org, input)), context(() => service.saveFanDrop(org, input))]);
+    expect(result.map(row => row.id)).toEqual([creation_id, creation_id]);
+    expect((await admin.query("select count(*)::int as count from label_suite.fan_drops where id=$1", [creation_id])).rows[0].count).toBe(1);
+    expect(await context(() => service.getFanDrop(org, creation_id))).toMatchObject({ content: { title: "Stable new Drop" }, revision: 1, published: null, published_revision: null });
+    await expect(context(() => service.saveFanDrop(org, { ...input, slug: `changed-slug-${suffix}` }))).rejects.toMatchObject({ status: 409 });
+    await expect(context(() => service.saveFanDrop(org, { ...input, artist_id: otherArtist }))).rejects.toMatchObject({ status: 409 });
+    await expect(context(() => service.saveFanDrop(org, { ...input, content: { ...content, title: "Changed" } }))).rejects.toMatchObject({ status: 409 });
+    const changed = await context(() => service.saveFanDrop(org, { id: creation_id, expected_revision: 1, artist_id: artist, release_id: null, slug: input.slug, content }));
+    await expect(context(() => service.saveFanDrop(org, input))).rejects.toMatchObject({ status: 409 });
+    await context(() => service.publishFanDrop(org, { id: creation_id, expected_revision: changed.revision, publish: true }));
+    await admin.query("update label_suite.fan_drops set revision=1 where id=$1", [creation_id]);
+    await expect(context(() => service.saveFanDrop(org, input))).rejects.toMatchObject({ status: 409 });
+    expect((await admin.query("select count(*)::int as count from label_suite.fan_drops where id=$1", [creation_id])).rows[0].count).toBe(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("rejects an occupied slug without creating the requested identity, which can be corrected explicitly", async () => {
+    const occupied = { creation_id: crypto.randomUUID(), artist_id: artist, release_id: null, slug: `occupied-${suffix}`, content };
+    await context(() => service.saveFanDrop(org, occupied));
+    const pending = { ...occupied, creation_id: crypto.randomUUID() };
+    await expect(context(() => service.saveFanDrop(org, pending))).rejects.toMatchObject({ status: 409 });
+    expect((await admin.query("select count(*)::int as count from label_suite.fan_drops where id=$1", [pending.creation_id])).rows[0].count).toBe(0);
+    expect((await context(() => service.saveFanDrop(org, { ...pending, slug: `corrected-${suffix}` }))).id).toBe(pending.creation_id);
+  });
+
+  it("does not adopt a foreign Drop identity or disclose it through exact lookup", async () => {
+    const creation_id = crypto.randomUUID(), foreignArtist = `foreign-drop-artist-${suffix}`;
+    await admin.query("insert into label_suite.artists(id,org_id,name) values($1,$2,'Foreign Drop artist')", [foreignArtist, otherOrg]);
+    const input = { creation_id, artist_id: foreignArtist, release_id: null, slug: `foreign-drop-${suffix}`, content };
+    await context(() => service.saveFanDrop(otherOrg, input), otherOrg);
+    await expect(context(() => service.saveFanDrop(org, { ...input, artist_id: artist }))).rejects.toMatchObject({ status: 409 });
+    await expect(context(() => service.getFanDrop(org, creation_id))).rejects.toMatchObject({ status: 404 });
+  });
+
   it("publishes only the approved projection and keeps subsequent draft edits private", async () => {
     const page = await drop("publication");
     const changed = await context(() => service.saveFanDrop(org, { id: page.id, expected_revision: page.revision, artist_id: artist, release_id: null, slug: page.slug, content: { ...content, title: "Private next announcement" } }));

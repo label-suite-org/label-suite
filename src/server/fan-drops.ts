@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from "node:util";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { artists, releases, project_events, fan_drops, fans, fan_subscriptions, fan_signups, fan_rate_limits, job_runs } from "../db/schema";
 import { db, runWithDatabaseContext } from "../lib/db";
@@ -10,6 +11,11 @@ export function publicDropPath(orgId: string, slug: string) { return `/drops/${e
 export async function listFanDrops(orgId: string, artistId?: string) {
   return db.select().from(fan_drops).where(and(eq(fan_drops.org_id, orgId), artistId ? eq(fan_drops.artist_id, artistId) : undefined)).orderBy(desc(fan_drops.updated_at)).limit(100);
 }
+export async function getFanDrop(orgId: string, id: string) {
+  const [drop] = await db.select().from(fan_drops).where(and(eq(fan_drops.org_id, orgId), eq(fan_drops.id, id)));
+  if (!drop) throw new NotFoundError("Drop not found");
+  return drop;
+}
 export async function saveFanDrop(orgId: string, raw: unknown) {
   const input = saveDropSchema.parse(raw);
   const [artist] = await db.select({ id: artists.id }).from(artists).where(and(eq(artists.org_id, orgId), eq(artists.id, input.artist_id)));
@@ -19,7 +25,19 @@ export async function saveFanDrop(orgId: string, raw: unknown) {
     if (!release) throw new NotFoundError("Release does not belong to this artist");
   }
   const values = { artist_id: input.artist_id, release_id: input.release_id, slug: input.slug, content: input.content, updated_at: new Date() };
-  if (!input.id) return (await db.insert(fan_drops).values({ ...values, id: crypto.randomUUID(), org_id: orgId }).returning())[0];
+  if (!input.id) {
+    const id = input.creation_id ?? crypto.randomUUID();
+    const [created] = await db.insert(fan_drops).values({ ...values, id, org_id: orgId })
+      .onConflictDoNothing().returning();
+    if (created) return created;
+    const [existing] = await db.select().from(fan_drops).where(and(eq(fan_drops.org_id, orgId), eq(fan_drops.id, id))).for("update");
+    if (!input.creation_id || !existing || existing.revision !== 1 || existing.published || existing.published_revision !== null
+      || existing.artist_id !== input.artist_id || existing.release_id !== input.release_id || existing.slug !== input.slug
+      || !isDeepStrictEqual(existing.content, input.content)) {
+      throw new ConflictError("The Drop identity already exists or changed. Check the saved Drop before continuing.");
+    }
+    return existing;
+  }
   const [current] = await db.select().from(fan_drops).where(and(eq(fan_drops.org_id, orgId), eq(fan_drops.id, input.id))).for("update");
   if (!current) throw new NotFoundError("Drop not found");
   if (current.revision !== input.expected_revision) throw new ConflictError("The Drop changed; reload before saving");

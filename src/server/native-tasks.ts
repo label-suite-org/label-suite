@@ -1,11 +1,31 @@
 import { and, asc, eq } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
-import { artists, budget_projects, campaigns, contacts, grants, ops_tasks, project_events, releases } from "../db/schema";
+import { artists, budget_projects, campaigns, contacts, grants, ops_tasks, org_memberships, project_events, releases } from "../db/schema";
 import { db } from "../lib/db";
+import { users } from "../db/auth-schema";
+import { createOpsTaskSchema } from "./ops-tasks";
 import { NotFoundError } from "./errors";
 import { recordAuditEvent } from "./integrations";
 import { assertTaskAssigneesEligible, mutateOpsTaskInTransaction, type TaskTransaction } from "./ops-tasks";
+
+export const nativeTaskCreateSchema = createOpsTaskSchema.pick({ task_name: true, due_date: true, notes: true,
+  assignee_ids: true, linked_artist_id: true, linked_release_id: true, project_id: true, event_id: true })
+  .extend({ id: z.uuid(), task_name: z.string().trim().min(1).max(500), notes: z.string().trim().max(10000).nullable().optional(),
+    priority: z.enum(["P0", "P1", "P2", "P3"]).default("P2") }).strict();
+
+export async function nativeTaskCreateOptions(orgId: string) {
+  const [artistRows, releaseRows, projectRows, eventRows, members] = await Promise.all([
+    db.select({ id: artists.id, name: artists.name }).from(artists).where(eq(artists.org_id, orgId)).orderBy(asc(artists.name), asc(artists.id)).limit(201),
+    db.select({ id: releases.id, name: releases.title }).from(releases).where(eq(releases.org_id, orgId)).orderBy(asc(releases.title), asc(releases.id)).limit(201),
+    db.select({ id: budget_projects.id, name: budget_projects.name }).from(budget_projects).where(eq(budget_projects.org_id, orgId)).orderBy(asc(budget_projects.name), asc(budget_projects.id)).limit(201),
+    db.select({ id: project_events.id, name: project_events.title }).from(project_events).where(eq(project_events.org_id, orgId)).orderBy(asc(project_events.title), asc(project_events.id)).limit(201),
+    db.select({ id: users.id, name: users.name }).from(org_memberships).innerJoin(users, eq(users.id, org_memberships.user_id)).where(eq(org_memberships.org_id, orgId)).orderBy(asc(users.name), asc(users.id)).limit(201),
+  ]);
+  return { artists: artistRows.slice(0, 200), releases: releaseRows.slice(0, 200), projects: projectRows.slice(0, 200), events: eventRows.slice(0, 200),
+    assignees: members.slice(0, 200).map(member => ({ ...member, name: member.name || "Workspace member" })),
+    truncated: [artistRows, releaseRows, projectRows, eventRows, members].some(rows => rows.length > 200), limit: 200 };
+}
 
 const taskActionBase = z.object({ expected_revision: z.number().int().nonnegative() });
 export const nativeTaskActionSchema = z.discriminatedUnion("action", [

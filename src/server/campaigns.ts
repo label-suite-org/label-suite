@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isDeepStrictEqual } from "node:util";
+import { recordAuditEvent } from "./integrations";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { artists, campaign_stations, campaigns, ops_tasks, releases } from "../db/schema";
 import { db } from "../lib/db";
@@ -8,7 +10,7 @@ import {
   type CampaignDocument,
   type CampaignDocumentDerived,
 } from "../lib/campaign-rich-text";
-import { ConflictError, NotFoundError } from "./errors";
+import { ConflictError, HttpError, NotFoundError } from "./errors";
 import {
   hasOwn,
   idSchema,
@@ -255,13 +257,24 @@ export async function listCampaignOptions(orgId: string) {
     .orderBy(asc(campaigns.campaign_name));
 }
 
-export async function createCampaign(orgId: string, input: CreateCampaignInput) {
+type CampaignClient = Pick<typeof db, "select" | "insert" | "update">;
+
+export async function createCampaign(orgId: string, input: CreateCampaignInput, actorUserId?: string) {
+  return db.transaction(tx => createCampaignInTransaction(tx, orgId, input, actorUserId));
+}
+
+async function createCampaignInTransaction(client: CampaignClient, orgId: string, input: CreateCampaignInput, actorUserId?: string) {
   const id = input.id ?? crypto.randomUUID();
   const goal = deriveRichTextField(input, "goal_document", "goal", true)!;
   const notes = deriveRichTextField(input, "notes_document", "notes", true)!;
-  await requireCampaignArtistAndRelease(orgId, input.linked_artist_id, input.linked_release_id);
+  try { await requireCampaignArtistAndRelease(orgId, input.linked_artist_id, input.linked_release_id, client); }
+  catch (error) {
+    // Native creation distinguishes rejected input (no write) from an ambiguous identity conflict.
+    if (actorUserId && error instanceof ConflictError) throw new HttpError(error.message, 400);
+    throw error;
+  }
 
-  await db.insert(campaigns).values({
+  const values = {
     id,
     org_id: orgId,
     campaign_name: input.campaign_name,
@@ -283,25 +296,42 @@ export async function createCampaign(orgId: string, input: CreateCampaignInput) 
     performance_rating: input.performance_rating ?? null,
     main_platform: input.main_platform ?? null,
     revision: 1,
-  }).onConflictDoNothing({ target: campaigns.id });
-
+  };
+  const [created] = await client.insert(campaigns).values(values).onConflictDoNothing({ target: campaigns.id }).returning();
+  if (!created) {
+    const [existing] = await client.select().from(campaigns).where(and(eq(campaigns.org_id, orgId), eq(campaigns.id, id))).for("update");
+    if (!existing || Object.entries(values).some(([key, value]) => {
+      const stored = existing[key as keyof typeof existing];
+      // PostgreSQL real stores budgets as float32, including when its text output is rounded.
+      if ((key === "budget_planned" || key === "budget_actual") && typeof stored === "number" && typeof value === "number") {
+        return Math.fround(stored) !== Math.fround(value);
+      }
+      return !isDeepStrictEqual(stored, value);
+    })
+      || existing.brief_document !== null || existing.campaign_audience_id !== null || existing.reviewed_template_id !== null || existing.final_report !== null) {
+      throw new ConflictError("Campaign identity already exists or changed. Check the saved campaign before continuing.");
+    }
+  } else if (actorUserId) {
+    await recordAuditEvent(orgId, { actor_user_id: actorUserId, event_type: "campaign.create", object_type: "campaign", object_id: id,
+      after: values, metadata: { resulting_revision: 1 } }, client);
+  }
   return { id, ok: true };
 }
 
-async function requireCampaignArtistAndRelease(orgId: string, artistId: string, releaseId: string) {
+async function requireCampaignArtistAndRelease(orgId: string, artistId: string, releaseId: string, client: CampaignClient = db) {
   const [artistRows, releaseRows] = await Promise.all([
-    db.select({ id: artists.id }).from(artists).where(and(eq(artists.id, artistId), eq(artists.org_id, orgId))).limit(1),
-    db.select({ id: releases.id, artist_id: releases.artist_id }).from(releases).where(and(eq(releases.id, releaseId), eq(releases.org_id, orgId))).limit(1),
+    client.select({ id: artists.id }).from(artists).where(and(eq(artists.id, artistId), eq(artists.org_id, orgId))).limit(1),
+    client.select({ id: releases.id, artist_id: releases.artist_id }).from(releases).where(and(eq(releases.id, releaseId), eq(releases.org_id, orgId))).limit(1),
   ]);
   if (!artistRows.length) throw new NotFoundError("Artist not found in active workspace");
   if (!releaseRows.length) throw new NotFoundError("Release not found in active workspace");
   if (releaseRows[0].artist_id && releaseRows[0].artist_id !== artistId) throw new ConflictError("Campaign Artist must match the Release Artist");
 }
 
-export async function updateCampaign(orgId: string, input: UpdateCampaignInput) {
+export async function updateCampaign(orgId: string, input: UpdateCampaignInput, client: CampaignClient = db) {
   if (hasOwn(input, "linked_artist_id") || hasOwn(input, "linked_release_id")) {
     if (!input.linked_artist_id || !input.linked_release_id) throw new ConflictError("Campaign Artist and Release are required when editing catalog links");
-    await requireCampaignArtistAndRelease(orgId, input.linked_artist_id, input.linked_release_id);
+    await requireCampaignArtistAndRelease(orgId, input.linked_artist_id, input.linked_release_id, client);
   }
   const updates: Partial<typeof campaigns.$inferInsert> = { updated_at: new Date(), revision: sql`${campaigns.revision} + 1` as unknown as number };
   const goal = deriveRichTextField(input, "goal_document", "goal", false);
@@ -330,7 +360,7 @@ export async function updateCampaign(orgId: string, input: UpdateCampaignInput) 
   if (hasOwn(input, "performance_rating")) updates.performance_rating = input.performance_rating as number | null;
   if (hasOwn(input, "main_platform")) updates.main_platform = input.main_platform as string | null;
 
-  const updated = await db
+  const updated = await client
     .update(campaigns)
     .set(updates)
     .where(and(eq(campaigns.id, input.id), eq(campaigns.org_id, orgId), eq(campaigns.revision, input.expected_revision)))
