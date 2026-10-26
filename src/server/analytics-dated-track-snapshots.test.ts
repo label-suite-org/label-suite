@@ -75,7 +75,7 @@ const database = vi.hoisted(() => {
   };
 });
 
-vi.mock("../lib/db", () => ({ db: { transaction: database.transaction } }));
+vi.mock("../lib/db", () => ({ db: { transaction: database.transaction, select: database.select } }));
 
 import { listDatedTrackSnapshotWorkspace, listFilteredTracksByGrowth } from "./analytics";
 
@@ -1153,6 +1153,20 @@ describe("dated track snapshot analytics read model", () => {
     );
 
     expect(rows).toEqual([]);
+  });
+
+  it("shows automated catalogue rows for an artist without a manual snapshot", async () => {
+    database.results.push([{
+      id: "automated-row", dimensions: { track_title: "Current track", primary_artist: "Artist A" },
+      metrics: { combined_streams: 123 }, lastSeenAt: "2026-10-25T08:00:00Z",
+      trackTitle: "Current track", releaseTitle: "Current release",
+    }]);
+    const rows = await listFilteredTracksByGrowth("org-a", 10, { artistId: "artist-a" }, boundary({
+      listCompletedRunsWithUploadedFile: async () => [],
+      listMetricRowsForRun: async () => [],
+      listLegacyTrackRows: async () => ({ recordCount: 0, rows: [] }),
+    }) as never);
+    expect(rows).toEqual([expect.objectContaining({ id: "automated-row", combinedStreams: 123 })]);
   });
 
   it("prefers latest dated rows and applies the selected release inside the artist scope", async () => {

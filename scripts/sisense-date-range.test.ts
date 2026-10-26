@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { formatSisenseCustomRangeDate, previousCalendarDayInTimeZone, resolveSisenseTimeZone } from "./sisense-date-range";
+import { formatSisenseCustomRangeDate, previousCalendarDayInTimeZone, resolveSisenseTimeZone, sisenseDateRangeSummary } from "./sisense-date-range";
 
 describe("Sisense custom date ranges", () => {
+  it("refreshes rolling presets using complete calendar days while preserving non-rolling presets", () => {
+    const now = new Date("2026-10-26T03:00:00.000Z");
+    expect(sisenseDateRangeSummary("14 Days", now, "Europe/Copenhagen")).toBe("2026-10-12 to 2026-10-25");
+    expect(sisenseDateRangeSummary("7 Days", now, "Europe/Copenhagen")).toBe("2026-10-19 to 2026-10-25");
+    expect(sisenseDateRangeSummary("Yesterday", now, "America/Los_Angeles")).toBe("2026-10-24 to 2026-10-24");
+    expect(sisenseDateRangeSummary("All Dates", now, "Europe/Copenhagen")).toBe("All Dates");
+  });
   it("uses the previous Copenhagen calendar day across the local date boundary", () => {
     expect(previousCalendarDayInTimeZone(new Date("2026-07-29T21:30:00.000Z"), "Europe/Copenhagen")).toBe("2026-07-28");
     expect(previousCalendarDayInTimeZone(new Date("2026-07-29T22:30:00.000Z"), "Europe/Copenhagen")).toBe("2026-07-29");

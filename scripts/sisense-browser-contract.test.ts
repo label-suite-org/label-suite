@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { resolveNewPageDownloadAction } from "./sisense-action-boundary";
-import { previousCalendarDayInTimeZone } from "./sisense-date-range";
+import { previousCalendarDayInTimeZone, sisenseDateRangeSummary } from "./sisense-date-range";
 
 const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const npmCli = process.env.npm_execpath;
@@ -30,9 +30,12 @@ async function startDashboardFixture(input: {
   shazamMenuState?: "late-ready" | "race-ready" | "poll-window-ready" | "post-click-empty";
   portalTracksMenuShape?: PortalTracksMenuShape;
   portalAppleMenu?: boolean;
+  sharedDownloadPortal?: boolean;
+  tracksPlaceholder?: "once" | "always";
   portalPlaylistMenu?: boolean;
 }): Promise<DashboardFixture> {
   const filterEvents: string[] = [];
+  let tracksDownloads = 0;
   const server = createServer((request, response) => {
     const filterEvent = request.url?.match(/^\/filter-event\/([^?]+)/)?.[1];
     if (filterEvent) {
@@ -48,7 +51,10 @@ async function startDashboardFixture(input: {
     }
     if (request.url === "/tracks.csv") {
       response.writeHead(200, { "content-type": "text/csv", "content-disposition": "attachment; filename=tracks.csv" });
-      response.end("Track,Streams\nTrack One,19\n");
+      tracksDownloads += 1;
+      response.end(input.tracksPlaceholder === "always" || (input.tracksPlaceholder === "once" && tracksDownloads === 1)
+        ? "There is no data for this csv.\n"
+        : "Track,Streams\nTrack One,19\n");
       return;
     }
     if (request.url === "/apple.csv") {
@@ -272,7 +278,11 @@ async function startDashboardFixture(input: {
           if (inlineMenu) inlineMenu.hidden = false;
           if (portalMenu) portalMenu.hidden = false;
         });
-        document.getElementById("apple-more")?.addEventListener("click", () => { document.getElementById("apple-portal").hidden = false; });
+        document.getElementById("apple-more")?.addEventListener("click", () => {
+          const menu = document.getElementById(${JSON.stringify(input.sharedDownloadPortal ? "tracks-portal" : "apple-portal")});
+          menu.querySelector("a").href = "/apple.csv";
+          menu.hidden = false;
+        });
         const playlistMore = document.getElementById("playlist-more");
         if (playlistMore) {
           let playlistReady = false;
@@ -463,7 +473,7 @@ describe("Sisense browser contract", () => {
         requestedDateRange: "7 Days",
         requestedAggregation: "Daily",
         observedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
-        providerFilterState: { artist: "True Blue", aggregation: "Daily", dateRange: "7 Days", track: "cherry-coloured funk" },
+        providerFilterState: { artist: "True Blue", aggregation: "Daily", dateRange: sisenseDateRangeSummary("7 Days", new Date(), "Europe/Copenhagen"), track: "cherry-coloured funk" },
         databaseLockHeld: false,
         effectiveWidgetKeys: ["apple-streams-source", "shazams-city", "tracks-by-growth-rate"],
         effectiveWidgetCount: 3,
@@ -601,7 +611,7 @@ describe("Sisense browser contract", () => {
       expect(manifest.providerFilterState).toEqual({
         artist: "True Blue",
         aggregation: "Daily",
-        dateRange: "7 Days",
+        dateRange: sisenseDateRangeSummary("7 Days", new Date(), "Europe/Copenhagen"),
         track: "cherry-coloured funk",
       });
       expect(fixture.filterEvents).toContain("artist-select:True Blue");
@@ -644,10 +654,10 @@ describe("Sisense browser contract", () => {
 
       expect(result.status).toBe(0);
       expect(result.output).toContain("Downloaded tracks-by-growth-rate");
-      expect(fixture.filterEvents).toContain("date-range-select:7 Days");
+      expect(fixture.filterEvents).toContain("date-range-select:Custom Range");
       expect(fixture.filterEvents).toContain("date-range-option-selected:true");
       expect(fixture.filterEvents).toContain("filters-applied");
-      expect(fixture.filterEvents).toContain("date-range-summary:7 Days");
+      expect(fixture.filterEvents).toContain(`date-range-summary:${sisenseDateRangeSummary("7 Days", new Date(), "Europe/Copenhagen")}`);
     } finally {
       await fixture.close();
       await rm(directory, { recursive: true, force: true });
@@ -836,6 +846,52 @@ describe("Sisense browser contract", () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it("recovers a reused export menu on a fresh page without mixing widget files", async () => {
+    const fixture = await startDashboardFixture({ activateRequestedRange: true, portalTracksMenuShape: "single", portalAppleMenu: true, sharedDownloadPortal: true });
+    const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-shared-portal-"));
+    try {
+      const result = await runScrape({
+        dashboardUrl: fixture.url,
+        downloadDir: directory,
+        widgets: [
+          { key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" },
+          { key: "apple-streams-source", title: "Apple Streams by Source" },
+        ],
+      });
+      const { runDir, manifest } = await readScrapeRun(directory);
+      expect(manifest.completeness.state).toBe("complete");
+      const apple = manifest.files.find((file) => file.widgetKey === "apple-streams-source")!;
+      expect(await readFile(path.join(runDir, apple.fileName), "utf8")).toBe("Date,Source,Streams\n2026-07-30,Search,7\n");
+      expect(result.status).toBe(0);
+    } finally {
+      await fixture.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 90_000);
+
+  it.each(["once", "always"] as const)("retries a %s empty CSV placeholder without publishing it", async (tracksPlaceholder) => {
+    const fixture = await startDashboardFixture({ activateRequestedRange: true, tracksPlaceholder });
+    const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-placeholder-"));
+    try {
+      const result = await runScrape({
+        dashboardUrl: fixture.url,
+        downloadDir: directory,
+        widgets: [{ key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" }],
+      });
+      expect(result.status).toBe(0);
+      const { runDir, manifest } = await readScrapeRun(directory);
+      expect(manifest.completeness.state).toBe(tracksPlaceholder === "once" ? "complete" : "partial");
+      expect(manifest.files).toHaveLength(tracksPlaceholder === "once" ? 1 : 0);
+      expect((await readdir(runDir)).filter((name) => name.endsWith(".csv"))).toHaveLength(manifest.files.length);
+      for (const file of manifest.files) {
+        expect(await readFile(path.join(runDir, file.fileName), "utf8")).toBe("Track,Streams\nTrack One,19\n");
+      }
+    } finally {
+      await fixture.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 90_000);
 
   it("waits for the scoped Spotify Playlist Listings menu to become actionable", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, portalPlaylistMenu: true });
@@ -1228,7 +1284,7 @@ describe("Sisense browser contract", () => {
       });
       expect(result.status).toBe(0);
       expect(fixture.filterEvents).toContain("poll-window-menu-ready");
-      expect(fixture.filterEvents.filter((event) => event === "poll-window-menu-clicked")).toHaveLength(1);
+      expect(fixture.filterEvents.filter((event) => event === "poll-window-menu-clicked")).toHaveLength(2);
       expect(result.output).toContain("Skipped shazams-city:");
       expect(result.output).not.toContain("Downloaded shazams-city");
     } finally {
