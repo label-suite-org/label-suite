@@ -27,7 +27,7 @@ export function PayoutView({ preview }: { preview: MasterPayoutPreview }) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <div className={`text-sm font-medium ${preview.readyToPay ? "text-emerald-600" : "text-red-600"}`}>
+        <div className={`text-sm font-medium ${preview.readyToPay ? "text-emerald-700 dark:text-emerald-400" : "text-red-600"}`}>
           <span className="inline-flex items-center gap-1.5">
             {preview.readyToPay ? <ShieldCheck className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}
             {preview.readyToPay ? "Ready to prepare payout" : "Preview only — not ready to pay"}

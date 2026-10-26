@@ -20,8 +20,9 @@
   Reconcile that backlog without importing private history or closing items
   solely because their implementation was exported. Deliver source changes
   through pull requests in this public repository.
-- GitHub is the source of truth. Forgejo references in retained documents are
-  historical; do not create, merge, or deploy work there.
+- GitHub is the source of truth. Forgejo is retired; do not create, merge, or
+  deploy work there. Superseded procedures must not remain as executable
+  instructions in active runbooks. See `docs/runbooks/repository-source-of-truth.md`.
 - Do not import private Git history, internal research, credentials, production
   database exports, or CI logs. Public Actions receives disposable fixtures only.
 - The public empty drift policy applies only to fresh databases. Production

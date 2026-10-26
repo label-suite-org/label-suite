@@ -180,7 +180,7 @@ export function MediaAssetManager({
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
           />
         </div>
-        <NativeSelect
+        <NativeSelect aria-label="Asset type"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
           className="px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
@@ -248,14 +248,14 @@ export function MediaAssetManager({
                     </div>
                     <div className="flex items-center gap-2 pt-1 flex-wrap">
                       {asset.file_link && (
-                        <Button onClick={() => openFile(asset.file_link)} className="text-xs px-2.5 py-1 rounded-md bg-muted hover:bg-muted/80">
+                        <Button variant="secondary" onClick={() => openFile(asset.file_link)} className="text-xs px-2.5 py-1 rounded-md bg-muted hover:bg-muted/80">
                           Open file
                         </Button>
                       )}
-                      {canMutate && <Button onClick={() => setEditingId(asset.id)} className="text-xs px-2.5 py-1 rounded-md bg-muted hover:bg-muted/80">
+                      {canMutate && <Button variant="secondary" onClick={() => setEditingId(asset.id)} className="text-xs px-2.5 py-1 rounded-md bg-muted hover:bg-muted/80">
                         {attentionFor(asset).orphaned ? "Repair ownership" : "Edit"}
                       </Button>}
-                      {canMutate && <Button onClick={() => deleteAsset(asset.id)} className="text-xs px-2.5 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400">
+                      {canMutate && <Button variant="secondary" onClick={() => deleteAsset(asset.id)} className="text-xs px-2.5 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400">
                         Delete
                       </Button>}
                     </div>

@@ -390,15 +390,15 @@ function ArtistRosterLine({
           </a>
         </ItemMedia>
         <ItemContent className="min-w-0">
-          <ItemTitle><a href={openArtistHref} className="hover:underline">{artist.name}</a></ItemTitle>
+          <ItemTitle><a href={openArtistHref} className="inline-flex min-h-6 items-center hover:underline">{artist.name}</a></ItemTitle>
           <ItemDescription>
-            {releaseHref ? <a href={releaseHref}>{linkedReleaseTitle(artist)}</a> : "No release linked"}
+            {releaseHref ? <a href={releaseHref} className="inline-flex min-h-6 items-center">{linkedReleaseTitle(artist)}</a> : "No release linked"}
           </ItemDescription>
         </ItemContent>
         <Badge variant={status.variant}>{status.label}</Badge>
       </Item>
       <div className="mt-2 pl-[58px]">
-        <a href={readinessHref} className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+        <a href={readinessHref} className="inline-flex min-h-6 items-center text-xs text-muted-foreground hover:text-foreground hover:underline">
           {missingProfileItems(artist).length ? readinessSummary({ ...artist, bio: null }) : `${health}% ready`}
           {artist.release_count === 0 ? " · No catalog yet" : ""}
         </a>
@@ -462,12 +462,12 @@ function ArtistOpsTable({
               <TableCell><p>{formatNumber(artist.spotify_followers)}</p><p className="text-xs text-muted-foreground">Popularity {artist.spotify_popularity ?? "–"}</p></TableCell>
               <TableCell>
                 <p>{artist.release_count} release{artist.release_count === 1 ? "" : "s"}</p>
-                {linkedReleaseHref(artist) ? <a href={linkedReleaseHref(artist)!} className="text-xs text-muted-foreground hover:underline">{linkedReleaseTitle(artist)}</a> : <p className="text-xs text-muted-foreground">No release linked</p>}
+                {linkedReleaseHref(artist) ? <a href={linkedReleaseHref(artist)!} className="inline-flex min-h-6 items-center text-xs text-muted-foreground hover:underline">{linkedReleaseTitle(artist)}</a> : <p className="text-xs text-muted-foreground">No release linked</p>}
               </TableCell>
               <TableCell className="space-y-1">
                 <p>{formatDate(artist.next_release_date)}</p>
                 <p className="text-xs text-muted-foreground">{artist.campaign_count} campaigns · {artist.open_task_count} tasks</p>
-                <a href={primaryReadinessHref(artist)} className="text-xs text-muted-foreground hover:underline">{missing.length ? `Missing ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` +${missing.length - 2}` : ""}` : `${completeness(artist)}% complete`}</a>
+                <a href={primaryReadinessHref(artist)} className="inline-flex min-h-6 items-center text-xs text-muted-foreground hover:underline">{missing.length ? `Missing ${missing.slice(0, 2).join(", ")}${missing.length > 2 ? ` +${missing.length - 2}` : ""}` : `${completeness(artist)}% complete`}</a>
               </TableCell>
               <TableCell>
                 {canMutate && <div className="flex justify-end gap-2"><ArtistEditButton artist={artist as Artist} contactOptions={contactOptions} /><ArtistDeleteButton artist={artist as Artist} /></div>}

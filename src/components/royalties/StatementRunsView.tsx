@@ -9,9 +9,9 @@ function formatMoney(value: number): string {
 function statusTone(status: RoyaltiesDashboard["statementRuns"][number]["status"]): string {
   switch (status) {
     case "paid":
-      return "text-emerald-600";
+      return "text-emerald-700 dark:text-emerald-400";
     case "ready":
-      return "text-emerald-600";
+      return "text-emerald-700 dark:text-emerald-400";
     case "blocked":
     default:
       return "text-red-600";

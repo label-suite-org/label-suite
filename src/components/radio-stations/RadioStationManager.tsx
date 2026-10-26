@@ -6,6 +6,7 @@ import { RadioStationForm, type RadioStation } from "./RadioStationForm";
 import { EmailComposer } from "./EmailComposer";
 
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 const TIER_ORDER = ["nacc", "jbe", "mediabase", "submodern", "spinning", "priority", "untiered"];
 
@@ -20,6 +21,15 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 const TIER_BG = "bg-muted text-muted-foreground border border-border";
+
+export function stationWebsite(value?: string | null): string | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw.replace(/^\/\//, "")}`);
+    return ["https:", "http:"].includes(url.protocol) && !url.username && !url.password ? url.href : undefined;
+  } catch { return undefined; }
+}
 
 function tierGroup(tier?: string | null) {
   const raw = (tier || "").trim();
@@ -265,6 +275,7 @@ export function RadioStationManager({
                       <div className="flex items-start gap-2 min-w-0 flex-1">
                         {canMutate && <Input
                           type="checkbox"
+                          aria-label={`Select ${s.name}`}
                           checked={isSelected}
                           onChange={() => toggleSelect(s.id)}
                           className="mt-1 w-4 h-4 rounded border-input text-primary focus:ring-2 focus:ring-ring cursor-pointer shrink-0"
@@ -311,9 +322,9 @@ export function RadioStationManager({
                                   {s.phone}
                                 </a>
                               )}
-                              {s.website && (
+                              {stationWebsite(s.website) && (
                                 <a
-                                  href={s.website}
+                                  href={stationWebsite(s.website)}
                                   target="_blank"
                                   rel="noopener"
                                   className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
@@ -359,37 +370,18 @@ export function RadioStationManager({
         </>
       )}
 
-      {/* Create modal */}
-      {canMutate && creating && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setCreating(false)}
-        >
-          <div
-            className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">Add Radio Station</h2>
-            <RadioStationForm onClose={() => setCreating(false)} />
-          </div>
-        </div>
-      )}
-
-      {/* Edit modal */}
-      {canMutate && editing && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setEditingId(null)}
-        >
-          <div
-            className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold mb-4">Edit Radio Station</h2>
-            <RadioStationForm initial={editing} onClose={() => setEditingId(null)} />
-          </div>
-        </div>
-      )}
+      {canMutate && <Dialog open={creating} onOpenChange={setCreating}>
+        <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Add Radio Station</DialogTitle></DialogHeader>
+          <RadioStationForm onClose={() => setCreating(false)} />
+        </DialogContent>
+      </Dialog>}
+      {canMutate && <Dialog open={Boolean(editing)} onOpenChange={open => { if (!open) setEditingId(null); }}>
+        <DialogContent className="sm:max-w-lg max-h-[90dvh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Radio Station</DialogTitle></DialogHeader>
+          {editing && <RadioStationForm key={editing.id} initial={editing} onClose={() => setEditingId(null)} />}
+        </DialogContent>
+      </Dialog>}
 
       {/* Email composer modal */}
       {canMutate && showEmailComposer && selectedStations.length > 0 && (

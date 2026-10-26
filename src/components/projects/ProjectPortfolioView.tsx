@@ -39,14 +39,14 @@ export function ProjectPortfolioView({ projects, events = [] }: { projects: Proj
           <a
             key={project.id}
             href={`/projects/${project.id}`}
-            className="group border border-border bg-card p-5 text-foreground no-underline transition hover:border-foreground/30 hover:bg-muted/20"
+            className="group min-w-0 break-words border border-border bg-card p-5 text-foreground no-underline transition hover:border-foreground/30 hover:bg-muted/20"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{type}</p>
                 <h2 className="mt-1 truncate text-base font-semibold">{project.name}</h2>
               </div>
-              <span className="border border-border bg-muted/40 px-2 py-1 text-[11px] capitalize text-muted-foreground">
+              <span className="shrink-0 border border-border bg-muted/40 px-2 py-1 text-[11px] capitalize text-muted-foreground">
                 {(project.status || "planning").replaceAll("_", " ")}
               </span>
             </div>

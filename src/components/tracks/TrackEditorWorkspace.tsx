@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode, type SubmitEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type SubmitEvent } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -14,6 +14,7 @@ import { TrackCreateDialog } from "./TrackCreateDialog";
 import { TrackDeleteButton, type Track } from "./TrackActionButtons";
 import { buildTrackReadinessChecks } from "./track-readiness-ui";
 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,28 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   const [assigningIsrcs, setAssigningIsrcs] = useState(false);
   const [isrcAssignmentError, setIsrcAssignmentError] = useState("");
   const [pendingTrackFocus, setPendingTrackFocus] = useState<TrackFocus | null>(null);
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  const dirty = useRef(false);
+  const currentLocation = useRef("");
+  const [pendingSelection, setPendingSelection] = useState<{ id: string; filter?: FilterKey; url?: string } | null>(null);
+  const onDirtyChange = useCallback((value: boolean) => { dirty.current = value; }, []);
+  const confirmDeparture = useCallback(() => !dirty.current || window.confirm("Discard unsaved track changes? An in-flight save may still complete."), []);
+  const selectTrack = useCallback((id: string) => {
+    if (id === selectedIdRef.current) return true;
+    if (dirty.current) { setPendingSelection({ id }); return false; }
+    dirty.current = false;
+    setSelectedId(id);
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (dirty.current) { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
 
   const selectedTrack = tracks.find((track) => track.id === selectedId) ?? tracks[0] ?? null;
   const readyCount = tracks.filter((track) => track.track_ready).length;
@@ -74,17 +97,24 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
 
   useEffect(() => {
     if (filteredTracks.length && !filteredTracks.some((track) => track.id === selectedId)) {
-      setSelectedId(filteredTracks[0].id);
+      selectTrack(filteredTracks[0].id);
     }
-  }, [filteredTracks, selectedId]);
+  }, [filteredTracks, selectedId, selectTrack]);
 
   useEffect(() => {
+    currentLocation.current = window.location.href;
     const applyRoute = () => {
       const route = parseTrackRoute(window.location.search);
       const requestedTrack = route.trackId ? tracks.find((track) => track.id === route.trackId) : null;
       if (requestedTrack) {
-        setSelectedId(requestedTrack.id);
+        if (!selectTrack(requestedTrack.id)) {
+          setPendingSelection({ id: requestedTrack.id, url: window.location.href });
+          window.history.pushState(null, "", currentLocation.current);
+          return;
+        }
+        setFilter("all");
       }
+      currentLocation.current = window.location.href;
       setPendingTrackFocus(route.focus);
     };
     applyRoute();
@@ -92,7 +122,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
     return () => {
       window.removeEventListener("popstate", applyRoute);
     };
-  }, [tracks]);
+  }, [tracks, selectTrack]);
 
   useEffect(() => {
     if (!selectedTrack || !pendingTrackFocus) return;
@@ -108,6 +138,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   }, [selectedTrack?.id, pendingTrackFocus]);
 
   async function assignMissingIsrcs() {
+    if (!confirmDeparture()) return;
     setAssigningIsrcs(true);
     setIsrcAssignmentError("");
     try {
@@ -123,6 +154,30 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
 
   return (
     <div className="space-y-6">
+      <Dialog open={pendingSelection !== null} onOpenChange={open => { if (!open) setPendingSelection(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard unsaved track changes?</DialogTitle>
+            <DialogDescription>Keep editing to preserve your changes. An in-flight save may still complete.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingSelection(null)}>Keep editing</Button>
+            <Button type="button" variant="destructive" className="text-red-700 dark:text-red-300" onClick={() => {
+              if (!pendingSelection) return;
+              dirty.current = false;
+              setSelectedId(pendingSelection.id);
+              if (pendingSelection.filter) setFilter(pendingSelection.filter);
+              if (pendingSelection.url) {
+                setFilter("all");
+                setPendingTrackFocus(parseTrackRoute(new URL(pendingSelection.url).search).focus);
+                window.history.pushState(null, "", pendingSelection.url);
+                currentLocation.current = pendingSelection.url;
+              }
+              setPendingSelection(null);
+            }}>Discard changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
       <header className="border-b border-border pb-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -174,7 +229,15 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
         <section className="min-w-0" aria-label="Tracks">
           <div className="mb-4 space-y-3">
             <h2 className="text-lg font-semibold">Tracks</h2>
-            <ToggleGroup aria-label="Filter tracks" value={[filter]} onValueChange={(values) => { if (values[0]) setFilter(values[0] as FilterKey); }} size="sm" className="max-w-full flex-wrap">
+            <ToggleGroup aria-label="Filter tracks" value={[filter]} onValueChange={(values) => { if (!values[0]) return;
+              const next = values[0] as FilterKey;
+              const candidates = tracks.filter(track => next === "all" || (next === "ready" ? track.track_ready : next === "missing-audio" ? !track.audio_url : !track.track_ready));
+              if (candidates.length && !candidates.some(track => track.id === selectedId)) {
+                if (dirty.current) { setPendingSelection({ id: candidates[0].id, filter: next }); return; }
+                dirty.current = false;
+                setSelectedId(candidates[0].id);
+              }
+              setFilter(next); }} size="sm" className="max-w-full flex-wrap">
               <ToggleGroupItem value="all">All</ToggleGroupItem>
               <ToggleGroupItem value="needs-work">Needs work</ToggleGroupItem>
               <ToggleGroupItem value="missing-audio">No audio</ToggleGroupItem>
@@ -185,13 +248,13 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
           <TrackTable
             tracks={filteredTracks}
             selectedId={selectedTrack?.id ?? ""}
-            onSelect={setSelectedId}
+            onSelect={selectTrack}
           />
         </section>
 
         <aside aria-label="Selected track editor" className="min-w-0 border-t border-border pt-6 lg:sticky lg:top-4 lg:self-start lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
           {selectedTrack && canMutate ? (
-            <TrackInspector key={selectedTrack.id} track={selectedTrack} releaseId={release.id} works={works} />
+            <TrackInspector key={selectedTrack.id} track={selectedTrack} releaseId={release.id} works={works} onDirtyChange={onDirtyChange} />
           ) : selectedTrack ? (
             <div className="rounded-lg border border-border p-6 text-sm text-muted-foreground">Track details are read-only for fundraiser.</div>
           ) : (
@@ -257,10 +320,12 @@ function TrackInspector({
   track,
   releaseId,
   works,
+  onDirtyChange,
 }: {
   track: TrackRow;
   releaseId: string;
   works: Array<{ id: string; title: string; isrc: string | null }>;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const [title, setTitle] = useState(track.title);
   const [position, setPosition] = useState(track.position?.toString() || "");
@@ -272,6 +337,14 @@ function TrackInspector({
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const dirty = Boolean(audioFile) || title !== track.title || position !== (track.position?.toString() || "")
+    || version !== (track.version || "Main") || isrc !== (track.isrc || "")
+    || audioUrl !== (track.audio_url || "") || duration !== (track.duration?.toString() || "")
+    || workId !== (track.work_id || "");
+  useEffect(() => {
+    onDirtyChange(dirty || loading);
+    return () => onDirtyChange(false);
+  }, [dirty, loading, onDirtyChange]);
 
   const readinessChecks = buildTrackReadinessChecks({
     audioUrl,
@@ -312,6 +385,7 @@ function TrackInspector({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Track update failed");
       }
+      onDirtyChange(false);
       window.location.reload();
     } catch (err: any) {
       setError(err.message || "Track update failed");

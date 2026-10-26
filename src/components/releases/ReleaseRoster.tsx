@@ -115,6 +115,30 @@ export function ReleaseRoster({
   const [filter, setFilter] = useState<FilterMode>("all");
   const [sort, setSort] = useState<SortMode>("date");
 
+  const [routeReady, setRouteReady] = useState(false);
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setQuery(params.get("q") || "");
+      const nextFilter = params.get("filter") as FilterMode;
+      const nextSort = params.get("sort") as SortMode;
+      setFilter(["all", "upcoming", "ready", "attention", "released"].includes(nextFilter) ? nextFilter : "all");
+      setSort(["date", "readiness", "budget", "title"].includes(nextSort) ? nextSort : "date");
+    };
+    restore();
+    setRouteReady(true);
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  useEffect(() => {
+    if (!routeReady) return;
+    const url = new URL(window.location.href);
+    for (const [key, value] of [["q", query], ["filter", filter === "all" ? "" : filter], ["sort", sort === "date" ? "" : sort]]) {
+      if (value) url.searchParams.set(key, value); else url.searchParams.delete(key);
+    }
+    window.history.replaceState(window.history.state, "", url);
+  }, [query, filter, sort, routeReady]);
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return releases

@@ -211,7 +211,7 @@ const coverageSummary = summarizeCoverageByCurrency(fundingCoverage.values());
             const context = [task.artist_name, task.release_title, task.campaign_name, task.contact_name, task.project_name].filter(Boolean).join(" · ");
             const owner = task.owner_contact_name || task.owner || "Unassigned";
             return (
-              <a href="/ops-tasks" class={`block p-4 transition-colors ${task.is_overdue ? "bg-red-50/45 hover:bg-red-50/70" : "bg-muted/20 hover:bg-muted/35"}`}>
+              <a href={`/ops-tasks?task=${encodeURIComponent(task.id)}`} class={`block p-4 transition-colors ${task.is_overdue ? "bg-red-50/45 hover:bg-red-50/70" : "bg-muted/20 hover:bg-muted/35"}`}>
                 <div class="flex items-start justify-between gap-3">
                   <h3 class="font-medium text-sm min-w-0">{task.task_name}</h3>
                   {task.priority && <span class="shrink-0 text-[11px] px-2 py-0.5 rounded bg-muted text-muted-foreground">{task.priority}</span>}

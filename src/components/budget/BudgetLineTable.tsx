@@ -152,7 +152,7 @@ export default function BudgetLineTable({ lines, varianceRequests, canDecideVari
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <label className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-xs text-muted-foreground">
             <SlidersHorizontal className="h-3.5 w-3.5" />
-            <NativeSelect value={groupFilter} onChange={(event) => setGroupFilter(event.target.value as any)} className="bg-transparent text-foreground outline-none">
+            <NativeSelect aria-label="Budget category" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value as any)} className="bg-transparent text-foreground outline-none">
               <option value="all">All lines</option>
               <option value="production">Production</option>
               <option value="marketing">Marketing</option>
