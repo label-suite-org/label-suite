@@ -1245,13 +1245,13 @@ function pickPrimaryTrackGrowthRange(ranges: AnalyticsTrackGrowthRangeSummary[])
   return ranges[0] ?? null;
 }
 
-function latestAutomatedTrackRun(orgId: string): SQL {
+function latestAutomatedWidgetRun(orgId: string, widgetKey: string): SQL {
   return sql`(select r.id from ${analytics_import_runs} r
     where r.org_id = ${orgId} and r.source = 'sisense'
       and r.status = 'completed' and r.mode <> 'manual_import'
       and exists (select 1 from ${analytics_metric_rows} m
         where m.org_id = r.org_id and m.last_seen_run_id = r.id
-          and m.widget_key = 'tracks-by-growth-rate')
+          and m.widget_key = ${widgetKey})
     order by r.completed_at desc, r.id desc limit 1)`;
 }
 
@@ -1474,9 +1474,9 @@ export async function listAnalyticsCommandCenter(
   ] = await Promise.all([
     listAnalyticsTotals(orgId),
     listFilteredTracksByGrowth(orgId, 100, effectiveFilter),
-    listAnalyticsCities(orgId, 100),
-    listAnalyticsWidgetRows(orgId, "spotify-playlist-listings", 100),
-    listAnalyticsWidgetRows(orgId, "shazams-city", 50),
+    listAnalyticsCities(orgId, 100, effectiveFilter),
+    listAnalyticsWidgetRows(orgId, "spotify-playlist-listings", 100, effectiveFilter),
+    listAnalyticsWidgetRows(orgId, "shazams-city", 50, effectiveFilter),
     listAnalyticsRunHistory(orgId, 30),
   ]);
 
@@ -1649,7 +1649,7 @@ export async function listFilteredTracksByGrowth(
     .where(and(
       eq(analytics_metric_rows.org_id, orgId),
       eq(analytics_metric_rows.widget_key, "tracks-by-growth-rate"),
-      sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedTrackRun(orgId)}`,
+      sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedWidgetRun(orgId, "tracks-by-growth-rate")}`,
       ...(filter.artistId ? [eq(analytics_metric_rows.artist_id, filter.artistId)] : []),
       ...(filter.releaseId ? [eq(analytics_metric_rows.release_id, filter.releaseId)] : []),
     ))
@@ -1771,7 +1771,7 @@ export async function listAnalyticsTracksByGrowth(
       and(
         eq(analytics_metric_rows.org_id, orgId),
         eq(analytics_metric_rows.widget_key, "tracks-by-growth-rate"),
-        sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedTrackRun(orgId)}`,
+        sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedWidgetRun(orgId, "tracks-by-growth-rate")}`,
       ),
     )
     .orderBy(
@@ -1811,6 +1811,7 @@ export interface AnalyticsCityRow {
 export async function listAnalyticsCities(
   orgId: string,
   limit = 50,
+  scope?: AnalyticsScopeFilter,
 ): Promise<AnalyticsCityRow[]> {
   const csvRows = await executeOptionalAnalyticsQuery<{
     city: string;
@@ -1846,6 +1847,9 @@ export async function listAnalyticsCities(
       and(
         eq(analytics_metric_rows.org_id, orgId),
         eq(analytics_metric_rows.widget_key, "spotify-superfans-active-streams-city"),
+        sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedWidgetRun(orgId, "spotify-superfans-active-streams-city")}`,
+        ...(scope?.artistId ? [eq(analytics_metric_rows.artist_id, scope.artistId)] : []),
+        ...(scope?.releaseId ? [eq(analytics_metric_rows.release_id, scope.releaseId)] : []),
       ),
     )
     .groupBy(sql`${analytics_metric_rows.dimensions}->>'city'`)
@@ -1948,6 +1952,7 @@ export async function listAnalyticsWidgetRows(
   orgId: string,
   widgetKey: string,
   limit = 100,
+  scope?: AnalyticsScopeFilter,
 ): Promise<AnalyticsWidgetRow[]> {
   if (widgetKey === "spotify-demographics-passion-indicators") {
     const rows = await executeOptionalAnalyticsQuery<{
@@ -2060,6 +2065,9 @@ export async function listAnalyticsWidgetRows(
       and(
         eq(analytics_metric_rows.org_id, orgId),
         eq(analytics_metric_rows.widget_key, widgetKey),
+        sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedWidgetRun(orgId, widgetKey)}`,
+        ...(scope?.artistId ? [eq(analytics_metric_rows.artist_id, scope.artistId)] : []),
+        ...(scope?.releaseId ? [eq(analytics_metric_rows.release_id, scope.releaseId)] : []),
       ),
     )
     .orderBy(desc(analytics_metric_rows.last_seen_at))

@@ -2,6 +2,7 @@ import {
   listAnalyticsCities,
   listAnalyticsStreamSources,
   listAnalyticsTracksByGrowth,
+  listAnalyticsWidgetRows,
 } from "../src/server/analytics";
 import { listAnalyticsDataQuality } from "../src/server/analytics-data-quality";
 
@@ -20,11 +21,12 @@ const expectedWidgetKeys = [
   "tracks-by-growth-rate",
 ];
 
-const [tracks, sources, cities, quality] = await Promise.all([
+const [tracks, sources, cities, quality, playlists] = await Promise.all([
   listAnalyticsTracksByGrowth(orgId, 100),
   listAnalyticsStreamSources(orgId),
   listAnalyticsCities(orgId, 50),
   listAnalyticsDataQuality(orgId),
+  listAnalyticsWidgetRows(orgId, "spotify-playlist-listings"),
 ]);
 
 if (tracks.length !== 5 || tracks.some((row) => row.combinedStreams <= 0)) {
@@ -35,6 +37,9 @@ if (!sources.spotify.length || !sources.apple.length || [...sources.spotify, ...
 }
 if (cities.length !== 6 || cities.some((row) => row.streams <= 0)) {
   throw new Error("Analytics sandbox query probe expected six city rows with streams > 0.");
+}
+if (!playlists.length || playlists.some((row) => row.label.startsWith("Obsolete"))) {
+  throw new Error("Analytics sandbox query probe must exclude obsolete playlist snapshots.");
 }
 if (
   quality.health.coverage !== "complete"

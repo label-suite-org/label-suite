@@ -1164,7 +1164,7 @@ describe("dated track snapshot analytics read model", () => {
     const rows = await listFilteredTracksByGrowth("org-a", 10, { artistId: "artist-a" }, boundary({
       listCompletedRunsWithUploadedFile: async () => [],
       listMetricRowsForRun: async () => [],
-      listLegacyTrackRows: async () => [],
+      listLegacyTrackRows: async () => ({ recordCount: 0, rows: [] }),
     }) as never);
     expect(rows).toEqual([expect.objectContaining({ id: "automated-row", combinedStreams: 123 })]);
   });

@@ -47,6 +47,21 @@ async function main(): Promise<void> {
     throw new Error("Analytics sandbox seed is not idempotent across exact owned IDs.");
   }
 
+  // A previously captured one-day snapshot must not override or add to the
+  // current catalogue, city or playlist snapshot.
+  const oldRunId = `${config.orgId}-old-snapshot`;
+  await client.query(`insert into label_suite.analytics_import_runs
+    (id, org_id, source, mode, status, started_at, completed_at)
+    values ($1, $2, 'sisense', 'sync', 'completed', '2026-07-01', '2026-07-01')`, [oldRunId, config.orgId]);
+  await client.query(`insert into label_suite.analytics_metric_rows
+    (id, org_id, source, widget_key, row_key, row_hash, requested_date_range, requested_aggregation,
+     dimensions, metrics, raw_row, first_seen_run_id, last_seen_run_id, first_seen_at, last_seen_at)
+    select $1 || '-' || widget_key, org_id, source, widget_key, $1 || '-' || widget_key, 'old', '1 Day', 'Daily',
+      '{"track_title":"Obsolete track","city":"Obsolete city","playlist__name":"Obsolete playlist"}'::jsonb,
+      '{"combined_streams":999999,"streams":999999}'::jsonb, '{}', $1, $1, '2026-07-01', '2026-07-01'
+    from label_suite.analytics_metric_rows where org_id=$2
+      and widget_key in ('tracks-by-growth-rate','spotify-superfans-active-streams-city','spotify-playlist-listings')
+    group by org_id, source, widget_key`, [oldRunId, config.orgId]);
   await runAnalyticsQueryProbe(config);
 
   await verifySentinelOrganization(client, sentinelBefore);
