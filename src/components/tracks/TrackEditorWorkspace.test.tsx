@@ -103,3 +103,47 @@ it("keeps a dirty track when switching is cancelled, including filters and page 
     await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
   }
 });
+
+
+it("keeps the accepted track URL when a later history transition is cancelled", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  window.history.replaceState(null, "", "/releases/release-1/tracks?track=one");
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const tracks = [
+    { id: "one", title: "First song", release_id: "release-1", position: 1, version: "Main", isrc: null, audio_url: null, duration: null, work_id: null },
+    { id: "two", title: "Second song", release_id: "release-1", position: 2, version: "Main", isrc: null, audio_url: null, duration: null, work_id: null },
+  ];
+  const editTitle = async (title: string) => {
+    const input = host.querySelector<HTMLInputElement>("aside input[required]")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, title);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  };
+  const navigate = async (id: string) => {
+    await act(async () => {
+      window.history.replaceState(null, "", `/releases/release-1/tracks?track=${id}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+  };
+  const choose = async (label: string) => {
+    const button = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === label)!;
+    await act(async () => button.click());
+  };
+  try {
+    await act(async () => root.render(<TrackEditorWorkspace release={{ id: "release-1", title: "Release" }} tracks={tracks} works={[]} />));
+    await editTitle("First draft");
+    await navigate("two");
+    await choose("Discard changes");
+    expect(window.location.search).toBe("?track=two");
+    expect(host.querySelector("aside h2")?.textContent).toBe("Second song");
+    await editTitle("Second draft");
+    await navigate("one");
+    await choose("Keep editing");
+    expect(window.location.search).toBe("?track=two");
+    expect(host.querySelector<HTMLInputElement>("aside input[required]")?.value).toBe("Second draft");
+  } finally {
+    await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals();
+  }
+});

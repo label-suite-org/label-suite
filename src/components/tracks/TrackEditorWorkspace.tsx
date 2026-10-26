@@ -59,6 +59,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
   const dirty = useRef(false);
+  const currentLocation = useRef("");
   const [pendingSelection, setPendingSelection] = useState<{ id: string; filter?: FilterKey; url?: string } | null>(null);
   const onDirtyChange = useCallback((value: boolean) => { dirty.current = value; }, []);
   const confirmDeparture = useCallback(() => !dirty.current || window.confirm("Discard unsaved track changes? An in-flight save may still complete."), []);
@@ -101,19 +102,19 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
   }, [filteredTracks, selectedId, selectTrack]);
 
   useEffect(() => {
-    let currentLocation = window.location.href;
+    currentLocation.current = window.location.href;
     const applyRoute = () => {
       const route = parseTrackRoute(window.location.search);
       const requestedTrack = route.trackId ? tracks.find((track) => track.id === route.trackId) : null;
       if (requestedTrack) {
         if (!selectTrack(requestedTrack.id)) {
           setPendingSelection({ id: requestedTrack.id, url: window.location.href });
-          window.history.pushState(null, "", currentLocation);
+          window.history.pushState(null, "", currentLocation.current);
           return;
         }
         setFilter("all");
       }
-      currentLocation = window.location.href;
+      currentLocation.current = window.location.href;
       setPendingTrackFocus(route.focus);
     };
     applyRoute();
@@ -170,6 +171,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
                 setFilter("all");
                 setPendingTrackFocus(parseTrackRoute(new URL(pendingSelection.url).search).focus);
                 window.history.pushState(null, "", pendingSelection.url);
+                currentLocation.current = pendingSelection.url;
               }
               setPendingSelection(null);
             }}>Discard changes</Button>
