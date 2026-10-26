@@ -124,6 +124,7 @@ export interface AnalyticsSourceMixRow {
 }
 
 export interface AnalyticsInsightCard {
+  source: "daily" | "tracks" | "cities" | "playlists";
   label: string;
   title: string;
   metric: string;
@@ -388,6 +389,7 @@ function buildInsights({
   return [
     {
       label: "Momentum",
+      source: "daily",
       title: changePct === null ? "Period comparison pending" : changePct >= 0 ? "Streams are up" : "Streams are down",
       metric: changePct === null ? "—" : signedPercent(changePct),
       detail: previousStreamTotal === null ? "Need an earlier comparable period for a clean delta." : `${formatCompact(streamTotal)} streams vs ${formatCompact(previousStreamTotal)} before.`,
@@ -396,6 +398,7 @@ function buildInsights({
     },
     {
       label: "Catalogue mover",
+      source: "tracks",
       title: topMover?.trackTitle ?? "No clear mover yet",
       metric: topMover?.streamsGrowth === null || !topMover ? "—" : signedPercent(topMover.streamsGrowth),
       detail: topMover ? `${topMover.primaryArtist ?? "Unknown artist"} · ${formatCompact(topMover.combinedStreams)} cumulative streams.` : "Import growth fields or period track rows to rank movers.",
@@ -404,6 +407,7 @@ function buildInsights({
     },
     {
       label: "Market",
+      source: "cities",
       title: topCity?.city ?? "No market signal yet",
       metric: topCity ? formatCompact(topCity.streams) : "—",
       detail: topCity ? `${topCity.listeners ? `${formatCompact(topCity.listeners)} superfans · ` : ""}highest city stream concentration.` : "No city data imported.",
@@ -412,6 +416,7 @@ function buildInsights({
     },
     {
       label: "Discovery channel",
+      source: topSource ? "daily" : "playlists",
       title: topSource ? `${titleCase(topSource.platform)} · ${topSource.source}` : topPlaylist?.label ?? "No channel signal yet",
       metric: topSource ? formatCompact(topSource.streams) : topPlaylist ? formatCompact(safeNumber(topPlaylist.metrics.streams)) : "—",
       detail: topSource ? `${formatPercent(topSource.sharePct)} of selected-period source streams.` : topPlaylist ? "Top playlist by stream contribution." : "No source or playlist rows imported.",

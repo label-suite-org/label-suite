@@ -1,5 +1,14 @@
 const DEFAULT_SISENSE_TIME_ZONE = "Europe/Copenhagen";
 
+export function sisenseDateRangeSummary(requested: string, now: Date, timeZone: string): string {
+  const days = requested === "Yesterday" ? 1 : Number(requested.match(/^([1-9]\d*) Days?$/)?.[1]);
+  if (!days) return requested;
+  const end = previousCalendarDayInTimeZone(now, timeZone);
+  const start = new Date(`${end}T00:00:00.000Z`);
+  start.setUTCDate(start.getUTCDate() - days + 1);
+  return `${start.toISOString().slice(0, 10)} to ${end}`;
+}
+
 export function resolveSisenseTimeZone(value: string | undefined): string {
   const timeZone = value?.trim() || DEFAULT_SISENSE_TIME_ZONE;
   try {

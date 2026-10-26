@@ -1,6 +1,6 @@
 import { parseCsv, type ParsedCsv } from "./sisense-csv";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { chromium, errors, type ElementHandle, type Locator, type Page } from "playwright";
@@ -14,7 +14,7 @@ import {
 } from "./analytics-sandbox-replace-evidence";
 import { createWakeableCancellation, pollDelayMs, NoDownloadAvailableError, resolveNewPageDownloadAction, visiblePageDownloadActions, type WakeableCancellation } from "./sisense-action-boundary";
 import type { DiagnosticFailureCode } from "./sisense-diagnostic-failure";
-import { formatSisenseCustomRangeDate, previousCalendarDayInTimeZone, resolveSisenseTimeZone } from "./sisense-date-range";
+import { formatSisenseCustomRangeDate, sisenseDateRangeSummary, resolveSisenseTimeZone } from "./sisense-date-range";
 import { buildImportCompleteness, parseSisenseMetric } from "./sisense-import-snapshot";
 
 const SOURCE = "sisense";
@@ -23,6 +23,7 @@ const DEFAULT_DOWNLOAD_DIR = ".data/sisense";
 const DEFAULT_STORAGE_PREFIX = "distributor/sisense";
 const WIDGET_MENU_ATTEMPT_TIMEOUT_MS = 500;
 const MAX_DOWNLOAD_TIMEOUT_MS = 1_800_000;
+class EmptyCsvExportError extends Error {}
 const DEFAULT_WIDGETS: WidgetTarget[] = [
   { key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" },
   { key: "spotify-superfans-active-streams-city", title: "Spotify Superfans & Active Streams by City" },
@@ -454,7 +455,21 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
       for (const widget of widgets) {
         try {
           setScrapeFailureStage("widget_export_resolution");
-          const result = await downloadWidget(page, widget, runDir, requestedDateRange, requestedAggregation, scopeForWidget(widget.key, scope), actionTimeoutMs, downloadTimeoutMs);
+          let result: WidgetDownloadResult;
+          try {
+            result = await downloadWidget(page, widget, runDir, requestedDateRange, requestedAggregation, scopeForWidget(widget.key, scope), actionTimeoutMs, downloadTimeoutMs);
+          } catch (error) {
+            if (!(error instanceof NoDownloadAvailableError) && !(error instanceof EmptyCsvExportError)) throw error;
+            // Provider menus can retain the previous widget's portaled action.
+            // Start once from a fresh document, re-verifying the same filters;
+            // never relax the unique-action or observed-empty requirements.
+            console.log(`Retrying ${widget.key} after reloading and verifying provider filters.`);
+            await page.goto(dashboardUrl, { waitUntil: "domcontentloaded" });
+            await maybeEnterPassword(page);
+            await page.waitForLoadState("networkidle", { timeout: 30_000 }).catch(() => undefined);
+            await maybeApplyFilters(page, requestedDateRange, requestedAggregation, providerScope);
+            result = await downloadWidget(page, widget, runDir, requestedDateRange, requestedAggregation, scopeForWidget(widget.key, scope), actionTimeoutMs, downloadTimeoutMs);
+          }
           if (result.kind === "observed_empty") {
             observedEmptyWidgets.push(result.widget);
             console.log(`Observed empty ${result.widget.key}: ${result.widget.reason}`);
@@ -463,8 +478,10 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
           files.push(result.file);
           console.log(`Downloaded ${result.file.fileName}`);
         } catch (error) {
-          if (error instanceof NoDownloadAvailableError) {
-            const reason = "No uniquely observable export action was available after opening the scoped widget menu.";
+          if (error instanceof NoDownloadAvailableError || error instanceof EmptyCsvExportError) {
+            const reason = error instanceof EmptyCsvExportError
+              ? "Downloaded CSV contained no data rows; no provider empty-state evidence was observed."
+              : "No uniquely observable export action was available after opening the scoped widget menu.";
             console.log(`Skipped ${widget.key}: ${reason}`);
             skippedWidgets.push({ key: widget.key, reason });
             continue;
@@ -525,7 +542,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     requestedAggregation: string,
     providerScope: ProviderScopeSelection,
   ): Promise<ProviderFilterState> {
-    const requestedDateSummary = requestedDateRangeSummary(requestedDateRange);
+    const requestedDateSummary = sisenseDateRangeSummary(requestedDateRange, new Date(), resolveSisenseTimeZone(process.env.SISENSE_TIME_ZONE));
     if (readBooleanEnv("SISENSE_SKIP_FILTERS", false)) {
       console.log("Skipping Sisense filter UI; verifying dashboard defaults match the requested state.");
       return {
@@ -545,8 +562,8 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     if (providerScope.artist) await selectProviderValue(page, "True_Nature_Artists", providerScope.artist);
     if (providerScope.track) await selectProviderValue(page, "True_Nature_Tracks", providerScope.track);
     await selectProviderDimensionOption(page, "Aggregation", requestedAggregation, "aggregation");
-    if (requestedDateRange === "Yesterday") {
-      await selectYesterdayCustomRange(page, requestedDateSummary);
+    if (requestedDateSummary !== requestedDateRange) {
+      await selectCustomRange(page, requestedDateSummary);
     } else {
       await selectProviderDimensionOption(page, "DateRange", requestedDateRange, "date range");
     }
@@ -624,7 +641,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     }
   }
 
-  async function selectYesterdayCustomRange(page: Page, expectedSummary: string): Promise<void> {
+  async function selectCustomRange(page: Page, expectedSummary: string): Promise<void> {
     const editor = await openProviderDimensionEditor(page, "DateRange");
     const customRange = await resolveProviderOption(editor, "Custom Range", "date range");
     const clickTarget = await resolveDateRangeOptionClickTarget(customRange);
@@ -637,17 +654,17 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
       throw new Error("Could not resolve exactly two scoped Custom Range date inputs.");
     }
     const [startDate, endDate] = expectedSummary.split(" to ");
-    if (!startDate || startDate !== endDate) throw new Error(`Invalid Yesterday custom range summary '${expectedSummary}'.`);
-    const providerDate = formatSisenseCustomRangeDate(startDate);
     for (let index = 0; index < 2; index += 1) {
+      const isoDate = index === 0 ? startDate : endDate;
+      const providerDate = formatSisenseCustomRangeDate(isoDate);
       const input = inputs.nth(index);
       if (!(await isVisible(input, 1_000))) {
         throw new Error(`Scoped Custom Range input ${index + 1} is not visible after selecting Custom Range.`);
       }
       await input.fill(providerDate);
       const observedDate = await input.inputValue();
-      if (observedDate !== startDate && observedDate !== providerDate) {
-        throw new Error(`Scoped Custom Range input ${index + 1} did not match accepted ISO '${startDate}' or provider '${providerDate}'.`);
+      if (observedDate !== isoDate && observedDate !== providerDate) {
+        throw new Error(`Scoped Custom Range input ${index + 1} did not match accepted ISO '${isoDate}' or provider '${providerDate}'.`);
       }
     }
   }
@@ -716,12 +733,6 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     return label.trim().replace(/\s+\(DEFAULT\)\s*$/i, "");
   }
 
-  function requestedDateRangeSummary(requestedDateRange: string): string {
-    if (requestedDateRange !== "Yesterday") return requestedDateRange;
-    const yesterday = previousCalendarDayInTimeZone(new Date(), resolveSisenseTimeZone(process.env.SISENSE_TIME_ZONE));
-    return `${yesterday} to ${yesterday}`;
-  }
-
   async function downloadWidget(
     page: Page,
     widget: WidgetTarget,
@@ -771,6 +782,11 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
       ].join("-"));
       const localPath = path.join(runDir, fileName.endsWith(".csv") ? fileName : `${fileName}.csv`);
       await download.saveAs(localPath);
+      if (!parseCsv(await readFile(localPath, "utf8")).rows.length) {
+        // Preserve diagnostic evidence outside the directory-import file set.
+        await rename(localPath, path.join(runDir, "failures", path.basename(localPath)));
+        throw new EmptyCsvExportError("Downloaded CSV contained no data rows.");
+      }
 
       return { kind: "downloaded", file: {
         widgetKey: widget.key,
@@ -1022,6 +1038,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     const contents = await readFile(file.localPath);
     const sha256 = hashBuffer(contents);
     const parsed = parseCsv(contents.toString("utf8"));
+    if (!parsed.rows.length) throw new EmptyCsvExportError("Refusing to import a CSV without data rows; use verified provider empty-state evidence instead.");
     const id = importFileId(file);
     let storageBucket: string | null = null;
     let storageKey: string | null = null;
