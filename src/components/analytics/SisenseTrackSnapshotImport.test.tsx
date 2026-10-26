@@ -172,13 +172,13 @@ afterEach(() => {
 });
 
 describe("SisenseTrackSnapshotImport", () => {
-  it("previews one fully labelled cumulative snapshot with the exact reporting form", async () => {
+  it("previews one fully labelled reporting-period snapshot with the exact reporting form", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(preview), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const { container, root } = await renderImport();
     try {
       expect(container.textContent).toContain(
-        "Import one cumulative Tracks by Growth Rate snapshot. The dates describe the reporting context used by Sisense; they are not a stream-period total.",
+        "Import one reporting-period Tracks by Growth Rate snapshot. The dates describe the reporting context used by Sisense; they are not a lifetime total.",
       );
       expect(primaryButton(container)?.disabled).toBe(true);
 

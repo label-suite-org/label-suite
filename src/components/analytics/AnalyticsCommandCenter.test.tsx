@@ -222,8 +222,8 @@ describe("AnalyticsCommandCenter", () => {
 
   it.each([
     ["overview", "Selected-period combined streams", "Daily streams trend"],
-    ["trends", "Daily streams trend", "Markets to act on"],
-    ["audience", "Markets to act on", "Discovery source mix"],
+    ["trends", "Daily streams trend", "Reported cities"],
+    ["audience", "Reported cities", "Discovery source mix"],
     ["discovery", "Discovery source mix", "Selected-period combined streams"],
   ] as const)("renders only the %s workspace section", async (section, visible, hidden) => {
     const { container, root } = await renderAnalytics(baseInput, "?period=7d", section);
@@ -660,4 +660,20 @@ it("offers an import entry point for missing data and retains failed-import guid
   const failed = renderToStaticMarkup(<AnalyticsCommandCenterView command={{ ...empty, dataHealth: { ...empty.dataHealth, latestRunStatus: "failed" } }} section="overview" />);
   expect(failed).toContain("The latest import failed");
   expect(failed).toContain("Review import");
+});
+
+
+it("shows the provider conflict and recording scope instead of an artist headline", () => {
+  const command = buildAnalyticsCommandCenter({ ...baseInput, providerIntegrity: {
+    status: "conflicting", artist: "Fixture Artist", track: "Recording A", dateRange: "14 Days", aggregation: "Daily", unmatchedCatalogueRows: 2,
+    conflicts: [{ platform: "apple", reportedCatalogueSum: 20, dailyTrackSum: 75, difference: 55 }],
+    reporting: [{ widgetKey: "apple-streams-source", from: "2026-07-01", through: "2026-07-02" }],
+  } });
+  const html = renderToStaticMarkup(<AnalyticsCommandCenterView command={command} section="overview" />);
+  expect(html).toContain("Provider totals conflict");
+  expect(html).toContain("Recording A");
+  expect(html).toContain("daily exceeds catalogue by 55");
+  expect(html).toContain("not worldwide totals");
+  expect(html).toContain("These are not lifetime counts");
+  expect(html).toContain("Artist totals are unverified");
 });

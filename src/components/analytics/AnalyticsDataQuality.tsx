@@ -1,3 +1,4 @@
+import ProviderIntegrityNotice from "./ProviderIntegrityNotice";
 import { useState } from "react";
 import type { AnalyticsDataQualityReport, AnalyticsDuplicateDisposition, AnalyticsDuplicateReason } from "../../server/analytics-data-quality";
 
@@ -51,13 +52,14 @@ export default function AnalyticsDataQuality({ report }: { report: AnalyticsData
       <p className="mt-1 text-sm text-muted-foreground">Missing or unmatched data remains visible until reviewed. Duplicate signals require an explicit, attributable disposition.</p>
     </div>
 
+    {report.providerIntegrity && <ProviderIntegrityNotice integrity={report.providerIntegrity} />}
     {!report.evidence.complete && <p className="border border-amber-500/40 bg-amber-500/10 p-3 text-sm" role="status">Complete duplicate evidence is unavailable for this schema state. Review actions remain disabled until the evidence contract is available.</p>}
     <div className="grid gap-3 sm:grid-cols-4">
       <Health label="Last success" value={formatDateTime(report.health.lastSuccessfulRunAt)} />
       <Health label="Source observed" value={formatDateTime(report.health.sourceObservedAt)} />
       <Health label="Reporting through" value={report.health.reportingThrough ? new Date(report.health.reportingThrough).toLocaleDateString() : "Unknown"} />
       <Health label="Freshness basis" value={report.health.freshnessBasis.replaceAll("_", " ")} />
-      <Health label="Coverage" value={report.health.coverage} />
+      <Health label="Export acquisition" value={report.health.coverage} />
       <Health label="Failed runs" value={String(report.health.failedRuns)} />
       <Health label="Unreviewed candidates" value={String(unreviewedCount)} />
     </div>

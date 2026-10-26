@@ -19,8 +19,8 @@ export function formatAnalyticsLongDate(value: Date | string | null): string {
   });
 }
 
-export function formatAnalyticsNumber(value: number): string {
-  return value.toLocaleString();
+export function formatAnalyticsNumber(value: number | null): string {
+  return value === null ? "—" : value.toLocaleString();
 }
 
 export function formatAnalyticsPercent(value: number | null): string {
