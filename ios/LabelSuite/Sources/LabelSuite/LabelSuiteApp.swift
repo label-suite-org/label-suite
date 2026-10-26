@@ -699,6 +699,7 @@ struct NativeArtistDetailView: View {
         }
       }
       if let detail {
+        if canMutate { Section { NavigationLink("Sync deals") { NativeSyncListView(workspace:workspace,session:session,api:api,artistID:artistID) } } }
         identitySection(detail)
         readinessSection(detail)
         releaseSection(detail)
@@ -1272,6 +1273,7 @@ struct NativeReleaseDetailView: View {
         }
         NativeResourceLinks(context: .init(kind: .release, id: releaseID), contextName: detail.release.title, workspace: workspace, session: session, api: api)
         NativeTracksView(releaseID: releaseID, workspace: workspace, session: session, api: api, inline: true)
+        if workspace.capabilities["operations.mutate"] == true { Section { NavigationLink("Sync deals") { NativeSyncListView(workspace:workspace,session:session,api:api,releaseID:releaseID) } } }
         Section("Release sections") { ForEach(detail.sections) { section in NavigationLink(section.title) { NativeReleaseSectionView(section: section, detail: detail, workspace: workspace, session: session, api: api) } } }
         if !detail.childReleases.isEmpty { Section("Child releases") { ForEach(detail.childReleases) { child in NavigationLink(child.title) { NativeReleaseDetailView(releaseID: child.id, workspace: workspace, session: session, api: api) } } } }
       } else if loading { Section { ProgressView("Loading release…") } }
@@ -2264,6 +2266,7 @@ private struct NativeMoreView: View {
     List {
       NavigationLink { NativeSettingsView(workspace: workspace, session: session, api: api) } label: { Label("Settings", systemImage: "gearshape").frame(minHeight: 44) }
       NavigationLink { NativeNotificationSettingsView(workspace: workspace, session: session, api: api) } label: { Label("Notifications", systemImage: "bell").frame(minHeight: 44) }
+      if workspace.capabilities["operations.mutate"] == true { Section("Licensing") { NavigationLink { NativeSyncListView(workspace:workspace,session:session,api:api) } label: { Label("Sync",systemImage:"film") } } }
       Section("Workspace library") {
         if case let .authenticated(active) = session.state, active.id == workspace.id, active.capabilities["royalties.read"] == true {
           NavigationLink { NativeRoyaltiesView(workspace: workspace, session: session, api: api) } label: { Label("Royalties", systemImage: "banknote").frame(minHeight: 44) }

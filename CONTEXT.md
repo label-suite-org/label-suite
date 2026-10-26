@@ -156,3 +156,11 @@ An attributed intake record describing a track, its contributors and any
 reported writing shares. Marking it reviewed records that the label has read it;
 it never changes canonical credits, rights or agreements automatically.
 _Avoid_: Approved split, verified identity, executed agreement
+
+## Sync licensing
+
+**Sync Deal**: One workspace-scoped production and exact recording version, with separately recorded commercial terms, master clearance, publishing clearance, contract, delivery, receipts, settlement, and cue-sheet follow-up. A secured placement report does not establish signature, clearance, currency, or collection.
+
+**Sync Revision**: A preserved snapshot of each saved deal and its recording actor. Material term changes require fresh clearance and contract review. Linked Tasks own the next action; existing catalog, contacts, documents, and media assets remain canonical.
+
+**Sync Receipt**: Exact decimal evidence of money collected in a stated currency with an accounting reference. Retry uses the same receipt ID. It neither posts royalties nor establishes an artist payout; settlement requires a separately reviewed worksheet.
