@@ -57,6 +57,15 @@ export const createReleaseSchema = z.object({
   status: releaseBaseSchema.status,
 });
 
+/** Stable client identity makes an explicitly retried native creation duplicate-safe. */
+export const nativeCreateReleaseSchema = z.object({
+  id: z.uuid(),
+  title: releaseBaseSchema.title.max(240),
+  artist_id: z.string().trim().min(1).max(160).nullable().optional(),
+  release_date: z.iso.date().nullable().optional(),
+  format: z.string().trim().min(1).max(80).nullable().optional(),
+}).strict();
+
 export const updateReleaseSchema = z.object(releaseBaseSchema).partial().extend({ id: idSchema });
 
 /** Native clients submit every editable release field except the canonical ID. */
@@ -69,6 +78,7 @@ export const deleteReleaseSchema = z.object({
 });
 
 export type CreateReleaseInput = z.infer<typeof createReleaseSchema>;
+export type NativeCreateReleaseInput = z.infer<typeof nativeCreateReleaseSchema>;
 export type UpdateReleaseInput = z.infer<typeof updateReleaseSchema>;
 export type NativeUpdateReleaseInput = z.infer<typeof nativeUpdateReleaseSchema> & { id: string };
 export type DeleteReleaseInput = z.infer<typeof deleteReleaseSchema>;
@@ -323,6 +333,14 @@ export async function getReleaseDetail(orgId: string, id: string) {
 }
 
 export async function createRelease(orgId: string, input: CreateReleaseInput) {
+  return createReleaseInternal(orgId, input);
+}
+
+export async function createReleaseForNative(orgId: string, input: NativeCreateReleaseInput, actorUserId: string) {
+  return createReleaseInternal(orgId, input, actorUserId);
+}
+
+async function createReleaseInternal(orgId: string, input: CreateReleaseInput, actorUserId?: string) {
   return db.transaction(async (tx) => {
     const id = input.id ?? crypto.randomUUID();
     const format = input.format ?? "single";
@@ -334,7 +352,7 @@ export async function createRelease(orgId: string, input: CreateReleaseInput) {
       await assertParentReleaseInOrg(tx, orgId, input.parent_release_id, id);
     }
 
-    await tx.insert(releases).values({
+    const insert = tx.insert(releases).values({
       id,
       org_id: orgId,
       title: input.title,
@@ -347,10 +365,29 @@ export async function createRelease(orgId: string, input: CreateReleaseInput) {
       status: input.status ?? "draft",
     }).onConflictDoNothing({ target: releases.id });
 
+    if (actorUserId) {
+      const [inserted] = await insert.returning();
+      if (!inserted) {
+        const [current] = await tx.select().from(releases)
+          .where(and(eq(releases.id, id), eq(releases.org_id, orgId)));
+        if (!current || current.title !== input.title || current.artist_id !== (input.artist_id ?? null)
+          || current.release_date !== (input.release_date ?? null) || current.format !== format) {
+          throw new ConflictError("Release identity already exists with different details; open the saved release before trying again");
+        }
+        return { id, ok: true, repeated: true };
+      }
+      await recordAuditEvent(orgId, {
+        actor_user_id: actorUserId, event_type: "release.created", object_type: "release", object_id: id,
+        before: null, after: releaseAuditData(inserted),
+      }, tx);
+    } else {
+      await insert;
+    }
+
     await syncReleaseCatalogEntry(tx, orgId, id, { allowMissing: true });
     await persistReleaseReadiness(id, tx, orgId);
 
-    return { id, ok: true };
+    return { id, ok: true, ...(actorUserId ? { repeated: false } : {}) };
   });
 }
 
