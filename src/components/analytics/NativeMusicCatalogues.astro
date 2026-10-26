@@ -1,0 +1,39 @@
+---
+import type { NativeMusicCatalogue } from "../../server/native-music-import";
+import { nativeCatalogueTotal } from "../../server/native-music-snapshot";
+interface Props { catalogues: NativeMusicCatalogue[] }
+const { catalogues } = Astro.props;
+const format = (value: number | null) => value === null ? "Unknown" : value.toLocaleString("en-US");
+---
+{catalogues.length > 0 && (
+  <section class="space-y-6" aria-labelledby="native-music-heading">
+    <div>
+      <h2 id="native-music-heading" class="text-2xl font-semibold">Direct from your artist dashboards</h2>
+      <p class="text-sm text-muted-foreground">Dated native song totals. Each provider has its own reporting cutoff. These captures refresh when imported.</p>
+    </div>
+    {catalogues.map((catalogue) => (
+      <article class="space-y-3 rounded-lg border border-[var(--border)] p-5">
+        <h3 class="text-lg font-semibold">{catalogue.artistName} · {catalogue.provider === "spotify_for_artists" ? "Spotify for Artists" : "Apple Music for Artists"}</h3>
+        <p>{catalogue.dateFrom}–{catalogue.dateThrough} · Worldwide · {catalogue.metric === "audio_streams" ? "Audio streams" : "Plays"}</p>
+        <p class="text-3xl font-semibold tabular-nums">{format(nativeCatalogueTotal(catalogue.rows))}</p>
+        <p class="text-sm text-muted-foreground">Selected-period total across {catalogue.rows.length} native song entries. Captured {catalogue.capturedAt.replace("T", " ").replace(/\.\d+Z$/, " UTC")}.</p>
+        {catalogue.artistTotal !== null && <p class="text-sm">Native artist rollup: {format(catalogue.artistTotal)} plays.
+          {nativeCatalogueTotal(catalogue.rows) !== null && catalogue.artistTotal !== nativeCatalogueTotal(catalogue.rows) &&
+            <> The native rollup differs from the song sum by {format(catalogue.artistTotal - nativeCatalogueTotal(catalogue.rows)!)} plays. This difference remains unresolved; neither value has been adjusted.</>}
+        </p>}
+        <p class="text-sm text-muted-foreground">Song entries retain their provider IDs and versions. Daily and geographic breakdowns are not included in this capture.</p>
+        <details>
+          <summary class="cursor-pointer font-medium">All songs and provider links</summary>
+          <div class="overflow-x-auto">
+            <table class="mt-3 w-full text-sm">
+              <thead><tr class="border-b"><th class="py-2 text-left" scope="col">Song</th><th class="py-2 text-right" scope="col">{catalogue.metric === "audio_streams" ? "Audio streams" : "Plays"}</th></tr></thead>
+              <tbody>{[...catalogue.rows].sort((a, b) => (b.value ?? -1) - (a.value ?? -1)).map((row) => (
+                <tr class="border-b"><th class="py-2 text-left font-normal" scope="row"><a href={row.sourceUrl} target="_blank" rel="noopener noreferrer" class="underline">{row.title}</a><span class="sr-only"> · {row.recordingId}</span></th><td class="py-2 text-right tabular-nums">{format(row.value)}</td></tr>
+              ))}</tbody>
+            </table>
+          </div>
+        </details>
+      </article>
+    ))}
+  </section>
+)}
