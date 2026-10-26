@@ -207,6 +207,7 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
       expect(listed).toEqual({items:[{id:doc.id,title:doc.title,created:doc.created}],next_page:2});
       expect(fetch.mock.calls[0][0]).toContain('title__icontains=Fuel');
       const before=(await read())!.money.forecast_cost;
+      if(before===null) throw new Error("Fixture forecast must be complete");
       const selected=await Promise.all([linkPaperlessReceipt(org,project,randomUUID(),doc.id),linkPaperlessReceipt(org,project,randomUUID(),doc.id)]);
       expect(selected[0].id).toBe(selected[1].id);
       expect((await sql`select count(*)::int n from label_suite.tour_receipts where org_id=${org} and document_id=${doc.id}`)[0].n).toBe(1);

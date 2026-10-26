@@ -23,7 +23,7 @@ it('rejects missing access and oversized bodies before forwarding a scan',async(
 });
 
 it('lists shared archive documents and links a bounded document selection in the actor scope',async()=>{
- const list={...req(),request:new Request('https://suite.test/api/native/projects/tour/tour/receipts?archive=paperless&query=fuel&page=2')};
+ const list={params:{id:'tour'},request:new Request('https://suite.test/api/native/projects/tour/tour/receipts?archive=paperless&query=fuel&page=2')} as never;
  m.archive.mockResolvedValue({items:[],next_page:null});
  expect((await GET(list)).status).toBe(200);expect(m.archive).toHaveBeenCalledWith('org','tour','fuel',2);
  const input={receipt_id:'c8cd09e7-3399-413a-a6a8-3293247a1f03',document_id:42};m.link.mockResolvedValue({id:'canonical'});
