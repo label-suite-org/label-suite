@@ -28,10 +28,16 @@ let pendingUrlRequests: PendingUrlRequest[] = [];
 let flushScheduled = false;
 
 export async function uploadFileToStorage(file: File, folder: string, context?: StorageAttachmentContext) {
+  const mediaUpload = !context && folder === "media-assets";
+  const maxMegabytes = mediaUpload ? 100 : 25;
+  if (file.size > maxMegabytes * 1024 * 1024) {
+    throw new Error(`File is too large. Maximum upload size is ${maxMegabytes} MB.`);
+  }
   const safeName = sanitizeFilename(file.name);
   const key = `${folder}/${Date.now()}-${safeName}`;
 
   if (context) return uploadFileThroughServer(file, key, context);
+  if (mediaUpload) return uploadFileThroughServer(file, key, undefined, true);
 
   const signedUploadRes = await fetch("/api/storage/upload-url", {
     method: "POST",
@@ -73,13 +79,13 @@ export async function uploadFileToStorage(file: File, folder: string, context?: 
   return uploadFileThroughServer(file, key);
 }
 
-async function uploadFileThroughServer(file: File, key: string, context?: StorageAttachmentContext) {
+async function uploadFileThroughServer(file: File, key: string, context?: StorageAttachmentContext, mediaUpload = false) {
   const form = new FormData();
   if (context) form.set("context", JSON.stringify(context));
   else form.set("key", key);
   form.set("file", file);
 
-  const uploadRes = await fetch("/api/storage/upload", {
+  const uploadRes = await fetch(mediaUpload ? "/api/storage/upload?kind=media-asset" : "/api/storage/upload", {
     method: "POST",
     body: form,
   });
