@@ -1,9 +1,9 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ actor: vi.fn(), context: vi.fn(), save: vi.fn(), publish: vi.fn(), audience: vi.fn(), messageSave: vi.fn(), messageGet: vi.fn(), schedule: vi.fn(), test: vi.fn() }));
+const mocks = vi.hoisted(() => ({ actor: vi.fn(), context: vi.fn(), save: vi.fn(), dropGet: vi.fn(), publish: vi.fn(), audience: vi.fn(), messageSave: vi.fn(), messageGet: vi.fn(), schedule: vi.fn(), test: vi.fn() }));
 vi.mock("../../../server/audit", () => ({ writeAuditLog: vi.fn() }));
 vi.mock("../../../lib/native-workspace", () => ({ resolveNativeActor: mocks.actor }));
 vi.mock("../../../lib/db", () => ({ db: {}, runWithDatabaseContext: mocks.context }));
-vi.mock("../../../server/fan-drops", () => ({ listFanDrops: vi.fn(), saveFanDrop: mocks.save, publishFanDrop: mocks.publish, fanAudience: mocks.audience, publicDropPath: vi.fn() }));
+vi.mock("../../../server/fan-drops", () => ({ getFanDrop: mocks.dropGet, listFanDrops: vi.fn(), saveFanDrop: mocks.save, publishFanDrop: mocks.publish, fanAudience: mocks.audience, publicDropPath: vi.fn() }));
 vi.mock("../../../server/fan-messages", () => ({ getFanMessage: mocks.messageGet, listFanMessages: vi.fn(), saveFanMessage: mocks.messageSave, previewFanMessage: vi.fn(), scheduleFanMessage: mocks.schedule, cancelFanMessage: vi.fn(), reconcileFanMessage: vi.fn(), testFanMessage: mocks.test, fanTestRecipient: vi.fn() }));
 vi.mock("../../../server/fan-feedback", () => ({ listFans: vi.fn(), fanHistory: vi.fn(), tagFan: vi.fn() }));
 import { GET, POST } from "./fan-drops";
@@ -44,4 +44,19 @@ it("retrieves an exact message only in the authenticated workspace and without a
   expect(await response.json()).toEqual({ id: "message-a", status: "draft" });
   expect(mocks.messageGet).toHaveBeenCalledWith("org-a", "message-a");
   expect(mocks.messageSave).not.toHaveBeenCalled(); expect(mocks.schedule).not.toHaveBeenCalled();
+});
+
+it("recovers an exact Drop in the authenticated workspace without changing artist audience filters", async () => {
+  mocks.dropGet.mockResolvedValue({ id: "drop-a", revision: 1, published: null });
+  const response = await GET({ request: new Request("https://suite.test/api/native/fan-drops?workspaceId=foreign&drop_id=drop-a") } as never);
+  expect(response.status).toBe(200);
+  expect(response.headers.get("cache-control")).toBe("private, no-store");
+  expect(await response.json()).toEqual({ id: "drop-a", revision: 1, published: null });
+  expect(mocks.dropGet).toHaveBeenCalledWith("org-a", "drop-a");
+  expect(mocks.save).not.toHaveBeenCalled(); expect(mocks.publish).not.toHaveBeenCalled();
+  mocks.dropGet.mockClear();
+  expect((await GET({ request: new Request("https://suite.test/api/native/fan-drops?artist_id=artist-a&drop_id=drop-a") } as never)).status).toBe(200);
+  expect(mocks.audience).toHaveBeenCalledWith("org-a", { artist_id: "artist-a", drop_id: "drop-a" });
+  expect(mocks.dropGet).not.toHaveBeenCalled();
+  expect((await GET({ request: new Request("https://suite.test/api/native/fan-drops?drop_id=") } as never)).status).toBe(400);
 });

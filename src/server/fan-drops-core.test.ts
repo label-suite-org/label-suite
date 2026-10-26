@@ -14,6 +14,15 @@ describe("fan subscription trust boundaries", () => {
     expect(saveFanMessageSchema.safeParse({ ...input, expected_revision: 1 }).success).toBe(false);
     expect(saveFanMessageSchema.safeParse({ ...input, recipient_ids: ["injected"] }).success).toBe(false);
   });
+  it("accepts a new Drop creation identity without allowing it on edits or publication input", () => {
+    const input = { creation_id: crypto.randomUUID(), artist_id: "artist-a", release_id: null, slug: "stable-drop",
+      content: { title: " Stable draft ", description: "", artwork_url: null, privacy_url: "https://artist.example/privacy", success_url: null } };
+    expect(saveDropSchema.parse(input).content.title).toBe("Stable draft");
+    expect(saveDropSchema.safeParse({ ...input, creation_id: "invalid" }).success).toBe(false);
+    expect(saveDropSchema.safeParse({ ...input, id: "existing", expected_revision: 1 }).success).toBe(false);
+    expect(saveDropSchema.safeParse({ ...input, expected_revision: 1 }).success).toBe(false);
+    expect(saveDropSchema.safeParse({ ...input, published: input.content }).success).toBe(false);
+  });
   it("binds signed links to purpose, scope and expiry", () => {
     const token = fanToken("confirm", "org-a", "signup-a", 2000);
     expect(readFanToken(token, "confirm", 1000)).toMatchObject({ orgId: "org-a", id: "signup-a" });

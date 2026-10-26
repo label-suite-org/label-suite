@@ -43,6 +43,40 @@ describe.skipIf(!enabled)("native Task audit and revision authority on disposabl
     await sql.end();
   });
 
+  it("creates and acknowledges one native task with one atomic audit across concurrent retries", async () => {
+    const { createOpsTask } = await import("./ops-tasks");
+    const id = randomUUID();
+    const input = { id, task_name: "Arrange rehearsal", due_date: "2027-01-01", priority: "P1", notes: "Fixture only", assignee_ids: [userB] };
+    const results = await Promise.all([1, 2].map(() => runWithDatabaseContext({ userId: userA, orgId: orgA }, () => createOpsTask(orgA, input, userA))));
+    expect(results).toEqual([{ id, ok: true }, { id, ok: true }]);
+    expect(await canonicalTask(orgA, id)).toMatchObject({ task: { id, title: input.task_name, revision: 0, assignee_ids: [userB] } });
+    const audits = await sql`select event_type, actor_user_id from label_suite.audit_events where object_id = ${id}`;
+    expect(audits).toEqual([{ event_type: "task.create", actor_user_id: userA }]);
+    await expect(runWithDatabaseContext({ userId: userA, orgId: orgA }, () => createOpsTask(orgA, { ...input, notes: "Different" }, userA))).rejects.toMatchObject({ status: 409 });
+    await sql`update label_suite.ops_tasks set task_name = 'Edited' where id = ${id}`;
+    await sql`update label_suite.ops_tasks set task_name = ${input.task_name} where id = ${id}`;
+    await expect(runWithDatabaseContext({ userId: userA, orgId: orgA }, () => createOpsTask(orgA, input, userA))).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("rejects foreign collisions, links and assignees without task writes", async () => {
+    const { createOpsTask } = await import("./ops-tasks");
+    const id = randomUUID();
+    await sql`insert into label_suite.ops_tasks (id, org_id, task_name) values (${id}, ${orgB}, 'Foreign')`;
+    const create = (input: Parameters<typeof createOpsTask>[1]) => runWithDatabaseContext({ userId: userA, orgId: orgA }, () => createOpsTask(orgA, input, userA));
+    await expect(create({ id, task_name: "Foreign" })).rejects.toMatchObject({ status: 409 });
+    await expect(create({ id: randomUUID(), task_name: "Foreign artist", linked_artist_id: foreignArtist })).rejects.toMatchObject({ status: 404 });
+    await expect(create({ id: randomUUID(), task_name: "Foreign member", assignee_ids: [foreignUser] })).rejects.toMatchObject({ status: 400 });
+    const [audit] = await sql`select count(*)::int as count from label_suite.audit_events where object_id = ${id}`;
+    expect(audit.count).toBe(0);
+    const workback = randomUUID();
+    await sql`insert into label_suite.ops_tasks (id, org_id, task_name, workback_key) values (${workback}, ${orgA}, 'Existing workback', 'delivery')`;
+    await expect(create({ id: workback, task_name: "Existing workback" })).rejects.toMatchObject({ status: 409 });
+    // An invalid audit actor forces the entire transaction (including the task) to roll back.
+    const rollback = randomUUID();
+    await expect(createOpsTask(orgA, { id: rollback, task_name: "Rollback" }, "missing-actor")).rejects.toThrow();
+    expect(await sql`select id from label_suite.ops_tasks where id = ${rollback}`).toHaveLength(0);
+  });
+
   it("atomically revisions and audits a native action without mutating another task", async () => {
     const result = await runWithDatabaseContext({ userId: userA, orgId: orgA }, () => executeNativeTaskAction(orgA, taskA, { action: "reschedule", expected_revision: 0, due_date: "2026-09-24" }, userA));
     expect(result).toMatchObject({ action: "reschedule", no_change: false, task: { revision: 1, due_date: "2026-09-24" } });

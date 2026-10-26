@@ -1,0 +1,73 @@
+import { randomUUID } from "node:crypto";
+import postgres, { type Sql } from "postgres";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+const enabled = process.env.NATIVE_AFFILIATIONS_INTEGRATION === "1";
+const org = `affiliation-${randomUUID()}`, foreign = `other-${randomUUID()}`;
+const actor = randomUUID(), person = randomUUID(), organization = randomUUID(), otherOrganization = randomUUID(), foreignOrganization = randomUUID();
+let sql: Sql;
+let create: typeof import("./contacts").createContactOrganization;
+let list: typeof import("./native-contact-affiliations").listNativeAffiliations;
+let mutate: typeof import("./native-contact-affiliations").mutateNativeAffiliation;
+describe.skipIf(!enabled)("native affiliation writes on disposable PostgreSQL", () => {
+  beforeAll(async () => {
+    const target = process.env.DATABASE_URL!, url = new URL(target);
+    if (url.hostname !== "127.0.0.1" || url.pathname !== "/native_affiliations_fixture") throw new Error("Disposable affiliation fixture only");
+    sql = postgres(target);
+    ({ createContactOrganization: create } = await import("./contacts"));
+    ({ listNativeAffiliations: list, mutateNativeAffiliation: mutate } = await import("./native-contact-affiliations"));
+    await sql`insert into label_suite.orgs (id,name,slug) values (${org},'Fixture',${org}),(${foreign},'Other',${foreign})`;
+    await sql`insert into label_suite.user (id,name,email,"emailVerified") values (${actor},'Fixture',${`${actor}@example.test`},true)`;
+    await sql`insert into label_suite.contacts (id,org_id,name) values (${person},${org},'Person')`;
+    await sql`insert into label_suite.organizations (id,org_id,name) values (${organization},${org},'Organisation'),(${otherOrganization},${org},'Second'),(${foreignOrganization},${foreign},'Foreign')`;
+  });
+  afterAll(async () => {
+    if (!sql) return;
+    await sql`delete from label_suite.audit_events where org_id in (${org},${foreign})`;
+    await sql`delete from label_suite.contact_organizations where org_id in (${org},${foreign})`;
+    await sql`delete from label_suite.contacts where id=${person}`;
+    await sql`delete from label_suite.organizations where id in (${organization},${otherOrganization},${foreignOrganization})`;
+    await sql`delete from label_suite.user where id=${actor}`;
+    await sql`delete from label_suite.audit_logs where org_id in (${org},${foreign})`;
+    await sql`delete from label_suite.orgs where id in (${org},${foreign})`;
+    await sql.end();
+  });
+  it("acknowledges concurrent exact creation once and refuses different IDs, payloads and changed rows", async () => {
+    const id = randomUUID(), input = { id,contact_id:person,organization_id:organization,title:"Manager" };
+    expect(await Promise.all([create(org,input,actor),create(org,input,actor)])).toEqual([{id,ok:true},{id,ok:true}]);
+    expect(await create(org,input)).toEqual({id,ok:true});
+    expect(await sql`select id from label_suite.audit_events where object_id=${id}`).toHaveLength(1);
+    await expect(create(org,{...input,title:"Changed"})).rejects.toMatchObject({status:409});
+    await expect(create(org,{...input,id:randomUUID()},actor)).rejects.toMatchObject({status:409});
+    const [row] = (await list(org,person,{id})).items;
+    expect(row).toMatchObject({organization_id:organization,title:"Manager",source:"manual"});
+    expect(await mutate(org,person,{id,expected_revision:row.revision,department:"Booking"},actor,false)).toEqual({id,ok:true});
+    const [updated] = (await list(org,person,{id})).items;
+    expect(updated).toMatchObject({title:"Manager",department:"Booking",source:"manual"});
+    await expect(create(org,input,actor)).rejects.toMatchObject({status:409});
+    await expect(mutate(org,person,{id,expected_revision:row.revision,title:"Stale"},actor,false)).rejects.toMatchObject({status:409});
+    await expect(mutate(org,person,{id,expected_revision:row.revision},actor,true)).rejects.toMatchObject({status:409});
+    expect(await mutate(org,person,{id,expected_revision:updated.revision},actor,true)).toEqual({id,ok:true});
+    await expect(list(org,person,{id})).rejects.toMatchObject({status:404});
+    expect(await sql`select id from label_suite.contacts where id=${person}`).toHaveLength(1);
+    expect(await sql`select id from label_suite.organizations where id=${organization}`).toHaveLength(1);
+  });
+  it("denies foreign link targets, foreign ID collisions and cross-person recovery", async () => {
+    await expect(create(org,{contact_id:person,organization_id:foreignOrganization},actor)).rejects.toMatchObject({status:404});
+    await expect(create(org,{contact_id:organization,organization_id:otherOrganization},actor)).rejects.toMatchObject({status:404});
+    const id=randomUUID();
+    await sql`insert into label_suite.contact_organizations(id,org_id,contact_id,organization_id) values (${id},${foreign},${person},${foreignOrganization})`;
+    await expect(create(org,{id,contact_id:person,organization_id:organization},actor)).rejects.toMatchObject({status:409});
+    await expect(list(org,person,{id})).rejects.toMatchObject({status:404});
+    await expect(list(org,organization,{})).rejects.toMatchObject({status:404});
+  });
+  it("rolls creation, edits and unlink back when audit fails", async () => {
+    const id=randomUUID(), input={id,contact_id:person,organization_id:otherOrganization};
+    await expect(create(org,input,"missing-actor")).rejects.toThrow();
+    expect(await sql`select id from label_suite.contact_organizations where id=${id}`).toHaveLength(0);
+    await create(org,input,actor);
+    const [row]=(await list(org,person,{id})).items;
+    await expect(mutate(org,person,{id,expected_revision:row.revision,title:"No commit"},"missing-actor",false)).rejects.toThrow();
+    await expect(mutate(org,person,{id,expected_revision:row.revision},"missing-actor",true)).rejects.toThrow();
+    expect((await list(org,person,{id})).items[0]).toMatchObject({revision:row.revision,title:null});
+  });
+});
