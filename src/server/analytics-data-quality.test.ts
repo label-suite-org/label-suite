@@ -349,7 +349,7 @@ it("clears historical failures after a successful run but retains the current fa
 
 
 describe("provider reconciliation", () => {
-  const filters = { providerFilterState: { artist: "Fixture Artist", track: "Recording A", dateRange: "14 Days", aggregation: "Daily" } };
+  const filters = { providerFilterState: { artist: "Fixture Artist", track: "Recording A", dateRange: "2026-07-01 to 2026-07-14", aggregation: "Daily" } };
   const catalogue = { widgetKey: "tracks-by-growth-rate", trackId: null, metrics: { apple_streams: 20 }, dimensions: {}, rawRow: {}, requestedDateRange: "14 Days", requestedAggregation: "Daily" };
   const daily = { ...catalogue, widgetKey: "apple-streams-source", trackId: "recording-id", metrics: { streams: 75 }, dimensions: { _col0: "2026-07-01" } };
   it("detects a daily recording exceeding the entire reported catalogue without a title join", () => {

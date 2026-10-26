@@ -59,7 +59,7 @@ export function evaluateAnalyticsProviderIntegrity(rows: readonly Pick<EvidenceD
     reporting.push({ widgetKey, from: dates[0] ?? null, through: dates.at(-1) ?? null });
     // Compare only this import's matching filter grain; never join recordings by title.
     if (!daily.length || !catalogue.length || !field("dateRange") || !field("track")
-      || [...daily, ...catalogue].some(row => row.requestedDateRange !== field("dateRange") || row.requestedAggregation !== "Daily")) continue;
+      || [...daily, ...catalogue].some(row => row.requestedDateRange !== catalogue[0].requestedDateRange || row.requestedAggregation !== "Daily")) continue;
     const knownCatalogue = catalogue.map(row => row.metrics[`${platform}_streams`]).filter((value): value is number => typeof value === "number" && Number.isFinite(value));
     const knownDaily = daily.map(row => row.metrics.streams);
     if (!knownCatalogue.length || knownDaily.some(value => typeof value !== "number" || !Number.isFinite(value))) continue;
