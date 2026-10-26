@@ -487,7 +487,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
             continue;
           }
           await page.screenshot({ path: path.join(failureDir, `${safeFileName(widget.key)}.png`), fullPage: true }).catch(() => undefined);
-          const safeWidgetResolutionError = `Could not resolve exactly one .widget-container for widget '${widget.key}'.`;
+          const safeWidgetResolutionError = `Could not resolve exactly one ready .widget-container for widget '${widget.key}'.`;
           if (errorMessage(error) === safeWidgetResolutionError) throw new Error(safeWidgetResolutionError);
           throw new Error(`Failed to download widget '${widget.key}' without a safely observable export action.`);
         }
@@ -743,7 +743,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     actionTimeoutMs: number,
     downloadTimeoutMs: number,
   ): Promise<WidgetDownloadResult> {
-    const widgetRoot = await resolveWidgetRoot(page, widget);
+    const widgetRoot = await resolveWidgetRoot(page, widget, actionTimeoutMs);
     const downloadLabel = widget.downloadLabel ?? "Download Data";
     const visiblePageActionsBeforeMenu = await visiblePageDownloadActions(page, downloadLabel);
     let pageDownloadAction: ElementHandle | null = null;
@@ -803,20 +803,22 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     }
   }
 
-  async function resolveWidgetRoot(page: Page, widget: WidgetTarget): Promise<Locator> {
+  async function resolveWidgetRoot(page: Page, widget: WidgetTarget, timeoutMs: number): Promise<Locator> {
     if (!widget.title) throw new Error(`Widget '${widget.key}' requires a title to resolve its .widget-container.`);
-    const titleMatches = page.getByText(widget.title, { exact: true });
-    const rootIndexes = await titleMatches.evaluateAll((elements) => {
-      const widgetContainers = [...document.querySelectorAll(".widget-container")];
-      return [...new Set(elements.map((element) => {
-        const container = element.closest(".widget-container");
-        return container ? widgetContainers.indexOf(container) : -1;
-      }).filter((index) => index >= 0))];
-    });
-    if (rootIndexes.length !== 1) {
-      throw new Error(`Could not resolve exactly one .widget-container for widget '${widget.key}'.`);
-    }
-    return page.locator(".widget-container").nth(rootIndexes[0]);
+    // Filter summaries update before Sisense finishes refreshing the tables.
+    // Keep a live title-scoped locator across rerenders; a numeric index can
+    // point at a different widget after the dashboard replaces its containers.
+    const roots = page.locator(".widget-container").filter({ has: page.getByText(widget.title, { exact: true }) });
+    const deadline = Date.now() + timeoutMs;
+    do {
+      const count = await roots.count();
+      if (count > 1) break;
+      if (count === 1 && await roots.isVisible() && await roots.locator(".widget-loader:visible").count() === 0) {
+        return roots;
+      }
+      if (Date.now() < deadline) await page.waitForTimeout(pollDelayMs(deadline - Date.now()));
+    } while (Date.now() < deadline);
+    throw new Error(`Could not resolve exactly one ready .widget-container for widget '${widget.key}'.`);
   }
 
   async function observedEmptyWidget(widgetRoot: Locator): Promise<string | null> {
