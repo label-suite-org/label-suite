@@ -11,15 +11,13 @@ describe("storage client", () => {
     expect(sanitizeFilename("  Album Art (final).png  ")).toBe("Album-Art-final.png");
   });
 
-  it("uploads directly with a presigned R2 URL", async () => {
+  it("uploads media assets through the bounded server path", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1234);
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(Response.json({
         key: "true-nature/media-assets/1234-cover.png",
         url: null,
-        uploadUrl: "https://signed.example/upload",
       }))
-      .mockResolvedValueOnce(new Response(null, { status: 200 }))
       .mockResolvedValueOnce(Response.json({ variants: [] }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -32,10 +30,21 @@ describe("storage client", () => {
       key: "true-nature/media-assets/1234-cover.png",
       url: null,
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://signed.example/upload");
-    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "PUT" });
-    expect(fetchMock.mock.calls[2]?.[0]).toBe("/api/storage/optimize-image");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/storage/upload?kind=media-asset");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/storage/optimize-image");
+  });
+
+  it("rejects oversized media and document files before sending bytes", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File(["fixture"], "master.wav", { type: "audio/wav" });
+    Object.defineProperty(file, "size", { value: 101 * 1024 * 1024, configurable: true });
+    await expect(uploadFileToStorage(file, "media-assets")).rejects.toThrow("100 MB");
+    Object.defineProperty(file, "size", { value: 26 * 1024 * 1024 });
+    await expect(uploadFileToStorage(file, "documents")).rejects.toThrow("25 MB");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("falls back to the server upload when direct R2 upload is unavailable", async () => {

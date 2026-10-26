@@ -13,6 +13,7 @@ import { assertGrantDocumentSignature, boundedMultipartRequest, MAX_UPLOAD_BYTES
 import { requireSameOrigin } from "../../../server/request-security";
 
 export const prerender = false;
+const MAX_MEDIA_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 const GRANT_DOCUMENT_TYPES = new Map([
   [".pdf", new Set(["application/pdf"])],
@@ -32,18 +33,24 @@ export const POST: APIRoute = async ({ request, locals }) => {
   try {
     requireSameOrigin(request);
     const capabilityOrgId = requireCapability(locals, "grant_documents.mutate");
-    const form = await (await boundedMultipartRequest(request)).formData();
+    const mediaUpload = new URL(request.url).searchParams.get("kind") === "media-asset";
+    if (mediaUpload) requireCapability(locals, "operations.mutate");
+    const maxFileBytes = mediaUpload ? MAX_MEDIA_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
+    const form = await (await boundedMultipartRequest(request, maxFileBytes + 1024 * 1024)).formData();
     const contextValue = form.get("context");
     const fileValue = form.get("file");
 
     if (!(fileValue instanceof File)) {
       throw new HttpError("File is required", 400);
     }
-    if (fileValue.size > MAX_UPLOAD_BYTES) {
-      throw new HttpError("File is too large. Maximum upload size is 25 MB.", 413);
+    if (fileValue.size > maxFileBytes) {
+      throw new HttpError(`File is too large. Maximum upload size is ${mediaUpload ? 100 : 25} MB.`, 413);
     }
 
     const keyValue = form.get("key");
+    if (mediaUpload && (contextValue !== null || typeof keyValue !== "string" || !keyValue.startsWith("media-assets/"))) {
+      throw new HttpError("Media uploads require a media-assets storage key and no document context", 400);
+    }
     if (typeof contextValue !== "string" || !contextValue.trim()) {
       if (typeof keyValue !== "string" || !keyValue.trim()) throw new HttpError("Storage key is required", 400);
       const orgId = requireCapability(locals, "operations.mutate");
