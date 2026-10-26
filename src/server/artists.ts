@@ -669,8 +669,11 @@ function artistAuditData(row: typeof artists.$inferSelect): Record<string, unkno
   };
 }
 
-export async function reviewArtistBio(orgId: string, artistId: string, actorId: string) {
-  const row = (await db
+export async function reviewArtistBio(orgId: string, artistId: string, actorId: string, options: {
+  expectedHash?: string; executor?: Pick<typeof db, "select" | "update">;
+} = {}) {
+  const executor = options.executor ?? db;
+  const row = (await executor
     .select({
       id: artists.id,
       bio: artists.bio,
@@ -691,8 +694,12 @@ export async function reviewArtistBio(orgId: string, artistId: string, actorId: 
     throw new ConflictError("Review unavailable: replace the invalid biography draft before reviewing");
   }
   if (derived.state === "missing") throw new ConflictError("Artist biography is missing");
+  if (options.expectedHash && options.expectedHash !== derived.hash) {
+    throw new ConflictError("Artist biography changed before review; refresh and review the current draft");
+  }
+  if (options.expectedHash && derived.state === "reviewed") return { ok: true, state: "reviewed" as const, hash: derived.hash };
 
-  const reviewed = await db.update(artists).set({
+  const reviewed = await executor.update(artists).set({
     bio_document: derived.document as unknown as Record<string, unknown>,
     bio: derived.plainText,
     bio_html: derived.html,

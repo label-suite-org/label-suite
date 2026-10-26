@@ -5,7 +5,7 @@ import { artists, releases, project_events } from "../../../db/schema";
 import { db, runWithDatabaseContext } from "../../../lib/db";
 import { json } from "../../../server/api";
 import { HttpError } from "../../../server/errors";
-import { listFanDrops, saveFanDrop, publishFanDrop, fanAudience } from "../../../server/fan-drops";
+import { getFanDrop, listFanDrops, saveFanDrop, publishFanDrop, fanAudience } from "../../../server/fan-drops";
 import { canonicalAppOrigin } from "../../../server/request-security";
 import { publicDropPath } from "../../../server/fan-drops";
 import { writeAuditLog } from "../../../server/audit";
@@ -27,6 +27,7 @@ export const GET: APIRoute = async ({ request }) => {
     return json(await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => {
       const params = new URL(request.url).searchParams;
       if (params.has("message_id")) return getFanMessage(actor.workspace.org.id, fanId.parse(params.get("message_id")));
+      if (params.has("drop_id") && !params.has("artist_id")) return getFanDrop(actor.workspace.org.id, fanId.parse(params.get("drop_id")));
       if (params.get("history")) return fanHistory(actor.workspace.org.id, params.get("history")!);
       if (params.get("fans")) return { fans: await listFans(actor.workspace.org.id, params.get("fans")!) };
       if (params.get("artist_id")) {

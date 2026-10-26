@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
         where: vi.fn(async () => selectRows.length ? selectRows.shift()! : existingRows),
       })),
     })),
-    insert: vi.fn(() => ({ values: vi.fn((value: Record<string, unknown>) => ({ onConflictDoNothing: vi.fn(async () => inserted.push(value)) })) })),
+    insert: vi.fn(() => ({ values: vi.fn((value: Record<string, unknown>) => ({ onConflictDoNothing: vi.fn(() => ({ returning: vi.fn(async () => { inserted.push(value); return [{ ...value, revision: 0 }]; }) })) })) })),
     update: vi.fn(() => ({
       set: vi.fn((value: Record<string, unknown>) => {
         updated.push(value);
