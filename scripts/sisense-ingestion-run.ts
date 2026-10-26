@@ -14,7 +14,7 @@ import {
 } from "./analytics-sandbox-replace-evidence";
 import { createWakeableCancellation, pollDelayMs, NoDownloadAvailableError, resolveNewPageDownloadAction, visiblePageDownloadActions, type WakeableCancellation } from "./sisense-action-boundary";
 import type { DiagnosticFailureCode } from "./sisense-diagnostic-failure";
-import { formatSisenseCustomRangeDate, previousCalendarDayInTimeZone, resolveSisenseTimeZone } from "./sisense-date-range";
+import { formatSisenseCustomRangeDate, sisenseDateRangeSummary, resolveSisenseTimeZone } from "./sisense-date-range";
 import { buildImportCompleteness, parseSisenseMetric } from "./sisense-import-snapshot";
 
 const SOURCE = "sisense";
@@ -542,7 +542,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     requestedAggregation: string,
     providerScope: ProviderScopeSelection,
   ): Promise<ProviderFilterState> {
-    const requestedDateSummary = requestedDateRangeSummary(requestedDateRange);
+    const requestedDateSummary = sisenseDateRangeSummary(requestedDateRange, new Date(), resolveSisenseTimeZone(process.env.SISENSE_TIME_ZONE));
     if (readBooleanEnv("SISENSE_SKIP_FILTERS", false)) {
       console.log("Skipping Sisense filter UI; verifying dashboard defaults match the requested state.");
       return {
@@ -562,8 +562,8 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     if (providerScope.artist) await selectProviderValue(page, "True_Nature_Artists", providerScope.artist);
     if (providerScope.track) await selectProviderValue(page, "True_Nature_Tracks", providerScope.track);
     await selectProviderDimensionOption(page, "Aggregation", requestedAggregation, "aggregation");
-    if (requestedDateRange === "Yesterday") {
-      await selectYesterdayCustomRange(page, requestedDateSummary);
+    if (requestedDateSummary !== requestedDateRange) {
+      await selectCustomRange(page, requestedDateSummary);
     } else {
       await selectProviderDimensionOption(page, "DateRange", requestedDateRange, "date range");
     }
@@ -641,7 +641,7 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     }
   }
 
-  async function selectYesterdayCustomRange(page: Page, expectedSummary: string): Promise<void> {
+  async function selectCustomRange(page: Page, expectedSummary: string): Promise<void> {
     const editor = await openProviderDimensionEditor(page, "DateRange");
     const customRange = await resolveProviderOption(editor, "Custom Range", "date range");
     const clickTarget = await resolveDateRangeOptionClickTarget(customRange);
@@ -654,17 +654,17 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
       throw new Error("Could not resolve exactly two scoped Custom Range date inputs.");
     }
     const [startDate, endDate] = expectedSummary.split(" to ");
-    if (!startDate || startDate !== endDate) throw new Error(`Invalid Yesterday custom range summary '${expectedSummary}'.`);
-    const providerDate = formatSisenseCustomRangeDate(startDate);
     for (let index = 0; index < 2; index += 1) {
+      const isoDate = index === 0 ? startDate : endDate;
+      const providerDate = formatSisenseCustomRangeDate(isoDate);
       const input = inputs.nth(index);
       if (!(await isVisible(input, 1_000))) {
         throw new Error(`Scoped Custom Range input ${index + 1} is not visible after selecting Custom Range.`);
       }
       await input.fill(providerDate);
       const observedDate = await input.inputValue();
-      if (observedDate !== startDate && observedDate !== providerDate) {
-        throw new Error(`Scoped Custom Range input ${index + 1} did not match accepted ISO '${startDate}' or provider '${providerDate}'.`);
+      if (observedDate !== isoDate && observedDate !== providerDate) {
+        throw new Error(`Scoped Custom Range input ${index + 1} did not match accepted ISO '${isoDate}' or provider '${providerDate}'.`);
       }
     }
   }
@@ -731,12 +731,6 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
 
   function normalizeProviderOptionLabel(label: string): string {
     return label.trim().replace(/\s+\(DEFAULT\)\s*$/i, "");
-  }
-
-  function requestedDateRangeSummary(requestedDateRange: string): string {
-    if (requestedDateRange !== "Yesterday") return requestedDateRange;
-    const yesterday = previousCalendarDayInTimeZone(new Date(), resolveSisenseTimeZone(process.env.SISENSE_TIME_ZONE));
-    return `${yesterday} to ${yesterday}`;
   }
 
   async function downloadWidget(

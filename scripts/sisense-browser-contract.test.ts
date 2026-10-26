@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { chromium, type Browser } from "playwright";
 import { resolveNewPageDownloadAction } from "./sisense-action-boundary";
-import { previousCalendarDayInTimeZone } from "./sisense-date-range";
+import { previousCalendarDayInTimeZone, sisenseDateRangeSummary } from "./sisense-date-range";
 
 const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const npmCli = process.env.npm_execpath;
@@ -473,7 +473,7 @@ describe("Sisense browser contract", () => {
         requestedDateRange: "7 Days",
         requestedAggregation: "Daily",
         observedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
-        providerFilterState: { artist: "True Blue", aggregation: "Daily", dateRange: "7 Days", track: "cherry-coloured funk" },
+        providerFilterState: { artist: "True Blue", aggregation: "Daily", dateRange: sisenseDateRangeSummary("7 Days", new Date(), "Europe/Copenhagen"), track: "cherry-coloured funk" },
         databaseLockHeld: false,
         effectiveWidgetKeys: ["apple-streams-source", "shazams-city", "tracks-by-growth-rate"],
         effectiveWidgetCount: 3,
@@ -611,7 +611,7 @@ describe("Sisense browser contract", () => {
       expect(manifest.providerFilterState).toEqual({
         artist: "True Blue",
         aggregation: "Daily",
-        dateRange: "7 Days",
+        dateRange: sisenseDateRangeSummary("7 Days", new Date(), "Europe/Copenhagen"),
         track: "cherry-coloured funk",
       });
       expect(fixture.filterEvents).toContain("artist-select:True Blue");
@@ -654,10 +654,10 @@ describe("Sisense browser contract", () => {
 
       expect(result.status).toBe(0);
       expect(result.output).toContain("Downloaded tracks-by-growth-rate");
-      expect(fixture.filterEvents).toContain("date-range-select:7 Days");
+      expect(fixture.filterEvents).toContain("date-range-select:Custom Range");
       expect(fixture.filterEvents).toContain("date-range-option-selected:true");
       expect(fixture.filterEvents).toContain("filters-applied");
-      expect(fixture.filterEvents).toContain("date-range-summary:7 Days");
+      expect(fixture.filterEvents).toContain(`date-range-summary:${sisenseDateRangeSummary("7 Days", new Date(), "Europe/Copenhagen")}`);
     } finally {
       await fixture.close();
       await rm(directory, { recursive: true, force: true });
