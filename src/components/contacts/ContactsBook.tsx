@@ -334,7 +334,7 @@ export function ContactsBook({
           <div className="shrink-0 border-b border-border bg-muted/75 p-3 backdrop-blur">
             <div className="mb-3 grid grid-cols-3 rounded-md border border-border bg-background p-1">
               {(["people", "organizations", "all"] as ViewMode[]).map((mode) => (
-                <Button
+                <Button variant="ghost"
                   key={mode}
                   type="button"
                   onClick={() => setViewMode(mode)}
@@ -504,11 +504,11 @@ function DirectoryPeopleList({
               const selectedRow = selected.kind === "person" && selected.id === contact.id;
               const primary = primaryOrganization(contact);
               return (
-                <Button
+                <Button variant="ghost"
                   key={contact.id}
                   type="button"
                   onClick={() => onSelect(contact.id)}
-                  className={`grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2.5 text-left transition ${
+                  className={`grid h-auto min-h-12 w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2.5 text-left transition ${
                     selectedRow ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-foreground hover:bg-background/70"
                   }`}
                 >
@@ -547,11 +547,11 @@ function DirectoryOrganizationList({
             {group.map((organization) => {
               const selectedRow = selected.kind === "organization" && selected.id === organization.id;
               return (
-                <Button
+                <Button variant="ghost"
                   key={organization.id}
                   type="button"
                   onClick={() => onSelect(organization.id)}
-                  className={`grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2.5 text-left transition ${
+                  className={`grid h-auto min-h-12 w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-md px-3 py-2.5 text-left transition ${
                     selectedRow ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-foreground hover:bg-background/70"
                   }`}
                 >

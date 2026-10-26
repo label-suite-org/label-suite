@@ -72,14 +72,15 @@ export function CampaignManager({
   artists: Array<{ id: string; name: string }>;
   canMutate?: boolean;
 }) {
+  const statusKey = (status: string | null) => status?.trim().toLowerCase() || "planning";
   const grouped = STATUS_ORDER.map((status) => ({
     status,
     label: STATUS_LABELS[status] || status,
-    items: campaigns.filter((c) => (c.status || "planning") === status),
+    items: campaigns.filter((c) => statusKey(c.status) === status),
   }));
 
   const otherStatuses = campaigns.filter(
-    (c) => !STATUS_ORDER.includes(c.status || "planning")
+    (c) => !STATUS_ORDER.includes(statusKey(c.status))
   );
   const otherLabel = otherStatuses.length > 0 ? "Other" : null;
 
@@ -118,8 +119,8 @@ export function CampaignManager({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="font-medium text-sm leading-snug">{c.campaign_name}</p>
-                      <span className={`shrink-0 text-[10px] px-1.5 py-0.5 font-medium border ${STATUS_COLORS[c.status || "planning"]}`}>
-                        {STATUS_LABELS[c.status || "planning"] || c.status}
+                      <span className={`shrink-0 text-[10px] px-1.5 py-0.5 font-medium border ${STATUS_COLORS[statusKey(c.status)]}`}>
+                        {STATUS_LABELS[statusKey(c.status)] || c.status}
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-1">

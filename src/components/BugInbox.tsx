@@ -78,7 +78,7 @@ export function BugInbox({ initialBugs }: { initialBugs: Bug[] }) {
     P0: "bg-red-100 text-red-700",
     P1: "bg-orange-100 text-orange-700",
     P2: "bg-neutral-100 text-neutral-600",
-    P3: "bg-neutral-50 text-neutral-400",
+    P3: "bg-neutral-50 text-muted-foreground",
   };
 
   return (
@@ -100,7 +100,7 @@ export function BugInbox({ initialBugs }: { initialBugs: Bug[] }) {
             <div className="flex items-center gap-2">
               <span className={`text-xs px-2 py-0.5 rounded font-medium ${priorityColor[b.priority || "P3"]}`}>{b.priority || "P3"}</span>
               <span className="font-medium text-sm flex-1">{b.title}</span>
-              {b.auto_generated && <span className="text-xs text-neutral-400">auto</span>}
+              {b.auto_generated && <span className="text-xs text-muted-foreground">auto</span>}
             </div>
             {b.description && <p className="text-xs text-neutral-500 mt-1">{b.description}</p>}
             <div
@@ -134,7 +134,7 @@ export function BugInbox({ initialBugs }: { initialBugs: Bug[] }) {
           </div>
         ))}
         {!bugs.length && (
-          <p className="flex items-center gap-2 text-sm text-neutral-400">
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <CheckCircle2 className="h-4 w-4" />
             No open bugs.
           </p>

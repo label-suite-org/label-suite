@@ -389,3 +389,16 @@ describe("GrantsFundingCockpit", () => {
     expect(html).toContain("Filter assets by freshness");
   });
 });
+
+it("opens only an application present in the workspace supplied by the tenant-scoped server", () => {
+  const application = { id: "app-deep-link", name: "Deep-linked application", notes: "Specific application notes", workflowStage: "draft", outcome: null, priority: "medium", currency: "DKK", amountRequested: 0, amountAwarded: 0, assetReadiness: { ready: 0, total: 0, missing: 0, stale: 0 }, documents: [], allocations: [], checklist: [] } as unknown as GrantApplicationView;
+  const workspace = { ...emptyWorkspace, applications: [application] };
+  const html = renderToStaticMarkup(<GrantsFundingCockpit workspace={workspace} initialApplicationId="app-deep-link" />);
+  expect(html).toContain("Edit application");
+  expect(html).toContain("Specific application notes");
+  const missing = renderToStaticMarkup(<GrantsFundingCockpit workspace={workspace} initialApplicationId="other-workspace-id" />);
+  expect(missing).toContain("This application is unavailable in this workspace.");
+  expect(missing).not.toContain("Edit application");
+  const readOnly = renderToStaticMarkup(<GrantsFundingCockpit workspace={workspace} initialApplicationId="app-deep-link" canMutate={false} />);
+  expect(readOnly).not.toContain("Edit application");
+});

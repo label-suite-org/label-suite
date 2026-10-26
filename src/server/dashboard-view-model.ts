@@ -271,7 +271,7 @@ function presentTaskRow(task: TaskDashboardInput): DashboardRow {
     title: task.task_name,
     detail: task.next_action ?? ([task.artist_name, task.release_title].filter(Boolean).join(" · ") || "Open task"),
     meta: task.due_date ? formatDate(task.due_date) : undefined,
-    href: "/ops-tasks",
+    href: `/ops-tasks?task=${encodeURIComponent(task.id)}`,
   };
 }
 

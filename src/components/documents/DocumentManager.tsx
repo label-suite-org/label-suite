@@ -164,7 +164,7 @@ export function DocumentManager({
           placeholder="Search documents, artists, releases, contacts..."
           className="flex-1 min-w-[240px] px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
         />
-        <NativeSelect
+        <NativeSelect aria-label="Document status"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
           className="px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
@@ -181,7 +181,7 @@ export function DocumentManager({
           <option value="missing">Missing file</option>
           <option value="unreviewed">Unreviewed</option>
         </NativeSelect>
-        {canMutate ? <Button onClick={() => setCreating(true)} className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 shrink-0">
+        {canMutate ? <Button variant="secondary" onClick={() => setCreating(true)} className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 shrink-0">
           + Add document
         </Button> : <span className="text-sm text-muted-foreground">Read-only for fundraiser</span>}
       </div>
@@ -210,11 +210,11 @@ export function DocumentManager({
               </div>
               <div className="bg-card border border-border rounded-xl divide-y divide-border">
                 {rows.map((doc) => (
-                  <div key={doc.id} className="p-4 flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
+                  <div key={doc.id} className="p-4 flex flex-col sm:flex-row items-start justify-between gap-4">
+                    <div className="min-w-0 w-full flex-1">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{doc.name}</p>
+                          <p className="font-medium text-sm break-words sm:truncate">{doc.name}</p>
                           <p className="text-xs text-muted-foreground truncate">
                             {[doc.doc_type, doc.artist_name && `Artist: ${doc.artist_name}`, doc.release_title && `Release: ${doc.release_title}`, doc.contact_name && `Contact: ${doc.contact_name}`, doc.project_name && `Project: ${doc.project_name}`, doc.grant_application_count ? `Grant evidence (${doc.grant_application_count})` : null].filter(Boolean).join(" · ") || "No owner"}
                           </p>
@@ -232,10 +232,10 @@ export function DocumentManager({
                     </div>
                     <div className="flex gap-1 shrink-0">
                       {doc.file_link && (
-                        <Button onClick={() => openFile(doc.file_link)} className="px-2.5 py-1 text-xs rounded-md bg-muted hover:bg-muted/80">Open</Button>
+                        <Button variant="secondary" onClick={() => openFile(doc.file_link)} className="px-2.5 py-1 text-xs rounded-md bg-muted hover:bg-muted/80">Open</Button>
                       )}
-                      {canMutate && <><Button onClick={() => setEditingId(doc.id)} className="px-2.5 py-1 text-xs rounded-md bg-muted hover:bg-muted/80">{attentionFor(doc).orphaned ? "Repair ownership" : "Edit"}</Button>
-                      <Button onClick={() => deleteDocument(doc.id)} className="px-2.5 py-1 text-xs rounded-md bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400">Delete</Button></>}
+                      {canMutate && <><Button variant="secondary" onClick={() => setEditingId(doc.id)} className="px-2.5 py-1 text-xs rounded-md bg-muted hover:bg-muted/80">{attentionFor(doc).orphaned ? "Repair ownership" : "Edit"}</Button>
+                      <Button variant="secondary" onClick={() => deleteDocument(doc.id)} className="px-2.5 py-1 text-xs rounded-md bg-red-50 hover:bg-red-100 text-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400">Delete</Button></>}
                     </div>
                   </div>
                 ))}

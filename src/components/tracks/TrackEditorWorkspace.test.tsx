@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TrackEditorWorkspace, parseTrackRoute, trackFocusId } from "./TrackEditorWorkspace";
 
 describe("TrackEditorWorkspace routing helpers", () => {
@@ -57,5 +57,49 @@ it("selects a track for editing and keeps its full checks available on demand", 
   } finally {
     await act(async () => root.unmount());
     host.remove();
+  }
+});
+
+
+it("keeps a dirty track when switching is cancelled, including filters and page departure", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  window.history.replaceState(null, "", "/releases/release-1/tracks");
+  const host = document.createElement("div"); document.body.append(host);
+  const root = createRoot(host);
+  const tracks = [
+    { id: "one", title: "First song", release_id: "release-1", position: 1, version: "Main", isrc: null, audio_url: null, duration: null, work_id: null, track_ready: false },
+    { id: "two", title: "Second song", release_id: "release-1", position: 2, version: "Main", isrc: null, audio_url: null, duration: null, work_id: null, track_ready: true },
+  ];
+  try {
+    await act(async () => root.render(<TrackEditorWorkspace release={{ id: "release-1", title: "Release" }} tracks={tracks} works={[]} />));
+    const input = [...host.querySelectorAll<HTMLInputElement>("aside input")].find(input => input.value === "First song")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Unsaved correction");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const second = [...host.querySelectorAll<HTMLButtonElement>("section button")].find(button => button.textContent?.includes("Second song"))!;
+    await act(async () => second.click());
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain("Discard unsaved track changes?");
+    const keep = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === "Keep editing")!;
+    await act(async () => keep().click());
+    expect(input.value).toBe("Unsaved correction");
+    expect(host.querySelector("aside h2")?.textContent).toBe("First song");
+    const ready = [...host.querySelectorAll<HTMLButtonElement>("[aria-label='Filter tracks'] button")].find(button => button.textContent === "Ready")!;
+    await act(async () => ready.click());
+    expect(host.querySelector("aside h2")?.textContent).toBe("First song");
+    expect(input.value).toBe("Unsaved correction");
+    await act(async () => keep().click());
+    const departure = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(departure);
+    expect(departure.defaultPrevented).toBe(true);
+    await act(async () => second.click());
+    const discard = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === "Discard changes")!;
+    await act(async () => discard.click());
+    expect(host.querySelector("aside h2")?.textContent).toBe("Second song");
+    const cleanDeparture = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(cleanDeparture);
+    expect(cleanDeparture.defaultPrevented).toBe(false);
+  } finally {
+    await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
   }
 });
