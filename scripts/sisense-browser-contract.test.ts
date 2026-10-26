@@ -32,14 +32,17 @@ async function startDashboardFixture(input: {
   portalAppleMenu?: boolean;
   sharedDownloadPortal?: boolean;
   tracksPlaceholder?: "once" | "always";
+  tracksRefresh?: "delayed" | "stuck";
   portalPlaylistMenu?: boolean;
 }): Promise<DashboardFixture> {
   const filterEvents: string[] = [];
   let tracksDownloads = 0;
+  let tracksReady = !input.tracksRefresh;
   const server = createServer((request, response) => {
     const filterEvent = request.url?.match(/^\/filter-event\/([^?]+)/)?.[1];
     if (filterEvent) {
       filterEvents.push(decodeURIComponent(filterEvent));
+      if (filterEvent === "tracks-refreshed") tracksReady = true;
       response.writeHead(204);
       response.end();
       return;
@@ -54,7 +57,7 @@ async function startDashboardFixture(input: {
       tracksDownloads += 1;
       response.end(input.tracksPlaceholder === "always" || (input.tracksPlaceholder === "once" && tracksDownloads === 1)
         ? "There is no data for this csv.\n"
-        : "Track,Streams\nTrack One,19\n");
+        : tracksReady ? "Track,Streams\nTrack One,19\n" : "Track,Streams\nStale Track,999\n");
       return;
     }
     if (request.url === "/apple.csv") {
@@ -262,6 +265,22 @@ async function startDashboardFixture(input: {
         document.getElementById("apply").addEventListener("click", () => {
           if (!customRange.hidden && startInput.value && endInput.value && ${input.activateRequestedRange}) {
             dateRangeSummary.querySelector(".label").textContent = normalizeDate(startInput.value) + " to " + normalizeDate(endInput.value);
+          }
+          if (${Boolean(input.tracksRefresh)}) {
+            const widget = document.getElementById("tracks-more").closest(".widget-container");
+            const title = widget.querySelector("h2");
+            title.textContent = "";
+            const loader = document.createElement("div");
+            loader.className = "loader widget-loader";
+            loader.textContent = "Loading";
+            widget.append(loader);
+            setTimeout(() => { title.textContent = "Tracks by Growth Rate"; }, 900);
+            if (${input.tracksRefresh === "delayed"}) setTimeout(() => {
+              const request = new XMLHttpRequest();
+              request.open("GET", "/filter-event/tracks-refreshed", false);
+              request.send();
+              loader.remove();
+            }, 1600);
           }
           record("filters-applied");
           record("aggregation-summary:" + aggregationSummary.querySelector(".label").textContent);
@@ -730,6 +749,26 @@ describe("Sisense browser contract", () => {
     }
   }, 30_000);
 
+  it.each(["delayed", "stuck"] as const)("waits for a %s provider refresh before exporting", async (tracksRefresh) => {
+    const fixture = await startDashboardFixture({ activateRequestedRange: true, tracksRefresh });
+    const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-refresh-"));
+    try {
+      const result = await runScrape({ dashboardUrl: fixture.url, downloadDir: directory,
+        widgets: [{ key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" }] });
+      expect(result.status).toBe(tracksRefresh === "delayed" ? 0 : 1);
+      if (tracksRefresh === "delayed") {
+        const { runDir, manifest } = await readScrapeRun(directory);
+        expect(manifest.completeness.state).toBe("complete");
+        expect(await readFile(path.join(runDir, manifest.files[0].fileName), "utf8")).toBe("Track,Streams\nTrack One,19\n");
+      } else {
+        expect(result.output).not.toContain("Downloaded");
+      }
+    } finally {
+      await fixture.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it("fails before downloading when a widget title resolves to duplicate containers", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, duplicateTrackTitle: true });
     const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-duplicate-title-"));
@@ -737,7 +776,7 @@ describe("Sisense browser contract", () => {
     try {
       const result = await runScrape({ dashboardUrl: fixture.url, downloadDir: directory });
       expect(result.status).toBe(1);
-      expect(result.output).toContain("Could not resolve exactly one .widget-container for widget 'tracks-by-growth-rate'.");
+      expect(result.output).toContain("Could not resolve exactly one ready .widget-container for widget 'tracks-by-growth-rate'.");
       expect(result.output).not.toContain("Downloaded");
     } finally {
       await fixture.close();
