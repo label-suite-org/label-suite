@@ -25,7 +25,7 @@ export function RoyaltiesOverview({ dashboard }: { dashboard: RoyaltiesDashboard
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <div className={`text-sm font-medium ${summary.readyToPay ? "text-emerald-600" : "text-red-600"}`}>
+        <div className={`text-sm font-medium ${summary.readyToPay ? "text-emerald-700 dark:text-emerald-400" : "text-red-600"}`}>
           <span className="inline-flex items-center gap-1.5">
             {summary.readyToPay ? <ShieldCheck className="h-4 w-4" /> : <CircleAlert className="h-4 w-4" />}
             {summary.readyToPay ? "Ready" : "Blocked"}

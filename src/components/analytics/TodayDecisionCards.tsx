@@ -96,7 +96,7 @@ function DecisionCard({ card }: { card: TodayHubCard }) {
       {card.linkUrl && (
         <a
           href={card.linkUrl}
-          className={`mt-3 inline-flex items-center gap-1 text-xs font-medium ${TONE_LINK[card.tone]} opacity-70 transition group-hover:opacity-100`}
+          className={`mt-3 inline-flex items-center gap-1 text-xs font-medium ${TONE_LINK[card.tone]} transition`}
         >
           <span>{card.linkLabel ?? "Open"}</span>
           <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />

@@ -40,11 +40,17 @@ const VIEWS: Array<{ id: WorkspaceView; label: string; icon: typeof Target }> = 
   { id: "calendar", label: "Calendar & reporting", icon: CalendarRange },
 ];
 
-export default function GrantsFundingCockpit({ workspace, currentUserName = null, canMutate = true, initialWorklist = [], initialNewApplicationProjectId = null, initialGrantId = null }: { workspace: GrantsWorkspacePayload; initialGrantId?: string | null; currentUserName?: string | null; canMutate?: boolean; initialWorklist?: GrantsWorklistItem[]; initialNewApplicationProjectId?: string | null }) {
+export default function GrantsFundingCockpit({ workspace, currentUserName = null, canMutate = true, initialWorklist = [], initialNewApplicationProjectId = null, initialGrantId = null, initialApplicationId = null }: { workspace: GrantsWorkspacePayload; initialApplicationId?: string | null; initialGrantId?: string | null; currentUserName?: string | null; canMutate?: boolean; initialWorklist?: GrantsWorklistItem[]; initialNewApplicationProjectId?: string | null }) {
   const [liveWorkspace, setLiveWorkspace] = useState(workspace);
-  const [activeView, setActiveView] = useState<WorkspaceView>(initialGrantId ? "opportunities" : "worklist");
+  const [activeView, setActiveView] = useState<WorkspaceView>(initialApplicationId ? "applications" : initialGrantId ? "opportunities" : "worklist");
   const [selectedProject, setSelectedProject] = useState<FundingProjectView | null>(null);
-  const [applicationDrawer, setApplicationDrawer] = useState<ApplicationDrawerSeed | null>(() => initialNewApplicationProjectId ? { projectId: initialNewApplicationProjectId } : null);
+  const [applicationDrawer, setApplicationDrawer] = useState<ApplicationDrawerSeed | null>(() => {
+    if (initialApplicationId && canMutate) {
+      const application = workspace.applications.find(item => item.id === initialApplicationId);
+      return application ? { application } : null;
+    }
+    return initialNewApplicationProjectId ? { projectId: initialNewApplicationProjectId } : null;
+  });
   const [opportunityEditor, setOpportunityEditor] = useState<GrantsWorkspacePayload["opportunities"][number] | "new" | null>(null);
   const [needEditor, setNeedEditor] = useState<{ project: FundingProjectView; need?: FundingProjectView["needs"][number] } | null>(null);
   const summary = useMemo(() => buildWorkspaceSummary(liveWorkspace), [liveWorkspace]);
@@ -73,6 +79,7 @@ export default function GrantsFundingCockpit({ workspace, currentUserName = null
 
   return (
     <div className="space-y-6">
+      {initialApplicationId && !liveWorkspace.applications.some(item => item.id === initialApplicationId) && <p role="status">This application is unavailable in this workspace.</p>}
       {!canMutate && <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">Read-only for your role</p>}
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">

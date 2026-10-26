@@ -121,3 +121,8 @@ it("guides an empty workspace without inventing readiness and graduates when wor
   expect(buildPersonalDashboardModel({ ...empty, openTaskCount: 1 }, defaultDashboardPreferences()).setup).toBeNull();
   expect(buildPersonalDashboardModel({ ...empty, analyticsRows: input.analyticsRows }, defaultDashboardPreferences()).setup).toBeNull();
 });
+
+it("keeps task identity in attention links", () => {
+  const model = buildPersonalDashboardModel(input, defaultDashboardPreferences());
+  expect(JSON.stringify(model)).toContain("/ops-tasks?task=t1");
+});

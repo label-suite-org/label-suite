@@ -4,6 +4,7 @@ import GrantsFundingCockpit from "../components/grants/GrantsFundingCockpit";
 import { getGrantsWorkspace } from "../server/grants-workspace";
 import { getGrantsWorklist } from "../server/grants-worklist";
 import { serializeClientCapabilities } from "../server/tenant";
+const initialApplicationId = Astro.url.searchParams.get("application");
 const initialGrantId = Astro.url.searchParams.get("grant");
 const orgId = Astro.locals.orgId!;
 const currentUserName = Astro.locals.user?.name ?? null;
@@ -11,4 +12,4 @@ const capabilities = serializeClientCapabilities(Astro.locals.membershipRole ?? 
 const initialNewApplicationProjectId = Astro.url.searchParams.get("newApplicationProjectId");
 const [workspace, initialWorklist] = await Promise.all([getGrantsWorkspace(orgId), getGrantsWorklist(orgId)]);
 ---
-<AppLayout><GrantsFundingCockpit client:load initialGrantId={initialGrantId} workspace={workspace} initialWorklist={initialWorklist} initialNewApplicationProjectId={initialNewApplicationProjectId} currentUserName={currentUserName} canMutate={capabilities["fundraising.mutate"]} /></AppLayout>
+<AppLayout><GrantsFundingCockpit client:load initialApplicationId={initialApplicationId} initialGrantId={initialGrantId} workspace={workspace} initialWorklist={initialWorklist} initialNewApplicationProjectId={initialNewApplicationProjectId} currentUserName={currentUserName} canMutate={capabilities["fundraising.mutate"]} /></AppLayout>

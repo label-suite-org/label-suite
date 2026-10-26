@@ -24,8 +24,8 @@ function formatIssueLabel(issueType: RoyaltiesDashboard["splitIssues"][number]["
 }
 
 function checklistStatus(pass: boolean, warning = false): { icon: JSX.Element; label: string; tone: string } {
-  if (pass) return { icon: <Check className="h-4 w-4" />, label: "OK", tone: "text-emerald-600" };
-  if (warning) return { icon: <AlertTriangle className="h-4 w-4" />, label: "Warning", tone: "text-amber-600" };
+  if (pass) return { icon: <Check className="h-4 w-4" />, label: "OK", tone: "text-emerald-700 dark:text-emerald-400" };
+  if (warning) return { icon: <AlertTriangle className="h-4 w-4" />, label: "Warning", tone: "text-amber-700 dark:text-amber-400" };
   return { icon: <CircleX className="h-4 w-4" />, label: "Blocked", tone: "text-red-600" };
 }
 

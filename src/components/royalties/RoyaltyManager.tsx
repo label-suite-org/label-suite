@@ -16,8 +16,8 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 const STATUS_STYLES: Record<string, string> = {
-  paid: "text-emerald-600",
-  pending: "text-amber-600",
+  paid: "text-emerald-700 dark:text-emerald-400",
+  pending: "text-amber-700 dark:text-amber-400",
   unpaid: "text-red-600",
 };
 

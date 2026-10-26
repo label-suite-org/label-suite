@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +43,7 @@ export function RadioStationForm({
   initial?: RadioStation | null;
   onClose: () => void;
 }) {
+  const formId = useId();
   const isEdit = !!initial;
   const [name, setName] = useState(initial?.name || "");
   const [callSign, setCallSign] = useState(initial?.call_sign || "");
@@ -98,73 +99,73 @@ export function RadioStationForm({
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Station Name *</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} required
+        <label htmlFor={`${formId}-name`} className="block text-sm font-medium text-foreground mb-1">Station Name *</label>
+        <Input id={`${formId}-name`} value={name} onChange={(e) => setName(e.target.value)} required
           className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Call Sign</label>
-          <Input value={callSign} onChange={(e) => setCallSign(e.target.value)} placeholder="KEXP"
+          <label htmlFor={`${formId}-callSign`} className="block text-sm font-medium text-foreground mb-1">Call Sign</label>
+          <Input id={`${formId}-callSign`} value={callSign} onChange={(e) => setCallSign(e.target.value)} placeholder="KEXP"
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Frequency</label>
-          <Input value={frequency} onChange={(e) => setFrequency(e.target.value)} placeholder="90.3 FM"
+          <label htmlFor={`${formId}-frequency`} className="block text-sm font-medium text-foreground mb-1">Frequency</label>
+          <Input id={`${formId}-frequency`} value={frequency} onChange={(e) => setFrequency(e.target.value)} placeholder="90.3 FM"
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">City</label>
-          <Input value={city} onChange={(e) => setCity(e.target.value)}
+          <label htmlFor={`${formId}-city`} className="block text-sm font-medium text-foreground mb-1">City</label>
+          <Input id={`${formId}-city`} value={city} onChange={(e) => setCity(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">State</label>
-          <Input value={state} onChange={(e) => setState(e.target.value)}
+          <label htmlFor={`${formId}-state`} className="block text-sm font-medium text-foreground mb-1">State</label>
+          <Input id={`${formId}-state`} value={state} onChange={(e) => setState(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Country</label>
-          <Input value={country} onChange={(e) => setCountry(e.target.value)}
-            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Email</label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Phone</label>
-          <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+          <label htmlFor={`${formId}-country`} className="block text-sm font-medium text-foreground mb-1">Country</label>
+          <Input id={`${formId}-country`} value={country} onChange={(e) => setCountry(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">Website</label>
-          <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..."
+          <label htmlFor={`${formId}-email`} className="block text-sm font-medium text-foreground mb-1">Email</label>
+          <Input id={`${formId}-email`} type="email" value={email} onChange={(e) => setEmail(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1">DJ Name</label>
-          <Input value={djName} onChange={(e) => setDjName(e.target.value)}
+          <label htmlFor={`${formId}-phone`} className="block text-sm font-medium text-foreground mb-1">Phone</label>
+          <Input id={`${formId}-phone`} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor={`${formId}-website`} className="block text-sm font-medium text-foreground mb-1">Website</label>
+          <Input id={`${formId}-website`} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..."
+            className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
+        </div>
+        <div>
+          <label htmlFor={`${formId}-djName`} className="block text-sm font-medium text-foreground mb-1">DJ Name</label>
+          <Input id={`${formId}-djName`} value={djName} onChange={(e) => setDjName(e.target.value)}
             className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Tier / Radio tag</label>
-        <Input
+        <label htmlFor={`${formId}-tier`} className="block text-sm font-medium text-foreground mb-1">Tier / Radio tag</label>
+        <Input id={`${formId}-tier`}
           value={tier}
           onChange={(e) => setTier(e.target.value)}
-          list="radio-tier-options"
+          list={`${formId}-tier-options`}
           placeholder="NACC 1, JBE, Mediabase, SubModern…"
           className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background"
         />
-        <datalist id="radio-tier-options">
+        <datalist id={`${formId}-tier-options`}>
           {TIER_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
@@ -172,8 +173,8 @@ export function RadioStationForm({
         <p className="mt-1 text-xs text-muted-foreground">Use the real chart/network tag from the station list; not only A/B/C/D.</p>
       </div>
       <div>
-        <label className="block text-sm font-medium text-foreground mb-1">Notes</label>
-        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
+        <label htmlFor={`${formId}-notes`} className="block text-sm font-medium text-foreground mb-1">Notes</label>
+        <Textarea id={`${formId}-notes`} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
           className="w-full px-3 py-2 border border-input rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring bg-background" />
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}

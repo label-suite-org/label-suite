@@ -334,7 +334,7 @@ export function PersonalDashboard({
                     >
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant={badge.variant}>{badge.label}</Badge>
+                          <Badge variant={badge.variant} className={badge.variant === "destructive" ? "text-red-700 dark:text-red-300" : undefined}>{badge.label}</Badge>
                           <span className="text-xs text-muted-foreground">
                             {item.domain}
                           </span>
