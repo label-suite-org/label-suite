@@ -1246,12 +1246,13 @@ function pickPrimaryTrackGrowthRange(ranges: AnalyticsTrackGrowthRangeSummary[])
 }
 
 function latestAutomatedTrackRun(orgId: string): SQL {
-  return sql`(select f.run_id from ${analytics_import_files} f
-    join ${analytics_import_runs} r on r.id = f.run_id and r.org_id = f.org_id
-    where f.org_id = ${orgId} and f.source = 'sisense'
-      and f.widget_key = 'tracks-by-growth-rate' and f.artist_id is null
+  return sql`(select r.id from ${analytics_import_runs} r
+    where r.org_id = ${orgId} and r.source = 'sisense'
       and r.status = 'completed' and r.mode <> 'manual_import'
-    order by r.completed_at desc, f.created_at desc limit 1)`;
+      and exists (select 1 from ${analytics_metric_rows} m
+        where m.org_id = r.org_id and m.last_seen_run_id = r.id
+          and m.widget_key = 'tracks-by-growth-rate')
+    order by r.completed_at desc, r.id desc limit 1)`;
 }
 
 function firstValue(values: Array<string | null>): string | null {
