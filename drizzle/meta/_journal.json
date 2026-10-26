@@ -694,6 +694,13 @@
       "when": 1792972800000,
       "tag": "0106_sync_licensing",
       "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1792985000000,
+      "tag": "0107_tour_budget_plan",
+      "breakpoints": true
     }
   ]
 }

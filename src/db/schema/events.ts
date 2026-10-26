@@ -100,6 +100,7 @@ export const tour_details = schema.table("tour_details", {
   announce_date: date("announce_date"),
   decision_date: date("decision_date"),
   notes: text("notes"),
+  budget_plan: jsonb("budget_plan").$type<Record<string, unknown>>(),
   created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
