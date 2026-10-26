@@ -1449,6 +1449,8 @@ export async function listAnalyticsCommandCenter(
   const availableReleases = await listCommandCenterReleases(orgId, filter?.artistId);
   const effectiveFilter = normalizeAnalyticsFilter(filter, availableReleases.map((release) => release.id));
 
+  const quality = await listAnalyticsDataQuality(orgId);
+
   const platformFilter = effectiveFilter?.platforms?.length
     ? sql`and platform = ANY(${effectiveFilter.platforms})`
     : sql``;
@@ -1466,7 +1468,7 @@ export async function listAnalyticsCommandCenter(
   `);
   const dailySources = legacyDailySources.length
     ? legacyDailySources
-    : await listCanonicalDailySources(orgId, effectiveFilter);
+    : await listCanonicalDailySources(orgId, effectiveFilter, quality.currentRun?.id);
 
   const [
     totals,
@@ -1475,7 +1477,6 @@ export async function listAnalyticsCommandCenter(
     playlists,
     shazams,
     runHistory,
-    quality,
   ] = await Promise.all([
     listAnalyticsTotals(orgId),
     listFilteredTracksByGrowth(orgId, 100, effectiveFilter),
@@ -1483,7 +1484,6 @@ export async function listAnalyticsCommandCenter(
     listAnalyticsWidgetRows(orgId, "spotify-playlist-listings", 100, effectiveFilter),
     listAnalyticsWidgetRows(orgId, "shazams-city", 50, effectiveFilter),
     listAnalyticsRunHistory(orgId, 30),
-    listAnalyticsDataQuality(orgId),
   ]);
 
   return buildAnalyticsCommandCenter({
@@ -1505,9 +1505,10 @@ export async function listAnalyticsCommandCenter(
   });
 }
 
-async function listCanonicalDailySources(
+export async function listCanonicalDailySources(
   orgId: string,
   filter?: AnalyticsCommandFilter,
+  evidenceRunId?: string,
 ): Promise<CommandDailySourceRow[]> {
   const dayExpr = sql<string>`coalesce(
     ${analytics_metric_rows.dimensions}->>'_col0',
@@ -1523,6 +1524,7 @@ async function listCanonicalDailySources(
     sql`${dayExpr} is not null`,
     sql`nullif(${analytics_metric_rows.metrics}->>'streams', '') is not null`,
   ];
+  if (evidenceRunId) conditions.push(eq(analytics_metric_rows.last_seen_run_id, evidenceRunId));
   if (filter?.artistId) conditions.push(eq(analytics_metric_rows.artist_id, filter.artistId));
   if (filter?.releaseId) conditions.push(eq(analytics_metric_rows.release_id, filter.releaseId));
   if (filter?.platforms?.length) {

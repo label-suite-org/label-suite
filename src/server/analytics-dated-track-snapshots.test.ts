@@ -78,7 +78,7 @@ const database = vi.hoisted(() => {
 
 vi.mock("../lib/db", () => ({ db: { transaction: database.transaction, select: database.select } }));
 
-import { listAnalyticsSummary, listDatedTrackSnapshotWorkspace, listFilteredTracksByGrowth } from "./analytics";
+import { listCanonicalDailySources, listAnalyticsSummary, listDatedTrackSnapshotWorkspace, listFilteredTracksByGrowth } from "./analytics";
 
 type FakeScopedQueries = {
   listCompletedRunsWithUploadedFile: (input: { orgId: string; artistId: string; limit?: number; offset?: number }) => Promise<unknown[]>;
@@ -252,6 +252,15 @@ describe("dated track snapshot analytics read model", () => {
     database.select.mockClear();
     database.transaction.mockClear();
     database.tx.execute.mockClear();
+  });
+
+  it("constrains daily charts to the same evidence run as their displayed recording scope", async () => {
+    database.results.push([]);
+    await listCanonicalDailySources("org-a", undefined, "current-evidence-run");
+    const query = new PgDialect().sqlToQuery(database.whereClauses[0] as SQL);
+    expect(query.sql).toContain('"analytics_metric_rows"."last_seen_run_id" =');
+    expect(query.params).toContain("current-evidence-run");
+    expect(query.params).toContain("org-a");
   });
 
   it("keeps artist-detail source blanks unknown and withholds incomplete artist totals", async () => {
