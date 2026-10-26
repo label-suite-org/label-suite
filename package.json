@@ -22,7 +22,7 @@
     "campaign:enrich": "tsx ops/campaign-enrichment-mcp/src/index.ts enrich",
     "campaign:mcp:test": "vitest run ops/campaign-enrichment-mcp/src",
     "build": "astro build",
-    "check": "node --max-old-space-size=2560 node_modules/astro/bin/astro.mjs check",
+    "check": "node --max-old-space-size=4096 node_modules/astro/bin/astro.mjs check",
     "deps:ci": "node scripts/npm-ci.mjs",
     "ci": "npm test -- --maxWorkers=2 --exclude scripts/sisense-browser-contract.test.ts && npm exec vitest run scripts/sisense-browser-contract.test.ts -- --maxWorkers=1 && npm run db:check && npm run check && npm run build",
     "preview": "astro preview",
