@@ -11,7 +11,7 @@ import { publicDropPath } from "../../../server/fan-drops";
 import { writeAuditLog } from "../../../server/audit";
 import { fanEmailEnabled, fanId, fanAllowedEmail } from "../../../server/fan-drops-core";
 import { readFanJson, handleFanError } from "../../../server/fan-request";
-import { listFanMessages, saveFanMessage, previewFanMessage, scheduleFanMessage, cancelFanMessage, reconcileFanMessage, testFanMessage, fanTestRecipient } from "../../../server/fan-messages";
+import { getFanMessage, listFanMessages, saveFanMessage, previewFanMessage, scheduleFanMessage, cancelFanMessage, reconcileFanMessage, testFanMessage, fanTestRecipient } from "../../../server/fan-messages";
 import { listFans, fanHistory, tagFan } from "../../../server/fan-feedback";
 import { z } from "zod";
 export const prerender = false;
@@ -26,6 +26,7 @@ export const GET: APIRoute = async ({ request }) => {
     const actor = await actorFor(request);
     return json(await runWithDatabaseContext({ userId: actor.userId, orgId: actor.workspace.org.id }, async () => {
       const params = new URL(request.url).searchParams;
+      if (params.has("message_id")) return getFanMessage(actor.workspace.org.id, fanId.parse(params.get("message_id")));
       if (params.get("history")) return fanHistory(actor.workspace.org.id, params.get("history")!);
       if (params.get("fans")) return { fans: await listFans(actor.workspace.org.id, params.get("fans")!) };
       if (params.get("artist_id")) {

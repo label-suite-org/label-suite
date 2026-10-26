@@ -1,9 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fanToken, readFanToken, fanSignupSchema, saveDropSchema, requireFanEmail, fanAllowedEmail, requireFanRecipient } from "./fan-drops-core";
 import { readFanJson } from "./fan-request";
+import { saveFanMessageSchema } from "./fan-messages-core";
+vi.mock("../lib/db", () => ({ db: {} }));
 beforeEach(() => vi.stubEnv("FAN_TOKEN_SECRET", "fixture-only-key-not-used-in-production-1234"));
 afterEach(() => vi.unstubAllEnvs());
 describe("fan subscription trust boundaries", () => {
+  it("accepts a stable new-message identity without weakening existing revision requirements", () => {
+    const input = { creation_id: crypto.randomUUID(), audience: { artist_id: "artist-a" }, content: { subject: "Draft", body: "Message", link_url: null } };
+    expect(saveFanMessageSchema.safeParse(input).success).toBe(true);
+    expect(saveFanMessageSchema.safeParse({ ...input, creation_id: "invalid" }).success).toBe(false);
+    expect(saveFanMessageSchema.safeParse({ ...input, id: "message-a", expected_revision: 1 }).success).toBe(false);
+    expect(saveFanMessageSchema.safeParse({ ...input, expected_revision: 1 }).success).toBe(false);
+    expect(saveFanMessageSchema.safeParse({ ...input, recipient_ids: ["injected"] }).success).toBe(false);
+  });
   it("binds signed links to purpose, scope and expiry", () => {
     const token = fanToken("confirm", "org-a", "signup-a", 2000);
     expect(readFanToken(token, "confirm", 1000)).toMatchObject({ orgId: "org-a", id: "signup-a" });

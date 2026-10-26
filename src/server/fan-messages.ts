@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { artists, fan_messages, fan_subscriptions, fans, job_runs } from "../db/schema";
 import { db, runWithDatabaseContext } from "../lib/db";
@@ -11,6 +12,12 @@ import { saveFanMessageSchema, messageRevisionSchema, scheduleFanMessageSchema, 
 export async function listFanMessages(orgId: string, artistId?: string) {
   const rows = await db.select().from(fan_messages).where(and(eq(fan_messages.org_id, orgId), artistId ? eq(fan_messages.artist_id, artistId) : undefined)).orderBy(desc(fan_messages.created_at)).limit(100);
   return rows.map(({ recipient_ids: _, ...message }) => message);
+}
+export async function getFanMessage(orgId: string, id: string) {
+  const [message] = await db.select().from(fan_messages).where(and(eq(fan_messages.org_id, orgId), eq(fan_messages.id, id)));
+  if (!message) throw new NotFoundError("Message not found");
+  const { recipient_ids: _, ...result } = message;
+  return result;
 }
 async function lockedMessage(orgId: string, id: string, revision?: number) {
   const [message] = await db.select().from(fan_messages).where(and(eq(fan_messages.org_id, orgId), eq(fan_messages.id, id))).for("update");
@@ -27,7 +34,16 @@ export async function saveFanMessage(orgId: string, raw: unknown) {
     if (current.status !== "draft") throw new ConflictError("Only draft messages can be edited. Cancel and create a new draft to reschedule.");
     return (await db.update(fan_messages).set({ artist_id: artist.id, audience: input.audience, content: input.content, revision: current.revision + 1, updated_at: new Date() }).where(eq(fan_messages.id, current.id)).returning())[0];
   }
-  return (await db.insert(fan_messages).values({ id: crypto.randomUUID(), org_id: orgId, artist_id: artist.id, audience: input.audience, content: input.content }).returning())[0];
+  const id = input.creation_id ?? crypto.randomUUID();
+  const [created] = await db.insert(fan_messages).values({ id, org_id: orgId, artist_id: artist.id, audience: input.audience, content: input.content })
+    .onConflictDoNothing({ target: fan_messages.id }).returning();
+  if (created) return created;
+  const [existing] = await db.select().from(fan_messages).where(and(eq(fan_messages.org_id, orgId), eq(fan_messages.id, id))).for("update");
+  if (!input.creation_id || !existing || existing.revision !== 1 || existing.status !== "draft" || existing.test_recipient
+    || !isDeepStrictEqual(existing.audience, input.audience) || !isDeepStrictEqual(existing.content, input.content)) {
+    throw new ConflictError("The message identity already exists or changed. Check the saved message before continuing.");
+  }
+  return existing;
 }
 export async function previewFanMessage(orgId: string, raw: unknown) {
   const input = messageRevisionSchema.parse(raw);
