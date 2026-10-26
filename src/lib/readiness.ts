@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { tracks, releases, roles, bugs, works } from "../db/schema";
+import { tracks, releases, roles, bugs, works, orgs } from "../db/schema";
 import { eq, and, ne, sql } from "drizzle-orm";
 import {
   computeClearanceFromRoleRows,
@@ -244,6 +244,7 @@ export async function runValidationSweep(orgId = TRUE_NATURE_ORG_ID): Promise<{
   const workRows = await db.select().from(works).where(eq(works.org_id, orgId));
   for (const w of workRows) {
     await db.transaction(async (tx) => {
+      await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
       await lockWorkRoles(tx, orgId, w.id);
       await persistClearanceProgress(w.id, tx, orgId);
     });

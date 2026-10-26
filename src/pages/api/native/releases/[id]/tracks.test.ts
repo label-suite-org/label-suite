@@ -50,8 +50,8 @@ describe("native release-scoped Track routes", () => {
     native.resolveNativeActor.mockResolvedValue({ userId: "user-a", workspace: { org: { id: "org-a" }, role: "payee" } });
     expect((await standalone(context())).status).toBe(403);
   });
-  it("rejects missing revisions, injected identities and Work mutations", async () => {
-    for (const body of [{ expected_revision: "r1" }, { title: "Changed" }, { id: "injected", expected_revision: "r1" }, { release_id: "other", expected_revision: "r1" }, { work_id: "other", expected_revision: "r1" }]) {
+  it("rejects missing revisions, injected identities and embedded Work mutations", async () => {
+    for (const body of [{ expected_revision: "r1" }, { title: "Changed" }, { id: "injected", expected_revision: "r1" }, { release_id: "other", expected_revision: "r1" }, { work: { title: "Injected" }, expected_revision: "r1" }]) {
       expect((await update(context("PATCH", body))).status).toBe(400);
     }
     expect(service.updateNativeTrack).not.toHaveBeenCalled();
