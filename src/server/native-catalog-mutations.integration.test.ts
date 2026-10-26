@@ -135,6 +135,17 @@ describe.skipIf(!enabled)(
       await expect(
         create(org, foreignRelease, newInput(), actor),
       ).rejects.toMatchObject({ status: 404 });
+      await expect(
+        patchWork(
+          org,
+          foreignWork,
+          {
+            expected_revision: await revision("works", foreignWork),
+            title: "Forbidden",
+          },
+          actor,
+        ),
+      ).rejects.toMatchObject({ status: 404 });
       const rollback = newInput();
       const before =
         await sql`select last_production_number from label_suite.isrc_sequences where org_id=${org}`;

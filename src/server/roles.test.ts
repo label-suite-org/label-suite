@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { orgs } from "../db/schema";
 
 const readiness = vi.hoisted(() => ({
   lockWorkRoles: vi.fn(async () => undefined),
@@ -12,9 +13,9 @@ const mocks = vi.hoisted(() => {
   const tx = {
     execute: vi.fn(async () => undefined),
     select: vi.fn((fields?: Record<string, unknown>) => ({
-      from: vi.fn(() => ({
+      from: vi.fn((table: unknown) => ({
         where: vi.fn(() => {
-          const rows = fields && Object.keys(fields).length === 1 && "work_id" in fields ? selectedRows[0] ?? [] : selectedRows.shift() ?? [];
+          const rows = table === orgs ? [{ id: "org-1" }] : fields && Object.keys(fields).length === 1 && "work_id" in fields ? selectedRows[0] ?? [] : selectedRows.shift() ?? [];
           return Object.assign(Promise.resolve(rows), { for: vi.fn(async () => rows) });
         }),
       })),
