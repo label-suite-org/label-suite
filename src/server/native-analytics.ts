@@ -38,6 +38,13 @@ export async function getNativeAnalytics(orgId: string, raw: unknown, now = new 
         release ? eq(analytics_metric_rows.release_id, release.id) : undefined,
       )).groupBy(analytics_metric_rows.source, analytics_metric_rows.widget_key),
     ]);
+    // Existing native clients require numeric platform points. Withhold incomplete
+    // periods rather than breaking decoding or inventing zeroes for missing data.
+    const periods = command.providerIntegrity ? [] : command.periods
+      .filter(period => period.dailyTrend.length > 0 && period.trendState.kind !== "invalid"
+        && period.dailyTrend.every(point => point.spotify !== null && point.apple !== null))
+      .map(({ insights: _insights, ...period }) => period);
+    const periodsWithheld = periods.length !== command.periods.length;
     const reportingThrough = command.dataWindow.to;
     const reportingAgeHours = reportingThrough ? (now.getTime() - new Date(`${reportingThrough}T00:00:00Z`).getTime()) / 3_600_000 : null;
     const query = new URLSearchParams({ section: "data-health" });
@@ -47,13 +54,15 @@ export async function getNativeAnalytics(orgId: string, raw: unknown, now = new 
       scope: { kind: release ? "release" : artist ? "artist" : "workspace", artist, release },
       fetched_at: now.toISOString(),
       reporting: { through: reportingThrough, stale: reportingAgeHours === null ? null : reportingAgeHours > ANALYTICS_IMPORT_STALE_AFTER_HOURS, basis: "latest_scoped_daily_reporting_date" },
-      periods: command.periods.map(({ insights: _insights, ...period }) => period),
+      periods,
       catalog: { ...command.catalog, completeness: "Top 100 track snapshot rows; not a complete catalog total" },
       sources,
       provider_integrity: command.providerIntegrity ?? null,
-      workspace_ingestion: { scope: "workspace", source: "sisense", ...quality.health },
+      workspace_ingestion: { scope: "workspace", source: "sisense", ...quality.health,
+        degradedReasons: [...quality.health.degradedReasons, ...(periodsWithheld ? ["native_periods_withheld_unverified_or_missing_provider_data"] : [])],
+      },
       available_artists: command.availableArtists, available_releases: command.availableReleases,
-      import_handoff: { href: `/analytics?${query}`, label: "Open in Label Suite Web", explanation: "Complex imports and source reconciliation require the web workspace. No native import is performed." },
+      import_handoff: { href: `/analytics?${query}`, label: "Open in Label Suite Web", explanation: periodsWithheld ? "Period totals and forecasts are withheld because provider coverage is unverified or platform data is missing. Open the web workspace to inspect reported rows and coverage. No native import is performed." : "Complex imports and source reconciliation require the web workspace. No native import is performed." },
     };
   }, { isolationLevel: "repeatable read" });
 }
