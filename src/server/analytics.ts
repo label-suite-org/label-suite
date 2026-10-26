@@ -45,11 +45,11 @@ export interface AnalyticsRecentRow {
 }
 
 export interface AnalyticsStreamTotals {
-  combinedStreams: number;
-  spotifyStreams: number;
-  appleStreams: number;
-  amazonStreams: number;
-  pandoraStreams: number;
+  combinedStreams: number | null;
+  spotifyStreams: number | null;
+  appleStreams: number | null;
+  amazonStreams: number | null;
+  pandoraStreams: number | null;
 }
 
 export interface AnalyticsTrackGrowthRow {
@@ -1067,11 +1067,6 @@ export async function listAnalyticsSummary(
       requestedAggregation: analytics_metric_rows.requested_aggregation,
       rowCount: sql<string>`count(*)`,
       lastSeenAt: sql<Date | null>`max(${analytics_metric_rows.last_seen_at})`,
-      combinedStreams: sql<string>`coalesce(sum(nullif(${analytics_metric_rows.metrics}->>'combined_streams', '')::numeric), 0)`,
-      spotifyStreams: sql<string>`coalesce(sum(nullif(${analytics_metric_rows.metrics}->>'spotify_streams', '')::numeric), 0)`,
-      appleStreams: sql<string>`coalesce(sum(nullif(${analytics_metric_rows.metrics}->>'apple_streams', '')::numeric), 0)`,
-      amazonStreams: sql<string>`coalesce(sum(nullif(${analytics_metric_rows.metrics}->>'amazon_streams', '')::numeric), 0)`,
-      pandoraStreams: sql<string>`coalesce(sum(nullif(${analytics_metric_rows.metrics}->>'pandora_streams', '')::numeric), 0)`,
     })
     .from(analytics_metric_rows)
     .where(and(where, eq(analytics_metric_rows.widget_key, "tracks-by-growth-rate")))
@@ -1083,13 +1078,7 @@ export async function listAnalyticsSummary(
     aggregationLabel: row.requestedAggregation,
     rowCount: Number(row.rowCount),
     lastSeenAt: toDate(row.lastSeenAt),
-    streamTotals: {
-      combinedStreams: Number(row.combinedStreams ?? 0),
-      spotifyStreams: Number(row.spotifyStreams ?? 0),
-      appleStreams: Number(row.appleStreams ?? 0),
-      amazonStreams: Number(row.amazonStreams ?? 0),
-      pandoraStreams: Number(row.pandoraStreams ?? 0),
-    },
+    streamTotals: emptyStreamTotals(),
   }));
   const selectedTrackGrowthRange = pickPrimaryTrackGrowthRange(trackGrowthRanges);
 
@@ -1160,15 +1149,15 @@ export async function listAnalyticsSummary(
           primaryArtist: row.dimensions.primary_artist ?? null,
           appTrackTitle: row.trackTitle,
           releaseTitle: row.releaseTitle,
-          combinedStreams: numberMetric(row.metrics, "combined_streams"),
-          spotifyStreams: numberMetric(row.metrics, "spotify_streams"),
-          appleStreams: numberMetric(row.metrics, "apple_streams"),
-          amazonStreams: numberMetric(row.metrics, "amazon_streams"),
-          pandoraStreams: numberMetric(row.metrics, "pandora_streams"),
+          combinedStreams: nullableNumberMetric(row.metrics, "combined_streams"),
+          spotifyStreams: nullableNumberMetric(row.metrics, "spotify_streams"),
+          appleStreams: nullableNumberMetric(row.metrics, "apple_streams"),
+          amazonStreams: nullableNumberMetric(row.metrics, "amazon_streams"),
+          pandoraStreams: nullableNumberMetric(row.metrics, "pandora_streams"),
           streamsGrowth: nullableNumberMetric(row.metrics, "streams_growth"),
-          youtubeViews: numberMetric(row.metrics, "youtube_views"),
-          tiktokViews: numberMetric(row.metrics, "tiktok_views"),
-          combinedViews: numberMetric(row.metrics, "combined_views"),
+          youtubeViews: nullableNumberMetric(row.metrics, "youtube_views"),
+          tiktokViews: nullableNumberMetric(row.metrics, "tiktok_views"),
+          combinedViews: nullableNumberMetric(row.metrics, "combined_views"),
           viewsGrowth: nullableNumberMetric(row.metrics, "views_growth"),
           lastSeenAt: toDate(row.lastSeenAt),
         })),
@@ -1232,11 +1221,11 @@ export function emptyAnalyticsSummary(): AnalyticsSummaryResult {
 
 function emptyStreamTotals(): AnalyticsStreamTotals {
   return {
-    combinedStreams: 0,
-    spotifyStreams: 0,
-    appleStreams: 0,
-    amazonStreams: 0,
-    pandoraStreams: 0,
+    combinedStreams: null,
+    spotifyStreams: null,
+    appleStreams: null,
+    amazonStreams: null,
+    pandoraStreams: null,
   };
 }
 
@@ -1460,6 +1449,8 @@ export async function listAnalyticsCommandCenter(
   const availableReleases = await listCommandCenterReleases(orgId, filter?.artistId);
   const effectiveFilter = normalizeAnalyticsFilter(filter, availableReleases.map((release) => release.id));
 
+  const quality = await listAnalyticsDataQuality(orgId);
+
   const platformFilter = effectiveFilter?.platforms?.length
     ? sql`and platform = ANY(${effectiveFilter.platforms})`
     : sql``;
@@ -1477,7 +1468,7 @@ export async function listAnalyticsCommandCenter(
   `);
   const dailySources = legacyDailySources.length
     ? legacyDailySources
-    : await listCanonicalDailySources(orgId, effectiveFilter);
+    : await listCanonicalDailySources(orgId, effectiveFilter, quality.currentRun?.id);
 
   const [
     totals,
@@ -1486,7 +1477,6 @@ export async function listAnalyticsCommandCenter(
     playlists,
     shazams,
     runHistory,
-    quality,
   ] = await Promise.all([
     listAnalyticsTotals(orgId),
     listFilteredTracksByGrowth(orgId, 100, effectiveFilter),
@@ -1494,7 +1484,6 @@ export async function listAnalyticsCommandCenter(
     listAnalyticsWidgetRows(orgId, "spotify-playlist-listings", 100, effectiveFilter),
     listAnalyticsWidgetRows(orgId, "shazams-city", 50, effectiveFilter),
     listAnalyticsRunHistory(orgId, 30),
-    listAnalyticsDataQuality(orgId),
   ]);
 
   return buildAnalyticsCommandCenter({
@@ -1516,9 +1505,10 @@ export async function listAnalyticsCommandCenter(
   });
 }
 
-async function listCanonicalDailySources(
+export async function listCanonicalDailySources(
   orgId: string,
   filter?: AnalyticsCommandFilter,
+  evidenceRunId?: string,
 ): Promise<CommandDailySourceRow[]> {
   const dayExpr = sql<string>`coalesce(
     ${analytics_metric_rows.dimensions}->>'_col0',
@@ -1534,6 +1524,7 @@ async function listCanonicalDailySources(
     sql`${dayExpr} is not null`,
     sql`nullif(${analytics_metric_rows.metrics}->>'streams', '') is not null`,
   ];
+  if (evidenceRunId) conditions.push(eq(analytics_metric_rows.last_seen_run_id, evidenceRunId));
   if (filter?.artistId) conditions.push(eq(analytics_metric_rows.artist_id, filter.artistId));
   if (filter?.releaseId) conditions.push(eq(analytics_metric_rows.release_id, filter.releaseId));
   if (filter?.platforms?.length) {

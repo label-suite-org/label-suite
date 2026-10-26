@@ -40,7 +40,7 @@ export default function ArtistSisensePanel({ section }: Props) {
       <div>
         <h2 className="text-lg font-semibold">Sisense Audience</h2>
         <p className="text-xs text-muted-foreground">
-          Sisense rows matched to this artist by name and import scope. Every figure states its own data window — nothing here is an all-time total.
+          Unverified distributor rows matched to this artist by name and import scope. Missing songs and collaborators can make these rows incomplete. Daily streams can cover a selected recording rather than the entire artist; city rows are partial, not worldwide totals. Every figure states its own data window — nothing here is an all-time total.
         </p>
       </div>
 

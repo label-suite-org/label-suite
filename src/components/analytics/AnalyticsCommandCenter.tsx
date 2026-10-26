@@ -758,7 +758,7 @@ function PlaylistList({ rows }: { rows: CommandPlaylistRow[] }) {
             <p className="text-xs text-[var(--muted-foreground)]">{row.dimensions.playlist__owner_id ?? row.dimensions.playlist_owner_id ?? "unknown owner"}</p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-sm font-semibold tabular-nums">{formatNumber(Number(row.metrics.streams ?? 0))}</p>
+            <p className="text-sm font-semibold tabular-nums">{formatNumber(row.metrics.streams == null ? null : Number(row.metrics.streams))}</p>
             <p className="text-xs text-[var(--muted-foreground)]">pos {row.metrics.latest_position ?? "—"}</p>
           </div>
         </div>
@@ -774,7 +774,7 @@ function ShazamList({ rows }: { rows: CommandShazamRow[] }) {
       {rows.map((row) => (
         <div key={row.id} className="rounded-2xl border border-[var(--border)] p-3">
           <p className="break-words text-sm font-medium" title={row.label}>{row.label}</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">{formatNumber(Number(row.metrics.shazams ?? 0))}</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums">{formatNumber(row.metrics.shazams == null ? null : Number(row.metrics.shazams))}</p>
           <p className="text-xs text-[var(--muted-foreground)]">Shazams</p>
         </div>
       ))}

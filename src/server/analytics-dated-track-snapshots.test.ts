@@ -30,6 +30,7 @@ const database = vi.hoisted(() => {
         whereClauses.push(where);
         return chain;
       },
+      groupBy: () => chain,
       orderBy: (...values: unknown[]) => {
         orderClauses.push(values);
         return chain;
@@ -77,7 +78,7 @@ const database = vi.hoisted(() => {
 
 vi.mock("../lib/db", () => ({ db: { transaction: database.transaction, select: database.select } }));
 
-import { listDatedTrackSnapshotWorkspace, listFilteredTracksByGrowth } from "./analytics";
+import { listCanonicalDailySources, listAnalyticsSummary, listDatedTrackSnapshotWorkspace, listFilteredTracksByGrowth } from "./analytics";
 
 type FakeScopedQueries = {
   listCompletedRunsWithUploadedFile: (input: { orgId: string; artistId: string; limit?: number; offset?: number }) => Promise<unknown[]>;
@@ -251,6 +252,28 @@ describe("dated track snapshot analytics read model", () => {
     database.select.mockClear();
     database.transaction.mockClear();
     database.tx.execute.mockClear();
+  });
+
+  it("constrains daily charts to the same evidence run as their displayed recording scope", async () => {
+    database.results.push([]);
+    await listCanonicalDailySources("org-a", undefined, "current-evidence-run");
+    const query = new PgDialect().sqlToQuery(database.whereClauses[0] as SQL);
+    expect(query.sql).toContain('"analytics_metric_rows"."last_seen_run_id" =');
+    expect(query.params).toContain("current-evidence-run");
+    expect(query.params).toContain("org-a");
+  });
+
+  it("keeps artist-detail source blanks unknown and withholds incomplete artist totals", async () => {
+    database.results.push(
+      [{ widgetKey: "tracks-by-growth-rate", rowCount: "1", trackCount: "1", lastSeenAt: null }],
+      [{ rowCount: "1", trackCount: "1", lastSeenAt: null }],
+      [{ requestedDateRange: "14 Days", requestedAggregation: "Daily", rowCount: "1", lastSeenAt: null }],
+      [{ id: "row-a", dimensions: { track_title: "Recording A" }, metrics: { combined_streams: 12, spotify_streams: 12, apple_streams: null, amazon_streams: 0 }, trackTitle: null, releaseTitle: null, lastSeenAt: null }],
+      [],
+    );
+    const summary = await listAnalyticsSummary("org-a", { artistId: "artist-a" });
+    expect(summary.streamTotals).toEqual({ combinedStreams: null, spotifyStreams: null, appleStreams: null, amazonStreams: null, pandoraStreams: null });
+    expect(summary.tracksByGrowth?.rows[0]).toMatchObject({ combinedStreams: 12, spotifyStreams: 12, appleStreams: null, amazonStreams: 0, combinedViews: null });
   });
 
   it("selects the latest completed manual Sisense track run that has an uploaded file", async () => {
