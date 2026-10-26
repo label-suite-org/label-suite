@@ -62,6 +62,13 @@ async function main(): Promise<void> {
     from label_suite.analytics_metric_rows where org_id=$2
       and widget_key in ('tracks-by-growth-rate','spotify-superfans-active-streams-city','spotify-playlist-listings')
     group by org_id, source, widget_key`, [oldRunId, config.orgId]);
+  await client.query(`insert into label_suite.analytics_metric_rows
+    (id, org_id, source, widget_key, row_key, row_hash, requested_date_range, requested_aggregation,
+     dimensions, metrics, raw_row, first_seen_run_id, last_seen_run_id, first_seen_at, last_seen_at)
+    select id || '-old', org_id, source, widget_key, row_key || '-legacy', 'old', '1 Day', requested_aggregation,
+      dimensions, '{"streams":999999}'::jsonb, '{}', $1, $1, '2026-07-01', '2026-07-01'
+    from label_suite.analytics_metric_rows where org_id=$2
+      and widget_key in ('spotify-streams-source','apple-streams-source')`, [oldRunId, config.orgId]);
   await runAnalyticsQueryProbe(config);
 
   await verifySentinelOrganization(client, sentinelBefore);

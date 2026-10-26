@@ -1255,6 +1255,21 @@ function latestAutomatedWidgetRun(orgId: string, widgetKey: string): SQL {
     order by r.completed_at desc, r.id desc limit 1)`;
 }
 
+function latestDailySourceObservation(): SQL {
+  // Different export ranges can contain the same scoped reporting day. Compare
+  // the actual dimensions because older imports used different row-key rules.
+  return sql`not exists (select 1 from ${analytics_metric_rows} newer
+    where newer.org_id = ${analytics_metric_rows.org_id}
+      and newer.source = ${analytics_metric_rows.source}
+      and newer.widget_key = ${analytics_metric_rows.widget_key}
+      and newer.requested_aggregation = ${analytics_metric_rows.requested_aggregation}
+      and newer.artist_id is not distinct from ${analytics_metric_rows.artist_id}
+      and newer.release_id is not distinct from ${analytics_metric_rows.release_id}
+      and newer.track_id is not distinct from ${analytics_metric_rows.track_id}
+      and newer.dimensions = ${analytics_metric_rows.dimensions}
+      and (newer.last_seen_at, newer.id) > (${analytics_metric_rows.last_seen_at}, ${analytics_metric_rows.id}))`;
+}
+
 function firstValue(values: Array<string | null>): string | null {
   return values.find((value): value is string => Boolean(value)) ?? null;
 }
@@ -1512,6 +1527,7 @@ async function listCanonicalDailySources(
   const conditions: SQL[] = [
     eq(analytics_metric_rows.org_id, orgId),
     inArray(analytics_metric_rows.widget_key, ["spotify-streams-source", "apple-streams-source"]),
+    latestDailySourceObservation(),
     sql`${dayExpr} is not null`,
     sql`nullif(${analytics_metric_rows.metrics}->>'streams', '') is not null`,
   ];
@@ -1916,6 +1932,7 @@ export async function listAnalyticsStreamSources(
         and(
           eq(analytics_metric_rows.org_id, orgId),
           eq(analytics_metric_rows.widget_key, widgetKey),
+          latestDailySourceObservation(),
         ),
       )
       .groupBy(
