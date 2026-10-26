@@ -42,6 +42,7 @@ const JUSTIFIED_EXCEPTIONS = new Map([
   ["api/native/artists.ts", "scoped native bearer Artist creation with operations.mutate"],
   ["api/native/releases.ts", "scoped native bearer Release creation with operations.mutate, stable identity and atomic audit"],
   ["api/native/artists/[id].ts", "scoped native bearer Artist update with operations.mutate"],
+  ["api/native/artists/[id]/bio.ts", "scoped native bearer biography review with fresh operations.mutate membership, exact source hash, rich-document preservation and atomic audit"],
   ["api/native/tracks/[trackId].ts", "scoped native bearer standalone Track update with operations.mutate, null Release context and exact revision"],
   ["api/native/releases/[id]/tracks/[trackId].ts", "scoped native bearer Track update with operations.mutate and exact revision"],
   ["api/native/releases/[id].ts", "scoped native bearer Release update with operations.mutate and explicit revision"],
