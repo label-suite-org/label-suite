@@ -49,6 +49,7 @@ const pitchRowsForClient = pitchRows.map((pitch) => ({
 ---
 
 <AppLayout>
+  {canManage && <div class="mb-4 flex justify-end"><a href={`/sync?release=${encodeURIComponent(id)}`} class="rounded-lg border px-4 py-2 text-sm">Sync deals</a></div>}
   {!release ? <p class="text-muted-foreground">Release not found.</p> : (
     <ReleaseWorkspace
       client:load

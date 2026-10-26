@@ -1,0 +1,11 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { SyncList } from "../../components/sync/SyncWorkspace";
+import { listSyncDeals } from "../../server/sync";
+import { requireCapability } from "../../server/tenant";
+if (!Astro.locals.user) return Astro.redirect("/login");
+if (!["owner","operator"].includes(Astro.locals.membershipRole??"")) return new Response("Sync is available to workspace owners and operators.",{status:403});
+const orgId=requireCapability(Astro.locals,"operations.mutate");
+const items=await listSyncDeals(orgId);
+---
+<AppLayout><SyncList items={items} artistId={Astro.url.searchParams.get("artist")??undefined} releaseId={Astro.url.searchParams.get("release")??undefined}/></AppLayout>
