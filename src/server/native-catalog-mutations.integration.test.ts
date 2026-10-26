@@ -220,10 +220,12 @@ describe.skipIf(!enabled)(
       });
     });
     it("changes only requested Work fields and propagates canonical ISRC without copying audio", async () => {
-      const id = randomUUID();
+      const id = randomUUID(),
+        linkedRelease = randomUUID();
+      await sql`insert into label_suite.releases(id,org_id,title,cover_art_url,upc_ean,release_date) values(${linkedRelease},${org},'Linked release','cover','987654321012','2027-01-01')`;
       await create(
         org,
-        release,
+        linkedRelease,
         {
           id,
           title: "Second appearance",
@@ -232,6 +234,11 @@ describe.skipIf(!enabled)(
         },
         actor,
       );
+      expect(
+        (
+          await sql`select release_ready from label_suite.releases where id=${linkedRelease}`
+        )[0].release_ready,
+      ).toBe(true);
       const before = await revision("works", work);
       await patchWork(
         org,
@@ -292,10 +299,15 @@ describe.skipIf(!enabled)(
         { expected_revision: await revision("works", work), isrc: null },
         actor,
       );
-      expect((await read(org, release, id)).track).toMatchObject({
+      expect((await read(org, linkedRelease, id)).track).toMatchObject({
         isrc: null,
         track_ready: false,
       });
+      expect(
+        (
+          await sql`select release_ready from label_suite.releases where id=${linkedRelease}`
+        )[0].release_ready,
+      ).toBe(false);
     });
     it("serializes overlapping role, Work and allocator writes, and rejects duplicate normalized ISRC", async () => {
       const { createRole } = await import("./roles");
