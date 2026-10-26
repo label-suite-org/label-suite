@@ -1241,13 +1241,17 @@ function emptyStreamTotals(): AnalyticsStreamTotals {
 }
 
 function pickPrimaryTrackGrowthRange(ranges: AnalyticsTrackGrowthRangeSummary[]): AnalyticsTrackGrowthRangeSummary | null {
-  return ranges.find((range) => isRecentDailyRange(range)) ?? ranges[0] ?? null;
+  // Callers order ranges by their latest capture, not by the preset name.
+  return ranges[0] ?? null;
 }
 
-function isRecentDailyRange(range: AnalyticsTrackGrowthRangeSummary): boolean {
-  const rangeLabel = range.rangeLabel.trim().toLowerCase();
-  const aggregationLabel = range.aggregationLabel.trim().toLowerCase();
-  return aggregationLabel === "daily" && ["1 day", "last day", "24 hours", "yesterday"].includes(rangeLabel);
+function latestAutomatedTrackRun(orgId: string): SQL {
+  return sql`(select f.run_id from ${analytics_import_files} f
+    join ${analytics_import_runs} r on r.id = f.run_id and r.org_id = f.org_id
+    where f.org_id = ${orgId} and f.source = 'sisense'
+      and f.widget_key = 'tracks-by-growth-rate' and f.artist_id is null
+      and r.status = 'completed' and r.mode <> 'manual_import'
+    order by r.completed_at desc, f.created_at desc limit 1)`;
 }
 
 function firstValue(values: Array<string | null>): string | null {
@@ -1549,7 +1553,7 @@ export async function listFilteredTracksByGrowth(
         releaseId: filter.releaseId,
       },
     );
-    return (workspace.latest?.rows ?? [])
+    if (workspace.latest) return workspace.latest.rows
       .filter((row) => !filter.releaseId || row.releaseId === filter.releaseId)
       .slice(0, limit)
       .map((row) => ({
@@ -1644,7 +1648,8 @@ export async function listFilteredTracksByGrowth(
     .where(and(
       eq(analytics_metric_rows.org_id, orgId),
       eq(analytics_metric_rows.widget_key, "tracks-by-growth-rate"),
-      ...(filter.artistId ? [sql`${analytics_metric_rows.dimensions}->>'primary_artist' = (select name from label_suite.artists where id = ${filter.artistId} and org_id = ${orgId})`] : []),
+      sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedTrackRun(orgId)}`,
+      ...(filter.artistId ? [eq(analytics_metric_rows.artist_id, filter.artistId)] : []),
       ...(filter.releaseId ? [eq(analytics_metric_rows.release_id, filter.releaseId)] : []),
     ))
     .orderBy(desc(sql<number>`nullif(${analytics_metric_rows.metrics}->>'combined_streams', '')::numeric`), desc(analytics_metric_rows.last_seen_at))
@@ -1749,33 +1754,6 @@ export async function listAnalyticsTracksByGrowth(
     }));
   }
 
-  const rangeRows = await db
-    .select({
-      requestedDateRange: analytics_metric_rows.requested_date_range,
-      requestedAggregation: analytics_metric_rows.requested_aggregation,
-      rowCount: sql<string>`count(*)`,
-      lastSeenAt: sql<Date | null>`max(${analytics_metric_rows.last_seen_at})`,
-    })
-    .from(analytics_metric_rows)
-    .where(
-      and(
-        eq(analytics_metric_rows.org_id, orgId),
-        eq(analytics_metric_rows.widget_key, "tracks-by-growth-rate"),
-      ),
-    )
-    .groupBy(analytics_metric_rows.requested_date_range, analytics_metric_rows.requested_aggregation)
-    .orderBy(desc(sql<Date>`max(${analytics_metric_rows.last_seen_at})`));
-
-  const ranges: AnalyticsTrackGrowthRangeSummary[] = rangeRows.map((row) => ({
-    rangeLabel: row.requestedDateRange,
-    aggregationLabel: row.requestedAggregation,
-    rowCount: Number(row.rowCount),
-    lastSeenAt: toDate(row.lastSeenAt),
-    streamTotals: { combinedStreams: 0, spotifyStreams: 0, appleStreams: 0, amazonStreams: 0, pandoraStreams: 0 },
-  }));
-  const primary = pickPrimaryTrackGrowthRange(ranges) ?? ranges[0];
-  if (!primary) return [];
-
   const rows = await db
     .select({
       id: analytics_metric_rows.id,
@@ -1792,8 +1770,7 @@ export async function listAnalyticsTracksByGrowth(
       and(
         eq(analytics_metric_rows.org_id, orgId),
         eq(analytics_metric_rows.widget_key, "tracks-by-growth-rate"),
-        eq(analytics_metric_rows.requested_aggregation, primary.aggregationLabel),
-        eq(analytics_metric_rows.requested_date_range, primary.rangeLabel),
+        sql`${analytics_metric_rows.last_seen_run_id} = ${latestAutomatedTrackRun(orgId)}`,
       ),
     )
     .orderBy(

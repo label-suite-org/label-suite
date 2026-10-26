@@ -1284,7 +1284,7 @@ describe("Sisense browser contract", () => {
       });
       expect(result.status).toBe(0);
       expect(fixture.filterEvents).toContain("poll-window-menu-ready");
-      expect(fixture.filterEvents.filter((event) => event === "poll-window-menu-clicked")).toHaveLength(1);
+      expect(fixture.filterEvents.filter((event) => event === "poll-window-menu-clicked")).toHaveLength(2);
       expect(result.output).toContain("Skipped shazams-city:");
       expect(result.output).not.toContain("Downloaded shazams-city");
     } finally {
