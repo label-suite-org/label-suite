@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fanToken, readFanToken, fanSignupSchema, saveDropSchema, requireFanEmail, fanAllowedEmail, requireFanRecipient } from "./fan-drops-core";
+import { fanToken, readFanToken, fanSignupSchema, saveDropSchema, requireFanEmail, fanAllowedEmail, fanPublicArtistId, fanDailyEmailLimit, requireFanRecipient } from "./fan-drops-core";
 import { readFanJson } from "./fan-request";
-import { saveFanMessageSchema } from "./fan-messages-core";
+import { saveFanMessageSchema, fanMessageHtml } from "./fan-messages-core";
 vi.mock("../lib/db", () => ({ db: {} }));
 beforeEach(() => vi.stubEnv("FAN_TOKEN_SECRET", "fixture-only-key-not-used-in-production-1234"));
 afterEach(() => vi.unstubAllEnvs());
@@ -67,4 +67,31 @@ it("fails closed for malformed pilot configuration and limits exact recipients a
   vi.stubEnv("FAN_EMAIL_ENABLED", "true");
   expect(() => requireFanEmail()).toThrow("not configured");
   vi.stubEnv("FAN_ALLOWED_EMAIL", ""); expect(() => fanAllowedEmail()).toThrow("not configured");
+});
+
+it("opens only the configured artist after explicit activation and a postal address, retaining the owner test address", () => {
+  vi.stubEnv("FAN_ALLOWED_EMAIL", "owner@example.test"); vi.stubEnv("FAN_BREVO_ORG_ID", "org-a");
+  vi.stubEnv("FAN_PUBLIC_ARTIST_ID", "artist-a"); vi.stubEnv("FAN_POSTAL_ADDRESS", "Fixture street 1\nFixture city");
+  expect(fanPublicArtistId()).toBeNull();
+  expect(() => requireFanRecipient("org-a", "fan@example.test", "artist-a")).toThrow();
+  vi.stubEnv("FAN_PUBLIC_SIGNUP_ENABLED", "true");
+  expect(() => requireFanRecipient("org-a", "fan@example.test", "artist-a")).not.toThrow();
+  expect(() => requireFanRecipient("org-a", "fan@example.test", "artist-b")).toThrow();
+  expect(() => requireFanRecipient("org-b", "fan@example.test", "artist-a")).toThrow();
+  expect(() => requireFanRecipient("org-a", "fan@example.test")).toThrow();
+  expect(fanAllowedEmail()).toBe("owner@example.test");
+  const html = fanMessageHtml({ subject: "New music", body: "Listen", link_url: null, link_label: "More" }, "Artist <A>");
+  expect(html).toContain("Artist &lt;A&gt;, sent by True Nature");
+  expect(html).toContain("Fixture street 1<br>Fixture city"); expect(html).toContain("{{ unsubscribe }}");
+  vi.stubEnv("FAN_POSTAL_ADDRESS", "");
+  expect(() => requireFanRecipient("org-a", "fan@example.test", "artist-a")).toThrow("postal address");
+  expect(() => fanMessageHtml({ subject: "Test", body: "Body", link_url: null, link_label: "More" }, "Artist")).toThrow("postal address");
+});
+
+it("bounds the daily launch budget below the shared provider cap", () => {
+  expect(fanDailyEmailLimit()).toBe(200);
+  for (const value of ["", "0", "251", "1.5", "invalid"]) {
+    vi.stubEnv("FAN_DAILY_EMAIL_LIMIT", value); expect(() => fanDailyEmailLimit()).toThrow();
+  }
+  vi.stubEnv("FAN_DAILY_EMAIL_LIMIT", "100"); expect(fanDailyEmailLimit()).toBe(100);
 });

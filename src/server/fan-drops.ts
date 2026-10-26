@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { artists, releases, project_events, fan_drops, fans, fan_subscriptions, fan_signups, fan_rate_limits, job_runs } from "../db/schema";
 import { db, runWithDatabaseContext } from "../lib/db";
 import { ConflictError, HttpError, NotFoundError } from "./errors";
-import { saveDropSchema, publishDropSchema, fanSignupSchema, fanAudienceSchema, fanRateKey, fanToken, readFanToken, requireFanEmail, fanAllowedEmail, requireFanRecipient, type PublishedDrop } from "./fan-drops-core";
+import { saveDropSchema, publishDropSchema, fanSignupSchema, fanAudienceSchema, fanRateKey, fanToken, readFanToken, requireFanEmail, fanAllowedEmail, fanPublicArtistId, fanDailyEmailLimit, requireFanRecipient, type PublishedDrop } from "./fan-drops-core";
 import { canonicalAppOrigin } from "./request-security";
 import { escapeEmailHtml, sendEmailViaBrevo } from "./email";
 
@@ -91,9 +91,9 @@ export async function signupToFanDrop(orgId: string, slug: string, raw: unknown,
   const result = { accepted: true, message: "If eligible, you will receive a confirmation email. Check your inbox." };
   if (input.website) return result;
   requireFanEmail();
-  requireFanRecipient(orgId, input.email);
   const [drop] = await db.select().from(fan_drops).where(and(eq(fan_drops.org_id, orgId), eq(fan_drops.slug, slug), isNotNull(fan_drops.published))).for("share");
   if (!drop?.published || !drop.published_revision) throw new NotFoundError("Drop not found");
+  requireFanRecipient(orgId, input.email, drop.artist_id);
   if (input.published_revision !== drop.published_revision) throw new ConflictError("This page changed. Reload before signing up.");
   const show = input.show_id ? drop.published.shows.find(show => show.id === input.show_id) : null;
   if (input.show_id && !show) throw new HttpError("Choose a listed show", 400);
@@ -101,6 +101,8 @@ export async function signupToFanDrop(orgId: string, slug: string, raw: unknown,
   await takeSignupLimit(orgId, `address:${clientAddress}`, 20, 3600_000, now);
   await takeSignupLimit(orgId, `email:${input.email}`, 3, 86400_000, now);
   await takeSignupLimit(orgId, `drop:${drop.id}`, 1000, 3600_000, now);
+  // Bound confirmation intake across IP addresses before creating pending records/jobs.
+  await takeSignupLimit(orgId, "fan-confirmation-intake", fanDailyEmailLimit(), 86400_000, now);
   const [fan] = await db.insert(fans).values({ id: crypto.randomUUID(), org_id: orgId, email: input.email }).onConflictDoUpdate({ target: [fans.org_id, fans.email], set: { email: input.email } }).returning();
   if (fan.provider_suppressed) return result;
   const [subscription] = await db.insert(fan_subscriptions).values({ id: crypto.randomUUID(), org_id: orgId, fan_id: fan.id, artist_id: drop.artist_id })
@@ -148,32 +150,44 @@ export async function fanAudience(orgId: string, raw: unknown) {
   const input = fanAudienceSchema.parse(raw);
   const conditions = [eq(fan_subscriptions.org_id, orgId), eq(fans.org_id, orgId), eq(fan_subscriptions.artist_id, input.artist_id), eq(fan_subscriptions.status, "confirmed"), eq(fans.provider_suppressed, false)];
   const allowed = fanAllowedEmail();
-  if (allowed) { requireFanRecipient(orgId, allowed); conditions.push(eq(fans.email, allowed)); }
+  if (!allowed) throw new HttpError("Fan pilot recipient is not configured", 503);
+  requireFanRecipient(orgId, allowed, input.artist_id);
+  if (fanPublicArtistId() !== input.artist_id) conditions.push(eq(fans.email, allowed));
   if (input.city) conditions.push(sql`lower(${fan_subscriptions.city}) = lower(${input.city})`);
   if (input.tag) conditions.push(sql`${fan_subscriptions.tags} @> ${JSON.stringify([input.tag])}::jsonb`);
   if (input.drop_id) conditions.push(sql`exists (select 1 from ${fan_signups} where ${fan_signups.org_id} = ${orgId} and ${fan_signups.subscription_id} = ${fan_subscriptions.id} and ${fan_signups.drop_id} = ${input.drop_id} and ${fan_signups.confirmed_at} is not null)`);
   return db.select({ id: fan_subscriptions.id, email: fans.email, name: fan_subscriptions.name, city: fan_subscriptions.city, tags: fan_subscriptions.tags, confirmed_at: fan_subscriptions.confirmed_at })
     .from(fan_subscriptions).innerJoin(fans, eq(fans.id, fan_subscriptions.fan_id)).where(and(...conditions)).orderBy(asc(fan_subscriptions.id)).limit(10001);
 }
+// Called inside the same transaction as the pending -> sending/preparing transition.
+export async function reserveFanEmailBudget(orgId: string, count: number) {
+  const limit = fanDailyEmailLimit();
+  if (!Number.isSafeInteger(count) || count < 1 || count > limit) return false;
+  const start = new Date(Math.floor(Date.now() / 86400_000) * 86400_000);
+  const next = sql`case when ${fan_rate_limits.window_start} = ${start} then ${fan_rate_limits.count} + ${count} else ${count} end`;
+  const rows = await db.insert(fan_rate_limits).values({ org_id: orgId, key: fanRateKey("fan-send-budget"), window_start: start, count })
+    .onConflictDoUpdate({ target: [fan_rate_limits.org_id, fan_rate_limits.key], set: { window_start: start, count: next }, setWhere: sql`${next} <= ${limit}` }).returning({ count: fan_rate_limits.count });
+  return rows.length === 1;
+}
 export async function dispatchFanConfirmation(orgId: string, signupId: string, signal?: AbortSignal) {
   requireFanEmail();
   const prepared = await runWithDatabaseContext({ userId: "fan-worker", orgId }, async () => {
     await db.select({ id: fan_signups.id }).from(fan_signups).where(and(eq(fan_signups.org_id, orgId), eq(fan_signups.id, signupId))).for("update");
-    const [row] = await db.select({ signup: fan_signups, email: fans.email, suppressed: fans.provider_suppressed, artist: artists.name, revoked: fan_subscriptions.revoked_at })
+    const [row] = await db.select({ signup: fan_signups, email: fans.email, suppressed: fans.provider_suppressed, artist: artists.name, artistId: artists.id, revoked: fan_subscriptions.revoked_at })
       .from(fan_signups).innerJoin(fan_subscriptions, and(eq(fan_subscriptions.id, fan_signups.subscription_id), eq(fan_subscriptions.org_id, orgId)))
       .innerJoin(fans, and(eq(fans.id, fan_subscriptions.fan_id), eq(fans.org_id, orgId)))
       .innerJoin(artists, and(eq(artists.id, fan_subscriptions.artist_id), eq(artists.org_id, orgId)))
       .where(and(eq(fan_signups.org_id, orgId), eq(fan_signups.id, signupId)));
     if (!row || ["submitted", "failed", "unknown", "suppressed"].includes(row.signup.email_status)) return null;
     const suppressed = row.suppressed || row.signup.confirmed_at || row.signup.expires_at.getTime() <= Date.now() || (row.revoked && row.revoked >= row.signup.created_at);
-    const status = suppressed ? "suppressed" : row.signup.email_status === "sending" ? "unknown" : "sending";
+    const status = suppressed ? "suppressed" : row.signup.email_status === "sending" ? "unknown" : await reserveFanEmailBudget(orgId, 1) ? "sending" : "failed";
     await db.update(fan_signups).set({ email_status: status }).where(and(eq(fan_signups.org_id, orgId), eq(fan_signups.id, signupId)));
     return status === "sending" ? row : null;
   });
   if (!prepared) return { skipped: true };
   let status: "submitted" | "failed" | "unknown" = "unknown";
   try {
-    requireFanRecipient(orgId, prepared.email);
+    requireFanRecipient(orgId, prepared.email, prepared.artistId);
     const token = fanToken("confirm", orgId, signupId, prepared.signup.expires_at.getTime());
     const url = new URL("/fans/confirm", canonicalAppOrigin()); url.searchParams.set("token", token);
     const unsubscribe = new URL("/fans/unsubscribe", canonicalAppOrigin());

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { fanAudienceSchema, fanId, requireFanEmail } from "./fan-drops-core";
+import { fanAudienceSchema, fanId, fanPostalAddress, fanPublicArtistId, requireFanEmail } from "./fan-drops-core";
 import { HttpError } from "./errors";
 import { escapeEmailHtml } from "./email";
 
@@ -20,7 +20,8 @@ export function fanPreviewHash(id: string, revision: number, audience: { id: str
 }
 const campaignText = (value: string) => escapeEmailHtml(value).replaceAll("{", "&#123;").replaceAll("}", "&#125;");
 export function fanMessageHtml(content: FanMessageContent, artist: string) {
-  return `<h1>${campaignText(content.subject)}</h1><p>${campaignText(content.body).replace(/\n/g, "<br>")}</p>${content.link_url ? `<p><a href="${campaignText(content.link_url)}">${campaignText(content.link_label)}</a></p>` : ""}<p>Email updates from ${campaignText(artist)}.</p><p><a href="{{ unsubscribe }}">Unsubscribe from all email updates sent by this label</a></p>`;
+  const address = fanPublicArtistId() || process.env.FAN_POSTAL_ADDRESS?.trim() ? fanPostalAddress() : null;
+  return `<h1>${campaignText(content.subject)}</h1><p>${campaignText(content.body).replace(/\n/g, "<br>")}</p>${content.link_url ? `<p><a href="${campaignText(content.link_url)}">${campaignText(content.link_label)}</a></p>` : ""}<p>Email updates from ${campaignText(artist)}, sent by True Nature.</p>${address ? `<p>${campaignText(address).replace(/\n/g, "<br>")}</p>` : ""}<p><a href="{{ unsubscribe }}">Unsubscribe from all email updates sent by this label</a></p>`;
 }
 export function requireFanBroadcast(orgId: string) {
   requireFanEmail();

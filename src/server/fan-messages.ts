@@ -4,9 +4,10 @@ import { z } from "zod";
 import { artists, fan_messages, fan_subscriptions, fans, job_runs } from "../db/schema";
 import { db, runWithDatabaseContext } from "../lib/db";
 import { users } from "../db/auth-schema";
-import { fanAllowedEmail, requireFanRecipient } from "./fan-drops-core";
+import { fanAllowedEmail, fanDailyEmailLimit, requireFanRecipient } from "./fan-drops-core";
 import { ConflictError, HttpError, NotFoundError } from "./errors";
-import { fanAudience } from "./fan-drops";
+import { fanAudience, reserveFanEmailBudget } from "./fan-drops";
+import { fanActivityReport } from "./fan-feedback";
 import { saveFanMessageSchema, messageRevisionSchema, scheduleFanMessageSchema, fanPreviewHash, fanMessageHtml, fanReportSchema, requireFanBroadcast } from "./fan-messages-core";
 
 export async function listFanMessages(orgId: string, artistId?: string) {
@@ -50,7 +51,7 @@ export async function previewFanMessage(orgId: string, raw: unknown) {
   const message = await lockedMessage(orgId, input.id, input.expected_revision);
   const audience = await fanAudience(orgId, message.audience);
   const [artist] = await db.select({ name: artists.name }).from(artists).where(and(eq(artists.org_id, orgId), eq(artists.id, message.artist_id)));
-  return { count: audience.length, audience: audience.slice(0, 500), limit_exceeded: audience.length > 500, preview_hash: fanPreviewHash(message.id, message.revision, audience), html: fanMessageHtml(message.content, artist?.name ?? "Artist") };
+  return { count: audience.length, audience: audience.slice(0, 500), limit_exceeded: audience.length > fanDailyEmailLimit(), preview_hash: fanPreviewHash(message.id, message.revision, audience), html: fanMessageHtml(message.content, artist?.name ?? "Artist") };
 }
 export async function scheduleFanMessage(orgId: string, raw: unknown) {
   const input = scheduleFanMessageSchema.parse(raw); requireFanBroadcast(orgId);
@@ -59,8 +60,7 @@ export async function scheduleFanMessage(orgId: string, raw: unknown) {
   const scheduled = new Date(input.scheduled_at);
   if (scheduled.getTime() < Date.now() || scheduled.getTime() > Date.now() + 366 * 86400_000) throw new HttpError("Choose a future time within one year", 400);
   const audience = await fanAudience(orgId, message.audience);
-  // shortcut: at most 500 recipients per campaign; raise after measuring worker and provider throughput.
-  if (!audience.length || audience.length > 500) throw new HttpError("Choose an audience of 1–500 confirmed fans", 400);
+  if (!audience.length || audience.length > fanDailyEmailLimit()) throw new HttpError(`Choose an audience of 1–${fanDailyEmailLimit()} confirmed fans`, 400);
   if (fanPreviewHash(message.id, message.revision, audience) !== input.preview_hash) throw new ConflictError("Audience changed; preview it again before scheduling");
   const [updated] = await db.update(fan_messages).set({ status: "scheduled", scheduled_at: scheduled, recipient_ids: audience.map(row => row.id), recipient_count: audience.length, revision: message.revision + 1, updated_at: new Date() }).where(eq(fan_messages.id, message.id)).returning();
   await db.insert(job_runs).values({ id: crypto.randomUUID(), org_id: orgId, job_type: "fan_message", trigger: "api", payload: { messageId: message.id }, available_at: scheduled, idempotency_key: message.id, max_attempts: 3 });
@@ -116,6 +116,10 @@ export async function dispatchFanMessage(orgId: string, messageId: string, signa
       return null;
     }
     if (row.status !== "scheduled" || !row.scheduled_at || row.scheduled_at.getTime() > Date.now()) return null;
+    if (!await reserveFanEmailBudget(orgId, row.recipient_count)) {
+      await db.update(fan_messages).set({ status: "review", failure_code: "daily_email_budget", updated_at: new Date() }).where(eq(fan_messages.id, row.id));
+      return null;
+    }
     await db.update(fan_messages).set({ status: "preparing", updated_at: new Date() }).where(eq(fan_messages.id, row.id));
     return row;
   });
@@ -144,7 +148,7 @@ export async function dispatchFanMessage(orgId: string, messageId: string, signa
     stage = "prepare_contacts";
     const synced: typeof candidates = [];
     for (const candidate of candidates) {
-      requireFanRecipient(orgId, candidate.email);
+      requireFanRecipient(orgId, candidate.email, message.artist_id);
       const existing = await brevo(`/contacts/${encodeURIComponent(candidate.email)}`, "GET", undefined, signal, true);
       if (existing !== null && providerContact.parse(existing).emailBlacklisted) {
         await workerContext(orgId, () => db.update(fans).set({ provider_suppressed: true }).where(and(eq(fans.org_id, orgId), eq(fans.email, candidate.email))));
@@ -178,7 +182,7 @@ export async function dispatchFanMessage(orgId: string, messageId: string, signa
       const count = synced.length - removed.length;
       if (count) {
         requireFanBroadcast(orgId); signal?.throwIfAborted();
-        for (const recipient of synced.filter(row => eligible.has(row.id))) requireFanRecipient(orgId, recipient.email);
+        for (const recipient of synced.filter(row => eligible.has(row.id))) requireFanRecipient(orgId, recipient.email, message.artist_id);
         await brevo(`/emailCampaigns/${campaign.id}/sendNow`, "POST", undefined, signal);
       }
       await db.update(fan_messages).set({ status: count ? "submitted" : "cancelled", recipient_count: count, updated_at: new Date() }).where(eq(fan_messages.id, messageId));
@@ -198,5 +202,6 @@ export async function reconcileFanMessage(orgId: string, raw: unknown) {
   const report = z.object({ id: z.number(), name: z.string(), status: z.string(), statistics: z.object({ globalStats: fanReportSchema }).optional() }).parse(await brevo(`/emailCampaigns/${message.provider_campaign_id}?statistics=globalStats&excludeHtmlContent=true`, "GET"));
   if (report.id !== message.provider_campaign_id || report.name !== `Label Suite ${message.id}`) throw new ConflictError("Provider campaign identity does not match");
   const status = report.status === "sent" ? "sent" : ["queued", "scheduled"].includes(report.status) ? "submitted" : message.status;
-  return (await db.update(fan_messages).set({ status, report: report.statistics?.globalStats ?? null, updated_at: new Date() }).where(eq(fan_messages.id, message.id)).returning())[0];
+  const counts = await fanActivityReport(orgId, message.id, report.statistics?.globalStats);
+  return (await db.update(fan_messages).set({ status, report: counts, updated_at: new Date() }).where(eq(fan_messages.id, message.id)).returning())[0];
 }
