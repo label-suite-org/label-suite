@@ -20,6 +20,7 @@ export const APP_NAV_SECTIONS = [
 ] as const satisfies readonly { id: AppNavSection; label: string }[];
 
 export const APP_NAV_ITEMS = [
+  { id: "sync", title: "Sync", url: "/sync", section: "operations", mobilePrimary: false, keywords: ["licensing", "placements", "master", "publishing"] },
   { id: "dashboard", title: "Dashboard", url: "/dashboard", section: "primary", mobilePrimary: true, keywords: ["home", "overview"] },
   { id: "today", title: "Today", url: "/today", section: "primary", mobilePrimary: true, keywords: ["today", "daily"] },
   { id: "events", title: "Events", url: "/events", section: "directory", mobilePrimary: false, keywords: ["events", "schedule", "agenda"] },
