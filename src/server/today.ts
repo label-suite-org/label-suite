@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import {
   artists,
@@ -140,10 +140,7 @@ async function loadTodayHubData(orgId: string) {
         ne(project_events.status, "completed"),
         ne(project_events.status, "cancelled"),
         ne(project_events.status, "canceled"),
-        or(
-          gte(project_events.start_date, workspaceToday(orgId)),
-          and(lte(project_events.start_date, workspaceToday(orgId)), or(isNull(project_events.end_date), gte(project_events.end_date, workspaceToday(orgId)))),
-        ),
+        sql`coalesce(${project_events.end_date}, ${project_events.start_date}) >= ${workspaceToday(orgId)}`,
       ))
       .orderBy(asc(project_events.start_date), asc(project_events.starts_at), asc(project_events.title))
       .limit(8),

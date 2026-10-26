@@ -104,6 +104,18 @@ jobs:
           # Astro type checking exceeds Node's default 2 GB heap on standard runners.
           NODE_OPTIONS: --max-old-space-size=4096
         run: bash scripts/run-ci-release-gate.sh
+      - name: Preserve disposable release-gate browser evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-gate-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/**/trace.zip
+            test-results/**/video.webm
+            test-results/**/error-context.md
+            test-results/release-gate-summary.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Verify Fans and Drops on isolated PostgreSQL
         run: |
           trap 'dropdb -h "$PGHOST" -U "$PGUSER" --if-exists fan_drops_test' EXIT
