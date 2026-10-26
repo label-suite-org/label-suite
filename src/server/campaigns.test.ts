@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => {
     insertValues,
     detailRows,
     db: {
+      transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(mocks.db)),
       select: vi.fn(() => ({
         from: vi.fn(() => {
           const chain = {
@@ -33,9 +34,7 @@ const mocks = vi.hoisted(() => {
       })),
       insert: vi.fn(() => ({
         values: vi.fn((values: Record<string, unknown>) => ({
-          onConflictDoNothing: vi.fn(async () => {
-            insertValues.push(values);
-          }),
+          onConflictDoNothing: vi.fn(() => ({ returning: vi.fn(async () => { insertValues.push(values); return [values]; }) })),
         })),
       })),
       update: vi.fn(() => ({
