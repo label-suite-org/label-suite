@@ -161,7 +161,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
           </DialogHeader>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setPendingSelection(null)}>Keep editing</Button>
-            <Button type="button" variant="destructive" onClick={() => {
+            <Button type="button" variant="destructive" className="text-red-700 dark:text-red-300" onClick={() => {
               if (!pendingSelection) return;
               dirty.current = false;
               setSelectedId(pendingSelection.id);
