@@ -35,6 +35,34 @@ describe.skipIf(!enabled)("native Event and Project PostgreSQL fixture", () => {
     await sql`insert into label_suite.ops_tasks (id, org_id, task_name, project_id, event_id, status, next_action) values ('native-task', ${orgA}, 'Book venue', 'native-project', 'native-event', 'todo', 'Confirm venue')`;
   });
   afterAll(async () => { if (!sql) return; await sql`delete from label_suite.audit_events where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.media_asset_files where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.media_assets where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.ops_tasks where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.project_events where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.budget_line_items where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.grant_applications where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.grants where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.funding_sources where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.documents where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.budget_projects where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.campaigns where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.artists where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.contacts where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.user where id=${userA}`; await sql`delete from label_suite.audit_logs where org_id in (${orgA}, ${orgB})`; await sql`delete from label_suite.orgs where id in (${orgA}, ${orgB})`; await sql.end(); });
+  it("Today excludes past single-day events and keeps today, future, and spanning events in the workspace date", async () => {
+    const { getTodayHubData } = await import("./today");
+    // These timezones have different calendar dates, regardless of the runner's clock hour.
+    for (const timezone of ["Pacific/Kiritimati", "Pacific/Pago_Pago"]) {
+      await sql!`update label_suite.orgs set timezone=${timezone} where id=${orgB}`;
+      await sql!`insert into label_suite.project_events (id, org_id, title, event_type, status, start_date, end_date)
+        select ${orgB} || '-' || fixture.name, ${orgB}, fixture.name, 'meeting', 'planned',
+          today.date + fixture.start_offset, today.date + fixture.end_offset
+        from (select (now() at time zone ${timezone})::date as date) today
+        cross join (values
+          ('past-no-end', -1, null::integer),
+          ('today-no-end', 0, null::integer),
+          ('future-no-end', 1, null::integer),
+          ('spanning', -2, 1),
+          ('ending-today', -2, 0),
+          ('ended-yesterday', -2, -1)
+        ) fixture(name, start_offset, end_offset)`;
+      try {
+        const result = await getTodayHubData(orgB);
+        expect(result.eventRows.map((event) => event.title).sort()).toEqual([
+          "ending-today", "future-no-end", "spanning", "today-no-end",
+        ]);
+      } finally {
+        await sql!`delete from label_suite.project_events where org_id=${orgB}`;
+      }
+    }
+  });
+
   it("returns decodable canonical detail after native create and update", async () => {
     const project = await service.createNativeProject(orgA, { name: "Native created project", description: "Original goal" }, userA);
     expect(project).toMatchObject({ record_type: "project", goal: "Original goal", revision: expect.any(String), relationships: { events: [], tasks: [] } });
