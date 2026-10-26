@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { isDeepStrictEqual } from "node:util";
+import { recordAuditEvent } from "./integrations";
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { artists, budget_projects, campaign_leads, campaigns, contacts, ops_tasks, org_memberships, project_events, release_milestones, releases } from "../db/schema";
@@ -179,15 +181,15 @@ export async function listOpsTasksForProject(orgId: string, projectId: string) {
   return (await listOpsTasks(orgId)).filter((task) => task.project_id === projectId);
 }
 
-export async function createOpsTask(orgId: string, input: CreateOpsTaskInput) {
+export async function createOpsTask(orgId: string, input: CreateOpsTaskInput, actorUserId?: string) {
   return db.transaction(async (tx) => {
     // ponytail: serialize task graph edits per workspace; narrow locks if write volume grows.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${orgId}, 91))`);
-    return createOpsTaskInTransaction(tx, orgId, input);
+    return createOpsTaskInTransaction(tx, orgId, input, actorUserId);
   });
 }
 
-async function createOpsTaskInTransaction(db: TaskTransaction, orgId: string, input: CreateOpsTaskInput) {
+async function createOpsTaskInTransaction(db: TaskTransaction, orgId: string, input: CreateOpsTaskInput, actorUserId?: string) {
   const id = input.id ?? crypto.randomUUID();
   await validateTaskPlanning(db, orgId, id, input);
   const status = input.status ?? "todo";
@@ -200,7 +202,7 @@ async function createOpsTaskInTransaction(db: TaskTransaction, orgId: string, in
   await assertCampaignLeadLink(db, orgId, input.linked_campaign_id, input.linked_campaign_lead_id);
   await assertTaskLinksInOrg(db, orgId, input);
 
-  await db.insert(ops_tasks).values({
+  const values = {
     id,
     org_id: orgId,
     task_name: input.task_name,
@@ -225,8 +227,19 @@ async function createOpsTaskInTransaction(db: TaskTransaction, orgId: string, in
     notes: input.notes ?? null,
     next_action: input.next_action ?? null,
     is_overdue: computeIsOverdue(status, dueDate),
-  }).onConflictDoNothing({ target: ops_tasks.id });
-
+  };
+  const [created] = await db.insert(ops_tasks).values(values).onConflictDoNothing({ target: ops_tasks.id }).returning();
+  if (!created) {
+    const [existing] = await db.select().from(ops_tasks).where(and(eq(ops_tasks.id, id), eq(ops_tasks.org_id, orgId))).for("update");
+    // Overdue is derived from today's date, not part of the original creation request.
+    const { is_overdue: _, ...identity } = values;
+    if (!existing || existing.revision !== 0 || existing.linked_grant_id !== null || existing.workback_key !== null || Object.entries(identity).some(([key, value]) => !isDeepStrictEqual(existing[key as keyof typeof existing], value))) {
+      throw new HttpError("Task identity already exists or changed. Check the saved task before continuing.", 409);
+    }
+  } else if (actorUserId) {
+    await recordAuditEvent(orgId, { actor_user_id: actorUserId, event_type: "task.create", object_type: "task", object_id: id,
+      after: values, metadata: { resulting_revision: created.revision } }, db);
+  }
   return { id, ok: true };
 }
 
