@@ -187,4 +187,50 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
     }
   });
 
+  it("reuses an existing Paperless document across concurrent selections without uploading or counting twice", async () => {
+    const env={PAPERLESS_ORG_ID:process.env.PAPERLESS_ORG_ID,PAPERLESS_URL:process.env.PAPERLESS_URL,PAPERLESS_TOKEN:process.env.PAPERLESS_TOKEN};
+    Object.assign(process.env,{PAPERLESS_ORG_ID:org,PAPERLESS_URL:'https://archive.example.invalid',PAPERLESS_TOKEN:'fixture'});
+    const pdf=new TextEncoder().encode('%PDF-existing-archive-fixture');
+    const hash=createHash('sha256').update(pdf).digest('hex');
+    const doc={id:90001,title:'Fuel receipt',created:'2026-10-19',content:'TOTAL USD 63.01'};
+    const fetch=vi.fn(async (url:string,init?:RequestInit)=>{
+      expect(init?.method ?? 'GET').toBe('GET');
+      if(url.includes('/90002/')) return new Response(null,{status:404});
+      if(url.endsWith('/metadata/')) return Response.json({original_checksum:hash});
+      if(url.includes('/90001/')) return Response.json(doc);
+      return Response.json({results:[doc],next:'https://untrusted.invalid/not-followed'});
+    });vi.stubGlobal('fetch',fetch);
+    const secondProject=`${project}-second`;
+    try {
+      const {listPaperlessReceipts,linkPaperlessReceipt,uploadTourReceipt}=await import('./tour-receipts');
+      const listed=await listPaperlessReceipts(org,project,'Fuel',1);
+      expect(listed).toEqual({items:[{id:doc.id,title:doc.title,created:doc.created}],next_page:2});
+      expect(fetch.mock.calls[0][0]).toContain('title__icontains=Fuel');
+      const before=(await read())!.money.forecast_cost;
+      const selected=await Promise.all([linkPaperlessReceipt(org,project,randomUUID(),doc.id),linkPaperlessReceipt(org,project,randomUUID(),doc.id)]);
+      expect(selected[0].id).toBe(selected[1].id);
+      expect((await sql`select count(*)::int n from label_suite.tour_receipts where org_id=${org} and document_id=${doc.id}`)[0].n).toBe(1);
+      expect((await read())!.money.forecast_cost).toBe(before);
+      expect((await uploadTourReceipt(org,project,randomUUID(),pdf)).id).toBe(selected[0].id);
+      const input=expense({receipt_id:selected[0].id,amount:6301,budget_line_id:'',distinct_purchase:true});
+      const posted=await service.saveTourDailyEntry(org,project,actor,input);
+      const repeated=await service.saveTourDailyEntry(org,project,actor,{...input,request_id:randomUUID()});
+      expect(repeated).toMatchObject({entry_id:posted.entry_id,repeated:true});
+      expect((await read())!.money.forecast_cost).toBe(before+6301);
+      expect(await linkPaperlessReceipt(org,project,randomUUID(),doc.id)).toMatchObject({status:'saved',entry_id:posted.entry_id});
+      const calls=fetch.mock.calls.length;
+      await expect(linkPaperlessReceipt('other-org',project,randomUUID(),doc.id)).rejects.toThrow('not found');
+      expect(fetch.mock.calls).toHaveLength(calls);
+      await expect(linkPaperlessReceipt(org,project,randomUUID(),90002)).rejects.toThrow('404');
+      expect((await sql`select count(*)::int n from label_suite.tour_receipts where org_id=${org} and document_id=90002`)[0].n).toBe(0);
+      await sql`insert into label_suite.budget_projects(id,org_id,name,project_type,currency) values (${secondProject},${org},'Other tour','tour','USD')`;
+      await expect(linkPaperlessReceipt(org,secondProject,randomUUID(),doc.id)).rejects.toThrow('another tour');
+      expect(fetch.mock.calls.every(([url])=>!url.includes('post_document'))).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      await sql`delete from label_suite.budget_projects where id=${secondProject}`;
+      for(const [key,value] of Object.entries(env)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+    }
+  });
+
 });
