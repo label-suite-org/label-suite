@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const nativeSession = vi.hoisted(() => ({ getNativeSession: vi.fn() }));
 vi.mock("../../../../../lib/native-session", () => ({ getNativeSession: nativeSession.getNativeSession, bearerToken: (request: Request) => request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null }));
-const native = vi.hoisted(() => ({ resolveNativeWorkspace: vi.fn() }));
+const database = vi.hoisted(() => ({ runWithDatabaseContext: vi.fn(async (_context: { userId: string; orgId: string }, operation: () => Promise<unknown>) => operation()) }));
+vi.mock("../../../../../lib/db", () => database);
+
+const native = vi.hoisted(() => ({ resolveNativeActor: vi.fn() }));
 const service = vi.hoisted(() => ({ listNativeCampaignLeads: vi.fn() }));
 
 vi.mock("../../../../../lib/native-workspace", () => native);
@@ -13,7 +16,7 @@ import { GET } from "./leads";
 describe("native campaign lead queues", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    native.resolveNativeWorkspace.mockResolvedValue({ org: { id: "org-a" } });
+    native.resolveNativeActor.mockResolvedValue({ userId: "user-a", workspace: { org: { id: "org-a" }, role: "operator" } });
     service.listNativeCampaignLeads.mockResolvedValue({ campaign_id: "campaign-a", queue: "follow_up", items: [], next_cursor: null });
   });
 
@@ -24,6 +27,7 @@ describe("native campaign lead queues", () => {
     } as never);
 
     expect(response.status).toBe(200);
+    expect(database.runWithDatabaseContext).toHaveBeenCalledWith({ userId: "user-a", orgId: "org-a" }, expect.any(Function));
     expect(service.listNativeCampaignLeads).toHaveBeenCalledWith("org-a", "campaign-a", {
       queue: "follow_up", channel: "youtube_channel", stage: "qualified", limit: "5", cursor: "next",
     });
@@ -49,14 +53,14 @@ describe("native campaign lead queues", () => {
 it("preserves valid sessions on workspace revocation and denies payee reads", async () => {
   vi.clearAllMocks();
   const invoke = () => GET({ request: new Request("https://suite.test/api/native/campaigns/campaign-a?workspaceId=org-a", { headers: { authorization: "Bearer token" } }), params: { id: "campaign-a" } } as never);
-  native.resolveNativeWorkspace.mockResolvedValue(null);
+  native.resolveNativeActor.mockResolvedValue(null);
   nativeSession.getNativeSession.mockResolvedValue({ user: { id: "user-a" } });
   const revoked = await invoke();
   expect(revoked.status).toBe(403);
   await expect(revoked.json()).resolves.toMatchObject({ code: "workspace_access_removed" });
   nativeSession.getNativeSession.mockResolvedValue(null);
   expect((await invoke()).status).toBe(401);
-  native.resolveNativeWorkspace.mockResolvedValue({ org: { id: "org-a" }, role: "payee" });
+  native.resolveNativeActor.mockResolvedValue({ userId: "user-a", workspace: { org: { id: "org-a" }, role: "payee" } });
   const denied = await invoke();
   expect(denied.status).toBe(403);
   await expect(denied.json()).resolves.toMatchObject({ code: "insufficient_permissions" });

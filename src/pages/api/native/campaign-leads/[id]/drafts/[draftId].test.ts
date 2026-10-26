@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const database = vi.hoisted(() => ({ runWithDatabaseContext: vi.fn(async (_context: { userId: string; orgId: string }, operation: () => Promise<unknown>) => operation()) }));
+vi.mock("../../../../../../lib/db", () => database);
+
 const native = vi.hoisted(() => ({ resolveNativeActor: vi.fn() }));
 const tenant = vi.hoisted(() => ({ hasCapability: vi.fn() }));
 const service = vi.hoisted(() => ({ createManualDraftVersion: vi.fn() }));
@@ -29,6 +32,7 @@ describe("native plain draft mutation", () => {
     } as never);
 
     expect(response.status).toBe(201);
+    expect(database.runWithDatabaseContext).toHaveBeenCalledWith({ userId: "user-a", orgId: "org-a" }, expect.any(Function));
     expect(service.createManualDraftVersion).toHaveBeenCalledWith(
       "org-a",
       "draft-a",
