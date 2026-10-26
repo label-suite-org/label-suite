@@ -46,7 +46,7 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     await admin.query(`insert into label_suite.orgs(id,name,slug) values ($1,'Fan fixture',$1),($2,'Other fixture',$2)`, [org, otherOrg]);
     await admin.query(`insert into label_suite.artists(id,org_id,name) values($1,$2,'Fixture Artist'),($3,$2,'Second Artist')`, [artist, org, otherArtist]);
   });
-  afterEach(() => { vi.unstubAllGlobals(); delete process.env.FAN_ALLOWED_EMAIL; });
+  afterEach(() => { vi.unstubAllGlobals(); for (const key of ["FAN_ALLOWED_EMAIL", "FAN_PUBLIC_SIGNUP_ENABLED", "FAN_PUBLIC_ARTIST_ID", "FAN_POSTAL_ADDRESS", "FAN_DAILY_EMAIL_LIMIT"]) delete process.env[key]; });
   afterAll(async () => { await database?.pool.end(); await admin?.end(); vi.unstubAllEnvs(); });
 
   it("retries a new message concurrently without duplicates and rejects changed or cross-state retries", async () => {
@@ -214,7 +214,7 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     expect(fetch).not.toHaveBeenCalled();
     const stale = await messageFixture("stale");
     await service.unsubscribeFan(core.fanToken("unsubscribe", org, stale.registration.subscription_id, Date.now() + 86400_000));
-    await expect(schedule(stale)).rejects.toThrow("1–500");
+    await expect(schedule(stale)).rejects.toThrow("1–200");
   });
   it("rechecks consent at handoff and never retries a send with a lost provider response", async () => {
     const fixture = await messageFixture("unknown"); const scheduled = await schedule(fixture);
@@ -315,6 +315,64 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
       expect(url).toContain("/9025/sendNow"); return new Response(null, { status: 204 });
     });
     expect(await messages.dispatchFanMessage(org, scheduled.id)).toEqual({ submitted: true });
+  });
+
+  it("admits confirmed public fans for one artist, rejects other artists, and closes again without exposing their audience", async () => {
+    const page = await drop("public-launch"), other = await drop("public-other", otherArtist);
+    vi.stubEnv("FAN_ALLOWED_EMAIL", `owner-launch-${suffix}@example.test`);
+    vi.stubEnv("FAN_PUBLIC_ARTIST_ID", artist); vi.stubEnv("FAN_POSTAL_ADDRESS", "Fixture street 1, Fixture city");
+    const input = { email: `public-${suffix}@example.test`, consent: true, published_revision: page.published_revision };
+    await expect(context(() => service.signupToFanDrop(org, page.slug, input, "127.0.1.1"))).rejects.toMatchObject({ status: 403 });
+    vi.stubEnv("FAN_PUBLIC_SIGNUP_ENABLED", "true");
+    await expect(context(() => service.signupToFanDrop(org, other.slug, { ...input, published_revision: other.published_revision }, "127.0.1.1"))).rejects.toMatchObject({ status: 403 });
+    await context(() => service.signupToFanDrop(org, page.slug, input, "127.0.1.1"));
+    const pending = await latest(input.email);
+    expect(await context(() => service.fanAudience(org, { artist_id: artist, drop_id: page.id }))).toHaveLength(0);
+    await service.confirmFanSignup(core.fanToken("confirm", org, pending.id, pending.expires_at.getTime()));
+    expect((await context(() => service.fanAudience(org, { artist_id: artist, drop_id: page.id }))).map(row => row.email)).toEqual([input.email]);
+    const draft = await context(() => messages.saveFanMessage(org, { audience: { artist_id: artist, drop_id: page.id }, content: { subject: "Public launch", body: "Confirmed only", link_url: null } }));
+    const review = await context(() => messages.previewFanMessage(org, { id: draft.id, expected_revision: draft.revision }));
+    const queued = await context(() => messages.scheduleFanMessage(org, { id: draft.id, expected_revision: draft.revision, preview_hash: review.preview_hash, scheduled_at: new Date(Date.now()+60000).toISOString() }));
+    vi.stubEnv("FAN_PUBLIC_SIGNUP_ENABLED", "false");
+    expect(await context(() => service.fanAudience(org, { artist_id: artist, drop_id: page.id }))).toHaveLength(0);
+    await admin.query("update label_suite.fan_messages set scheduled_at=now()-interval '1 minute' where id=$1", [queued.id]);
+    const provider = vi.fn(async (url: string) => {
+      throw new Error("A closed launch must not contact fans");
+    }); vi.stubGlobal("fetch", provider);
+    await messages.dispatchFanMessage(org, queued.id);
+    expect((await context(() => messages.getFanMessage(org, queued.id))).status).toBe("cancelled");
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it("does not erase verified delivery or count duplicate callbacks when provider aggregates are zero", async () => {
+    const fixture = await messageFixture("event-report");
+    await admin.query("update label_suite.fan_messages set provider_campaign_id=9041,recipient_ids=$2::jsonb where id=$1", [fixture.draft.id, JSON.stringify([fixture.registration.subscription_id])]);
+    const event = { event: "delivered", email: fixture.email, camp_id: 9041, ts_event: Math.floor(Date.now()/1000) };
+    await context(() => feedback.recordFanWebhook(org, event));
+    await context(() => feedback.recordFanWebhook(org, event));
+    await context(() => feedback.recordFanWebhook(org, { ...event, ts_event: event.ts_event+1 }));
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ id: 9041, name: `Label Suite ${fixture.draft.id}`, status: "sent", statistics: { globalStats: { sent: 0, delivered: 0 } } })));
+    const result = await context(() => messages.reconcileFanMessage(org, { id: fixture.draft.id, expected_revision: fixture.draft.revision }));
+    expect(result.report).toMatchObject({ sent: 1, delivered: 1, uniqueClicks: 0 });
+    expect((await context(() => feedback.fanActivityReport(otherOrg, fixture.draft.id), otherOrg)).delivered).toBe(0);
+  });
+
+  it("shares an atomic daily budget across confirmation and campaigns and never contacts the provider after exhaustion", async () => {
+    const fixture = await messageFixture("budget"); const queued = await schedule(fixture);
+    const page = await drop("budget-confirmation"), email = `budget-confirmation-${suffix}@example.test`;
+    await signup(page, email); const pending = await latest(email);
+    await admin.query("delete from label_suite.fan_rate_limits where org_id=$1 and key=$2", [org, core.fanRateKey("fan-send-budget")]);
+    vi.stubEnv("FAN_DAILY_EMAIL_LIMIT", "1");
+    const reservations = await Promise.all([context(() => service.reserveFanEmailBudget(org, 1)), context(() => service.reserveFanEmailBudget(org, 1))]);
+    expect(reservations.filter(Boolean)).toHaveLength(1);
+    await admin.query("update label_suite.fan_messages set scheduled_at=now()-interval '1 minute' where id=$1", [queued.id]);
+    const provider = vi.fn(); vi.stubGlobal("fetch", provider);
+    await messages.dispatchFanMessage(org, queued.id); await service.dispatchFanConfirmation(org, pending.id);
+    expect(provider).not.toHaveBeenCalled();
+    expect(await context(() => messages.getFanMessage(org, queued.id))).toMatchObject({ status: "review", failure_code: "daily_email_budget" });
+    expect((await latest(email)).email_status).toBe("failed");
+    await admin.query("update label_suite.fan_rate_limits set window_start=now()-interval '2 days' where org_id=$1 and key=$2", [org, core.fanRateKey("fan-send-budget")]);
+    expect(await context(() => service.reserveFanEmailBudget(org, 1))).toBe(true);
   });
 
 });

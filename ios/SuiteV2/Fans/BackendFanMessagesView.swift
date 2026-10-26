@@ -77,7 +77,7 @@ struct FanMessageEditor: View {
                             Text(draft.content.body)
                             if let link = draft.content.link_url { Text("\(draft.content.link_label): \(link)").font(.caption) }
                             Text("\(preview.count) confirmed fans").font(.headline)
-                            if preview.limit_exceeded { Text("Narrow the audience to 500 or fewer fans.").foregroundStyle(.orange) }
+                            if preview.limit_exceeded { Text("Narrow the audience to fit the daily sending budget.").foregroundStyle(.orange) }
                             DisclosureGroup("Exact reviewed audience") { ForEach(preview.audience) { fan in VStack(alignment: .leading) { Text(fan.email); Text(fan.city).font(.caption) } } }
                             DatePicker("Send at", selection: $scheduledAt, in: Date.now...)
                             Text("Time zone: \(TimeZone.current.identifier). Later signups are not added; opt-outs are checked again at dispatch. Cancellation is available until delivery preparation begins.").font(.caption)

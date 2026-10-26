@@ -9,7 +9,7 @@ import { getFanDrop, listFanDrops, saveFanDrop, publishFanDrop, fanAudience } fr
 import { canonicalAppOrigin } from "../../../server/request-security";
 import { publicDropPath } from "../../../server/fan-drops";
 import { writeAuditLog } from "../../../server/audit";
-import { fanEmailEnabled, fanId, fanAllowedEmail } from "../../../server/fan-drops-core";
+import { fanEmailEnabled, fanId, fanAllowedEmail, fanPublicArtistId, fanDailyEmailLimit } from "../../../server/fan-drops-core";
 import { readFanJson, handleFanError } from "../../../server/fan-request";
 import { getFanMessage, listFanMessages, saveFanMessage, previewFanMessage, scheduleFanMessage, cancelFanMessage, reconcileFanMessage, testFanMessage, fanTestRecipient } from "../../../server/fan-messages";
 import { listFans, fanHistory, tagFan } from "../../../server/fan-feedback";
@@ -40,7 +40,7 @@ export const GET: APIRoute = async ({ request }) => {
         releases: await db.select({ id: releases.id, artist_id: releases.artist_id, title: releases.title, cover_art_url: releases.cover_art_url }).from(releases).where(and(eq(releases.org_id, orgId), scope ? eq(releases.artist_id, scope) : undefined)).orderBy(asc(releases.title)).limit(500),
         shows: await db.select({ id: project_events.id, artist_id: project_events.artist_id, title: project_events.title, start_date: project_events.start_date, city: project_events.city }).from(project_events).where(and(eq(project_events.org_id, orgId), scope ? eq(project_events.artist_id, scope) : undefined)).orderBy(asc(project_events.start_date)).limit(500),
         public_base_url: canonicalAppOrigin(),
-        allowed_email: fanAllowedEmail(), test_recipient: actor.workspace.role === "owner" ? await fanTestRecipient(orgId, actor.userId) : null,
+        allowed_email: fanPublicArtistId() ? null : fanAllowedEmail(), public_artist_id: fanPublicArtistId(), daily_email_limit: fanDailyEmailLimit(), test_recipient: actor.workspace.role === "owner" ? await fanTestRecipient(orgId, actor.userId) : null,
         drops: (await listFanDrops(orgId, scope)).map(drop => ({ ...drop, public_url: new URL(publicDropPath(orgId, drop.slug), canonicalAppOrigin()).toString() })), messages: await listFanMessages(orgId, scope), email_enabled: fanEmailEnabled(), broadcast_enabled: process.env.FAN_BROADCAST_ENABLED === "true" && process.env.FAN_BREVO_ORG_ID === actor.workspace.org.id };
     }));
   } catch (error) { return nativeError(error); }

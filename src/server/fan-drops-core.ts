@@ -70,15 +70,35 @@ export function fanAllowedEmail() {
   if (!parsed.success) throw new HttpError("Fan pilot recipient is not configured", 503);
   return parsed.data;
 }
-export function requireFanRecipient(orgId: string, email: string) {
+export function fanPostalAddress() {
+  const value = process.env.FAN_POSTAL_ADDRESS?.trim();
+  if (!value || value.length > 500 || /[<>]/.test(value)) throw new HttpError("Fan postal address is not configured", 503);
+  return value;
+}
+export function fanPublicArtistId() {
+  if (process.env.FAN_PUBLIC_SIGNUP_ENABLED !== "true") return null;
+  const artist = fanId.safeParse(process.env.FAN_PUBLIC_ARTIST_ID);
+  if (!artist.success) throw new HttpError("Public fan artist is not configured", 503);
+  fanPostalAddress();
+  return artist.data;
+}
+export function fanDailyEmailLimit() {
+  const value = Number(process.env.FAN_DAILY_EMAIL_LIMIT ?? "200");
+  // shortcut: reserve at least 50 of the current 300/day plan for other mail; revisit with account-wide quota management.
+  if (!Number.isSafeInteger(value) || value < 1 || value > 250) throw new HttpError("Fan daily email limit must be between 1 and 250", 503);
+  return value;
+}
+export function requireFanRecipient(orgId: string, email: string, artistId?: string) {
   const allowed = fanAllowedEmail();
   if (!allowed) throw new HttpError("Fan pilot recipient is not configured", 503);
-  if (process.env.FAN_BREVO_ORG_ID !== orgId || email.toLowerCase() !== allowed) throw new HttpError("This pilot sends only to its configured owner address", 403);
+  const publicArtist = fanPublicArtistId();
+  if (process.env.FAN_BREVO_ORG_ID !== orgId || (email.toLowerCase() !== allowed && (!publicArtist || publicArtist !== artistId))) throw new HttpError("This signup accepts only permitted addresses", 403);
 }
 export function fanEmailEnabled() { return process.env.FAN_EMAIL_ENABLED === "true"; }
 export function requireFanEmail() {
   if (!fanEmailEnabled()) throw new HttpError("Email signup is not available yet", 503);
   tokenSecret();
   if (!fanAllowedEmail()) throw new HttpError("Fan pilot recipient is not configured", 503);
+  fanPublicArtistId(); fanDailyEmailLimit();
   if (!process.env.BREVO_API_KEY || !process.env.BREVO_SENDER_EMAIL) throw new HttpError("Email signup is not configured", 503);
 }

@@ -5,6 +5,21 @@ import { db } from "../lib/db";
 import { fans, fan_subscriptions, fan_signups, fan_messages, fan_activity } from "../db/schema";
 import { fanId, fanRateKey } from "./fan-drops-core";
 import { ConflictError, HttpError, NotFoundError } from "./errors";
+import { fanReportSchema, type FanMessageReport } from "./fan-messages-core";
+
+export async function fanActivityReport(orgId: string, messageId: string, provider?: FanMessageReport) {
+  const rows = await db.select({ kind: fan_activity.kind, count: sql<number>`count(distinct ${fan_activity.subscription_id})::int` }).from(fan_activity)
+    .where(and(eq(fan_activity.org_id, orgId), eq(fan_activity.message_id, messageId))).groupBy(fan_activity.kind);
+  const counts = fanReportSchema.parse(provider ?? {});
+  const keys = { delivered: "delivered", click: "uniqueClicks", hard_bounce: "hardBounces", soft_bounce: "softBounces", spam: "complaints", unsubscribed: "unsubscriptions" } as const;
+  for (const row of rows) {
+    const key = keys[row.kind as keyof typeof keys];
+    if (key) counts[key] = Math.max(counts[key], row.count);
+  }
+  // Receipt proves at least one send; do not treat opens/clicks as delivery evidence.
+  counts.sent = Math.max(counts.sent, counts.delivered);
+  return counts;
+}
 
 export function authenticateFanWebhook(request: Request, orgId: string) {
   const secret = process.env.FAN_BREVO_WEBHOOK_SECRET;
