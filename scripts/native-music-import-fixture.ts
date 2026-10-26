@@ -57,7 +57,7 @@ try {
   await assert.rejects(listNativeMusicCatalogues(orgId, artistId, database), /catalogue is incomplete/);
   console.log("PASS native catalogue import: identity, tenant isolation, preview binding, deduplication, immutable runs, latest observation, null/zero and incomplete read rejection");
 } finally {
-  for (const table of ["analytics_metric_changes", "analytics_metric_rows", "analytics_import_files", "analytics_import_runs", "artists", "orgs"]) {
+  for (const table of ["analytics_metric_changes", "analytics_metric_rows", "analytics_import_files", "analytics_import_runs", "artists", "audit_logs", "orgs"]) {
     await pool.query(`delete from label_suite.${table} where ${table === "orgs" ? "id" : "org_id"}=$1`, [orgId]);
   }
   await pool.end();
