@@ -883,6 +883,7 @@ describe("Sisense browser contract", () => {
       const { runDir, manifest } = await readScrapeRun(directory);
       expect(manifest.completeness.state).toBe(tracksPlaceholder === "once" ? "complete" : "partial");
       expect(manifest.files).toHaveLength(tracksPlaceholder === "once" ? 1 : 0);
+      expect((await readdir(runDir)).filter((name) => name.endsWith(".csv"))).toHaveLength(manifest.files.length);
       for (const file of manifest.files) {
         expect(await readFile(path.join(runDir, file.fileName), "utf8")).toBe("Track,Streams\nTrack One,19\n");
       }

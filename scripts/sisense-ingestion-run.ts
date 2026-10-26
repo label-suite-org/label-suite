@@ -1,6 +1,6 @@
 import { parseCsv, type ParsedCsv } from "./sisense-csv";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { chromium, errors, type ElementHandle, type Locator, type Page } from "playwright";
@@ -783,6 +783,8 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
       const localPath = path.join(runDir, fileName.endsWith(".csv") ? fileName : `${fileName}.csv`);
       await download.saveAs(localPath);
       if (!parseCsv(await readFile(localPath, "utf8")).rows.length) {
+        // Preserve diagnostic evidence outside the directory-import file set.
+        await rename(localPath, path.join(runDir, "failures", path.basename(localPath)));
         throw new EmptyCsvExportError("Downloaded CSV contained no data rows.");
       }
 
