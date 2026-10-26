@@ -1,8 +1,9 @@
 import { and, asc, eq, getTableColumns, isNull, sql } from "drizzle-orm";
 import { releases, tracks, works } from "../db/schema";
 import { db } from "../lib/db";
+import { normalizeIsrcValue } from "../lib/isrc";
 import { z } from "zod";
-import { updateTrack, updateTrackSchema } from "./tracks";
+import { createTrack, updateTrack, updateTrackSchema } from "./tracks";
 import { NotFoundError } from "./errors";
 
 /** Release context is part of the route, not inferred from an unscoped Track ID. */
@@ -43,7 +44,7 @@ export async function getNativeTrack(orgId: string, releaseId: string | null, tr
   };
 }
 
-export const nativeTrackUpdateSchema = updateTrackSchema.omit({ id: true, work_id: true })
+export const nativeTrackUpdateSchema = updateTrackSchema.omit({ id: true })
   .extend({ expected_revision: z.string().trim().min(1) }).strict()
   .refine((input) => Object.keys(input).some((key) => key !== "expected_revision"), "At least one Track field is required");
 
@@ -51,4 +52,30 @@ export async function updateNativeTrack(orgId: string, releaseId: string | null,
   const { expected_revision, ...input } = nativeTrackUpdateSchema.parse(raw);
   await updateTrack(orgId, { ...input, id: trackId }, { releaseId, expectedRevision: expected_revision, actorUserId });
   return getNativeTrack(orgId, releaseId, trackId);
+}
+
+const createText = z.string().trim().min(1).max(2000);
+export const nativeTrackCreateSchema = z.object({
+  id: z.string().uuid(), title: createText,
+  position: z.number().int().min(1).max(2147483647).nullable().default(null),
+  version: z.string().trim().min(1).nullable().default(null),
+  audio_url: z.string().trim().min(1).nullable().default(null),
+  duration: z.number().int().min(0).max(2147483647).nullable().default(null),
+  work: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("existing"), id: createText }).strict(),
+    z.object({ kind: z.literal("new"), id: z.string().uuid(), title: createText,
+      isrc: z.string().trim().min(1).nullable().default(null), auto_isrc: z.boolean().default(false) }).strict(),
+  ]),
+}).strict().refine(input => input.work.kind !== "new" || !input.work.isrc || !input.work.auto_isrc, "Choose a supplied ISRC or allocation, not both");
+
+export async function createNativeTrack(orgId: string, releaseId: string, raw: unknown, actorUserId: string) {
+  const request = nativeTrackCreateSchema.parse(raw);
+  if (request.work.kind === "new") request.work.isrc = normalizeIsrcValue(request.work.isrc);
+  const result = await createTrack(orgId, {
+    title: request.title, release_id: releaseId, position: request.position, version: request.version,
+    audio_url: request.audio_url, duration: request.duration,
+    ...(request.work.kind === "existing" ? { work_id: request.work.id, auto_isrc: false } :
+      { new_work_title: request.work.title, isrc: request.work.isrc, auto_isrc: request.work.auto_isrc }),
+  }, { id: request.id, newWorkId: request.work.kind === "new" ? request.work.id : undefined, actorUserId, request: { ...request, release_id: releaseId } });
+  return { ok: true, id: result.id, release_id: releaseId, work_id: result.work_id };
 }

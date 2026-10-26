@@ -265,6 +265,7 @@ export type AssignIsrcsResult = {
  */
 export async function assignISRCsToRelease(orgId: string, releaseId: string): Promise<AssignIsrcsResult> {
   return db.transaction(async (tx) => {
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
     const trackRows = await tx
       .select()
       .from(tracks)
