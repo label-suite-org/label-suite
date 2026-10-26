@@ -30,9 +30,12 @@ async function startDashboardFixture(input: {
   shazamMenuState?: "late-ready" | "race-ready" | "poll-window-ready" | "post-click-empty";
   portalTracksMenuShape?: PortalTracksMenuShape;
   portalAppleMenu?: boolean;
+  sharedDownloadPortal?: boolean;
+  tracksPlaceholder?: "once" | "always";
   portalPlaylistMenu?: boolean;
 }): Promise<DashboardFixture> {
   const filterEvents: string[] = [];
+  let tracksDownloads = 0;
   const server = createServer((request, response) => {
     const filterEvent = request.url?.match(/^\/filter-event\/([^?]+)/)?.[1];
     if (filterEvent) {
@@ -48,7 +51,10 @@ async function startDashboardFixture(input: {
     }
     if (request.url === "/tracks.csv") {
       response.writeHead(200, { "content-type": "text/csv", "content-disposition": "attachment; filename=tracks.csv" });
-      response.end("Track,Streams\nTrack One,19\n");
+      tracksDownloads += 1;
+      response.end(input.tracksPlaceholder === "always" || (input.tracksPlaceholder === "once" && tracksDownloads === 1)
+        ? "There is no data for this csv.\n"
+        : "Track,Streams\nTrack One,19\n");
       return;
     }
     if (request.url === "/apple.csv") {
@@ -272,7 +278,11 @@ async function startDashboardFixture(input: {
           if (inlineMenu) inlineMenu.hidden = false;
           if (portalMenu) portalMenu.hidden = false;
         });
-        document.getElementById("apple-more")?.addEventListener("click", () => { document.getElementById("apple-portal").hidden = false; });
+        document.getElementById("apple-more")?.addEventListener("click", () => {
+          const menu = document.getElementById(${JSON.stringify(input.sharedDownloadPortal ? "tracks-portal" : "apple-portal")});
+          menu.querySelector("a").href = "/apple.csv";
+          menu.hidden = false;
+        });
         const playlistMore = document.getElementById("playlist-more");
         if (playlistMore) {
           let playlistReady = false;
@@ -836,6 +846,51 @@ describe("Sisense browser contract", () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 30_000);
+
+  it("recovers a reused export menu on a fresh page without mixing widget files", async () => {
+    const fixture = await startDashboardFixture({ activateRequestedRange: true, portalTracksMenuShape: "single", portalAppleMenu: true, sharedDownloadPortal: true });
+    const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-shared-portal-"));
+    try {
+      const result = await runScrape({
+        dashboardUrl: fixture.url,
+        downloadDir: directory,
+        widgets: [
+          { key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" },
+          { key: "apple-streams-source", title: "Apple Streams by Source" },
+        ],
+      });
+      const { runDir, manifest } = await readScrapeRun(directory);
+      expect(manifest.completeness.state).toBe("complete");
+      const apple = manifest.files.find((file) => file.widgetKey === "apple-streams-source")!;
+      expect(await readFile(path.join(runDir, apple.fileName), "utf8")).toBe("Date,Source,Streams\n2026-07-30,Search,7\n");
+      expect(result.status).toBe(0);
+    } finally {
+      await fixture.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 90_000);
+
+  it.each(["once", "always"] as const)("retries a %s empty CSV placeholder without publishing it", async (tracksPlaceholder) => {
+    const fixture = await startDashboardFixture({ activateRequestedRange: true, tracksPlaceholder });
+    const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-placeholder-"));
+    try {
+      const result = await runScrape({
+        dashboardUrl: fixture.url,
+        downloadDir: directory,
+        widgets: [{ key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" }],
+      });
+      expect(result.status).toBe(0);
+      const { runDir, manifest } = await readScrapeRun(directory);
+      expect(manifest.completeness.state).toBe(tracksPlaceholder === "once" ? "complete" : "partial");
+      expect(manifest.files).toHaveLength(tracksPlaceholder === "once" ? 1 : 0);
+      for (const file of manifest.files) {
+        expect(await readFile(path.join(runDir, file.fileName), "utf8")).toBe("Track,Streams\nTrack One,19\n");
+      }
+    } finally {
+      await fixture.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 90_000);
 
   it("waits for the scoped Spotify Playlist Listings menu to become actionable", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, portalPlaylistMenu: true });

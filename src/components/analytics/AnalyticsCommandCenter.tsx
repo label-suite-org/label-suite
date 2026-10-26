@@ -117,6 +117,13 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
   const dailySourceAvailability = sourceAvailability(command, [["csv-daily-source-mix"], requestedPlatformWidgetKeys]);
   const trackTotalsAvailability = sourceAvailability(command, [["csv-track-totals"], ["tracks-by-growth-rate"]]);
   const geoAvailability = sourceAvailability(command, [["csv-geo-superfans"], ["spotify-superfans-active-streams-city"]]);
+  const insightAvailability = {
+    daily: dailySourceAvailability,
+    tracks: trackTotalsAvailability,
+    cities: geoAvailability,
+    playlists: sourceAvailability(command, [["csv-playlists"], ["spotify-playlist-listings"]]),
+  };
+  const availableInsights = selectedPeriod.insights.filter((insight) => insightAvailability[insight.source].available);
   const catalogueMetricLabel = command.activeFilters.artistId
     ? "Selected artist combined streams"
     : command.activeFilters.releaseId
@@ -222,7 +229,8 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
 
       {section === "overview" && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {selectedPeriod.insights.map((insight) => <InsightCard key={insight.label} insight={insight} />)}
+          {availableInsights.map((insight) => <InsightCard key={insight.label} insight={insight} />)}
+          {availableInsights.length === 0 && <p className="text-sm text-muted-foreground">Recommendations will appear when current source data is available.</p>}
         </div>
       )}
 

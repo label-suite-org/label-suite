@@ -199,6 +199,27 @@ describe("AnalyticsCommandCenter", () => {
     }
   });
 
+  it("withholds recommendations backed by stale source data", async () => {
+    const { container, root } = await renderAnalytics({
+      ...baseInput,
+      dailySources: [
+        { date: "2026-07-04", platform: "spotify", source: "radio", streams: 120 },
+        { date: "2026-07-05", platform: "apple", source: "library", streams: 80 },
+      ],
+      widgets: ["tracks-by-growth-rate", "spotify-streams-source", "apple-streams-source", "spotify-superfans-active-streams-city"]
+        .map((widgetKey) => ({ widgetKey, rowCount: 2, trackCount: 2, lastSeenAt: "2026-07-05" })),
+    }, "?period=all", "overview");
+
+    try {
+      expect(container.textContent).toContain("Source data is stale");
+      expect(container.textContent).not.toContain("Decide if this deserves content, pitch, or ad support.");
+      expect(container.textContent).not.toContain("Use this for geo-targeting, PR angles, and routing fan outreach.");
+      expect(container.textContent).not.toContain("Lean into algorithmic/radio compounding; watch saves and completion.");
+    } finally {
+      await cleanup(container, root);
+    }
+  });
+
   it.each([
     ["overview", "Selected-period combined streams", "Daily streams trend"],
     ["trends", "Daily streams trend", "Markets to act on"],
