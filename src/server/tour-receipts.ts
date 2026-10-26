@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../lib/db';
 import { budget_projects, tour_money_entries, tour_receipts } from '../db/schema';
@@ -37,6 +37,37 @@ export async function listTourReceipts(org: string, project: string) {
   paperlessConfig(org);
   const rows = await db.select().from(tour_receipts).where(and(eq(tour_receipts.org_id, org), eq(tour_receipts.project_id, project))).orderBy(desc(tour_receipts.created_at)).limit(100);
   return { items: rows.map(view) };
+}
+const archiveDocumentSchema = z.object({id:z.number().int().positive(),title:z.string(),created:z.string()});
+export async function listPaperlessReceipts(org: string, project: string, query: string, page: number) {
+  await tour(org, project); paperlessConfig(org);
+  z.string().max(200).parse(query); z.number().int().min(1).max(10000).parse(page);
+  const params = new URLSearchParams({page:String(page),page_size:'30',ordering:'-created',fields:'id,title,created'});
+  if (query.trim()) params.set('title__icontains',query.trim());
+  const result = z.object({results:z.array(archiveDocumentSchema),next:z.string().nullable()}).parse(
+    await paperless<unknown>(org,`/api/documents/?${params}`));
+  // Never follow a server-provided URL with the archive credential.
+  return {items:result.results,next_page:result.next && page < 10000 ? page+1 : null};
+}
+export async function linkPaperlessReceipt(org: string, project: string, id: string, documentID: number) {
+  z.uuid().parse(id); z.number().int().positive().parse(documentID);
+  await tour(org, project); paperlessConfig(org);
+  // These reads enforce Paperless object permissions, including on repeated selections.
+  const doc = archiveDocumentSchema.extend({content:z.string()}).parse(
+    await paperless<unknown>(org,`/api/documents/${documentID}/?fields=id,title,created,content`));
+  if (doc.id !== documentID) throw new HttpError('Receipt archive returned a different document',502);
+  const metadata = z.object({original_checksum:z.string().regex(/^[a-f0-9]{64}$/)}).parse(
+    await paperless<unknown>(org,`/api/documents/${documentID}/metadata/`));
+  await db.insert(tour_receipts).values({id,org_id:org,project_id:project,sha256:metadata.original_checksum,
+    document_id:documentID,status:'review',content:doc.content.slice(0,60000)}).onConflictDoNothing();
+  const rows = await db.select().from(tour_receipts).where(and(eq(tour_receipts.org_id,org),
+    or(eq(tour_receipts.document_id,documentID),eq(tour_receipts.sha256,metadata.original_checksum))));
+  if (rows.length !== 1 || rows[0].project_id !== project) throw new HttpError('This receipt is already assigned to another tour or needs review before linking.',409);
+  const row = rows[0];
+  if (!row.document_id) throw new HttpError('This receipt already has an upload in progress. Check that scan before linking it.',409);
+  // The existing unique document/hash keys make retries and concurrent selections idempotent.
+  // Linking evidence never uploads bytes or writes a money entry.
+  return getTourReceipt(org,project,row.id);
 }
 export async function uploadTourReceipt(org: string, project: string, id: string, bytes: Uint8Array) {
   z.uuid().parse(id); await tour(org, project); paperlessConfig(org);
