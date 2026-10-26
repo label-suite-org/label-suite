@@ -337,13 +337,11 @@ suite("fan Drop lifecycle against disposable PostgreSQL", () => {
     expect(await context(() => service.fanAudience(org, { artist_id: artist, drop_id: page.id }))).toHaveLength(0);
     await admin.query("update label_suite.fan_messages set scheduled_at=now()-interval '1 minute' where id=$1", [queued.id]);
     const provider = vi.fn(async (url: string) => {
-      if (url.endsWith("/contacts/lists")) return Response.json({ id: 9031 });
-      if (url.endsWith("/emailCampaigns")) return Response.json({ id: 9032 });
       throw new Error("A closed launch must not contact fans");
     }); vi.stubGlobal("fetch", provider);
     await messages.dispatchFanMessage(org, queued.id);
     expect((await context(() => messages.getFanMessage(org, queued.id))).status).toBe("cancelled");
-    expect(provider.mock.calls.some(([url]) => url.includes("/sendNow") || url.endsWith("/contacts"))).toBe(false);
+    expect(provider).not.toHaveBeenCalled();
   });
 
   it("does not erase verified delivery or count duplicate callbacks when provider aggregates are zero", async () => {

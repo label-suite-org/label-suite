@@ -143,6 +143,10 @@ export async function dispatchFanMessage(orgId: string, messageId: string, signa
     const initial = await workerContext(orgId, () => fanAudience(orgId, message.audience));
     const approved = new Set(message.recipient_ids);
     const candidates = initial.filter(row => approved.has(row.id));
+    if (!candidates.length) {
+      await workerContext(orgId, () => db.update(fan_messages).set({ status: "cancelled", recipient_count: 0, updated_at: new Date() }).where(eq(fan_messages.id, messageId)));
+      return { skipped: true };
+    }
     const list = providerId.parse(await brevo("/contacts/lists", "POST", { name: `Label Suite ${message.id}`, folderId }, signal));
     await workerContext(orgId, () => db.update(fan_messages).set({ provider_list_id: list.id }).where(eq(fan_messages.id, messageId)));
     stage = "prepare_contacts";

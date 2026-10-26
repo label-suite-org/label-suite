@@ -21,7 +21,7 @@ Prepare a one-artist public launch while retaining the owner-only live pilot. Do
 4. Publish a separate fan-facing Drop only after reviewing the copy/offer from the signup workstream. Keep the current concert signup/QR destination intact until a separate cutover decision. Accept new double-opt-in subscriptions first. List membership alone does not establish consent for import.
 5. On an owner-controlled address, complete mobile signup, real confirmation, audience review, scheduled inbox receipt, cancellation, and unsubscribe followed by exclusion from preview and dispatch. Confirm the provider unsubscribe's label-wide scope; never clear a real blacklist merely to restore testability. Use isolated fixtures for synthetic bounce and unknown-response tests.
 6. Accept the physical iPhone flow against the latest combined app. The native copy change in this release only removes the obsolete 500-recipient advice; coordinate it with the current native workstream before the next build/install. Preserve saved drafts and the latest shared source.
-7. Only after all items above pass, set `FAN_PUBLIC_ARTIST_ID` to the intended artist and explicitly set `FAN_PUBLIC_SIGNUP_ENABLED=true` through Dokploy. Missing postal address must still fail closed. A code merge or deployment is not activation approval.
+7. Only after all items above pass, verify the intended `FAN_PUBLIC_ARTIST_ID` exists in the configured workspace, set it, and explicitly set `FAN_PUBLIC_SIGNUP_ENABLED=true` through Dokploy. Missing postal address must still fail closed. A code merge or deployment is not activation approval.
 
 ## Recovery and current hold
 
