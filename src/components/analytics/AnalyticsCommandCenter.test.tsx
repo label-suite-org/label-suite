@@ -378,7 +378,7 @@ describe("AnalyticsCommandCenter", () => {
     expect(html).toContain("Source: Sisense playlists");
     expect(html).toContain("Source: Sisense shazams by city");
     expect(html).toContain("Reporting: Last 30 days");
-    expect(html).toContain("Freshness:");
+    expect(html).toContain("Import freshness:");
     expect(html).toContain("Stale threshold: 48 hours");
   });
 
@@ -401,7 +401,7 @@ describe("AnalyticsCommandCenter", () => {
       .join("");
 
     expect(html).not.toContain("Last seen: Waiting for import");
-    expect(html).toContain("Freshness: <span class=\"font-medium text-green-700 dark:text-green-300\">current</span>");
+    expect(html).toContain("Import freshness: <span class=\"font-medium text-green-700 dark:text-green-300\">current</span>");
   });
 
   it("keeps long catalogue/playlist/shazam labels readable without truncation", async () => {
@@ -545,7 +545,7 @@ describe("AnalyticsCommandCenter", () => {
     const playlistMeta = playlistPanel?.closest("section")?.textContent ?? "";
     const staleLinks = [...container.querySelectorAll('a[href*="#analytics-sync-runs"]')];
 
-    expect(playlistMeta).toContain("Freshness:");
+    expect(playlistMeta).toContain("Import freshness:");
     expect(playlistMeta).toContain("stale");
     expect(playlistMeta).toContain("Affected source:");
     expect(playlistMeta).toContain("Source: Sisense playlists");
@@ -676,4 +676,5 @@ it("shows the provider conflict and recording scope instead of an artist headlin
   expect(html).toContain("not worldwide totals");
   expect(html).toContain("These are not lifetime counts");
   expect(html).toContain("Artist totals are unverified");
+  expect(html).toContain("Catalogue rows retain combined-platform counts when a platform is selected.");
 });

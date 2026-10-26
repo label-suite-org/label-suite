@@ -247,9 +247,9 @@ export default function AnalyticsCommandCenterView({ command, section }: Props) 
             <TrendChart period={selectedPeriod} />
           </Panel>
           <Panel
-            title="Reported catalogue rows (unverified)"
+            title="Reported combined catalogue rows (unverified)"
             eyebrow="Source evidence"
-            description="Provider-reported counts and growth within the export window. Recording coverage and provider agreement are unverified."
+            description="Combined-platform counts and growth within the export window; platform buttons do not change these catalogue values. Recording coverage and provider agreement are unverified."
             metadata={trackTotalsMeta}
           >
             <CatalogueMovers rows={command.catalog.topTracks} />
@@ -397,7 +397,7 @@ function buildReportingMeta({
     `Reporting: ${reportingLabel}`,
     scopeLabel,
     <span key={`freshness-${sourceLabel}`}>
-      Freshness: <span className={isSourceStale ? "font-medium text-amber-700 dark:text-amber-300" : "font-medium text-green-700 dark:text-green-300"}>{isSourceStale ? "stale" : "current"}</span>.
+      Import freshness: <span className={isSourceStale ? "font-medium text-amber-700 dark:text-amber-300" : "font-medium text-green-700 dark:text-green-300"}>{isSourceStale ? "stale" : "current"}</span>.
       {isSourceStale && staleSourceLabels.length
         ? (
           <span>
