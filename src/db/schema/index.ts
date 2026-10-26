@@ -17,3 +17,5 @@ export * from "./notifications";
 export * from "./tour-money";
 
 export * from "./fans";
+
+export * from "./sync";

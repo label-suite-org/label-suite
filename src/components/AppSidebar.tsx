@@ -53,6 +53,7 @@ const navIcons: Record<string, LucideIcon> = {
   today: CalendarDays,
   events: CalendarDays,
   "ops-tasks": CheckSquare,
+  sync: Music,
   forecast: TrendingUp,
   analytics: BarChart3,
   artists: Users,

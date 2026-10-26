@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AB323001AB323001AB323001 /* NativeSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB323002AB323002AB323002 /* NativeSync.swift */; };
 		A33100010000000000000001 /* NativeDiscoveryReview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A33100020000000000000002 /* NativeDiscoveryReview.swift */; };
 		A25500010000000000000001 /* NativeRadioPreparation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25500020000000000000002 /* NativeRadioPreparation.swift */; };
 		A25600010000000000000001 /* NativePublicPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25600020000000000000002 /* NativePublicPage.swift */; };
@@ -127,6 +128,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		AB323002AB323002AB323002 /* NativeSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSync.swift; sourceTree = "<group>"; };
 		A33100020000000000000002 /* NativeDiscoveryReview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDiscoveryReview.swift; sourceTree = "<group>"; };
 		A25500020000000000000002 /* NativeRadioPreparation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRadioPreparation.swift; sourceTree = "<group>"; };
 		A25600020000000000000002 /* NativePublicPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativePublicPage.swift; sourceTree = "<group>"; };
@@ -301,6 +303,7 @@
 				515C7EF031754402636F13C3 /* KeychainSessionStore.swift */,
 				58E27013FDB76DEA5858DF1D /* LabelSuiteApp.swift */,
 				2E00F9BD25D3B74973A50294 /* NativeAPI.swift */,
+				AB323002AB323002AB323002 /* NativeSync.swift */,
 				330A00000000000000000002 /* NativeCampaignDetail.swift */,
 				A33500000000000000000002 /* NativeEventProjectLibrary.swift */,
 				A32600000000000000000002 /* NativeTracks.swift */,
@@ -466,6 +469,7 @@
 				F652FD203ECF86D212E7BD39 /* KeychainSessionStore.swift in Sources */,
 				DEA8271A9ECEE9146346EA1F /* LabelSuiteApp.swift in Sources */,
 				DA33F8D76F1B88933E8A9C67 /* NativeAPI.swift in Sources */,
+				AB323001AB323001AB323001 /* NativeSync.swift in Sources */,
 				330A00000000000000000001 /* NativeCampaignDetail.swift in Sources */,
 				A33500000000000000000001 /* NativeEventProjectLibrary.swift in Sources */,
 				A32600000000000000000001 /* NativeTracks.swift in Sources */,

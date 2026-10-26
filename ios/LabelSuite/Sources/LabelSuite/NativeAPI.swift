@@ -468,6 +468,37 @@ public struct NativeAPI: NativeAPIClient, Sendable {
     guard let status = (response as? HTTPURLResponse)?.statusCode, status == 204 || status == 401 else { throw NativeAPIError.transientFailure }
   }
 
+  func syncDeals(workspace: Workspace, session: NativeSession, id: String? = nil) async throws -> NativeSyncEnvelope {
+    let data = try await syncRequest(workspace: workspace, session: session, id: id)
+    return try JSONDecoder().decode(NativeSyncEnvelope.self, from: data)
+  }
+  func saveSync(_ input: NativeSyncInput, workspace: Workspace, session: NativeSession) async throws -> NativeSyncRecord {
+    struct Body: Encodable { let action = "save"; let input: NativeSyncInput }
+    let data = try await syncRequest(workspace: workspace, session: session, body: JSONEncoder().encode(Body(input:input)))
+    return try JSONDecoder().decode(NativeSyncRecord.self, from:data)
+  }
+  func recordSyncReceipt(_ input: NativeSyncReceipt, workspace: Workspace, session: NativeSession) async throws -> NativeSyncRecord {
+    struct Body: Encodable { let action = "receipt"; let input: NativeSyncReceipt }
+    let data = try await syncRequest(workspace:workspace,session:session,body:JSONEncoder().encode(Body(input:input)))
+    return try JSONDecoder().decode(NativeSyncRecord.self,from:data)
+  }
+  private func syncRequest(workspace:Workspace,session:NativeSession,id:String? = nil,body:Data? = nil) async throws -> Data {
+    var components=URLComponents(url:baseURL.appending(path:"/api/native/sync"),resolvingAgainstBaseURL:false)!
+    components.queryItems=[URLQueryItem(name:"workspaceId",value:workspace.id)]
+    if let id { components.queryItems?.append(URLQueryItem(name:"id",value:id)) }
+    var request=URLRequest(url:components.url!)
+    request.setValue("Bearer " + session.token,forHTTPHeaderField:"Authorization")
+    if let body {request.httpMethod="POST";request.httpBody=body;request.setValue("application/json",forHTTPHeaderField:"Content-Type")}
+    let (payload,response)=try await data(for:request)
+    guard let http=response as? HTTPURLResponse else{throw NativeAPIError.transientFailure}
+    if http.statusCode == 400 || http.statusCode == 409 {
+      struct ErrorBody:Decodable{let error:String}
+      throw NativeSyncError(message:(try? JSONDecoder().decode(ErrorBody.self,from:payload))?.error ?? "Could not save this deal")
+    }
+    try checkReadStatus(response)
+    return payload
+  }
+
   public func today(for workspace: Workspace, session: NativeSession) async throws -> NativeTodayResponse {
     var components = URLComponents(url: baseURL.appending(path: "/api/native/today"), resolvingAgainstBaseURL: false)!
     components.queryItems = [URLQueryItem(name: "workspaceId", value: workspace.id)]
