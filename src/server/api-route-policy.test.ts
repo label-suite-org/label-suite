@@ -42,6 +42,7 @@ const JUSTIFIED_EXCEPTIONS = new Map([
   ["api/native/tracks/[trackId].ts", "scoped native bearer standalone Track update with operations.mutate, null Release context and exact revision"],
   ["api/native/releases/[id]/tracks/[trackId].ts", "scoped native bearer Track update with operations.mutate and exact revision"],
   ["api/native/releases/[id].ts", "scoped native bearer Release update with operations.mutate and explicit revision"],
+  ["api/native/tasks.ts", "scoped native bearer Task creation with operations.mutate, stable identity and atomic actor audit"],
   ["api/native/tasks/[id].ts", "scoped native bearer Task actions with operations.mutate"],
   ["api/native/campaign-leads/[id]/preparation.ts", "scoped native bearer preparation mutation"],
   ["api/native/campaign-leads/[id]/drafts/[draftId].ts", "scoped native bearer plain draft mutation"],
