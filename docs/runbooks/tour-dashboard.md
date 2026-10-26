@@ -70,3 +70,9 @@ through the reviewed release process; retain additive tables and do not restore
 an old single-use refresh token after it has rotated.
 
 Square reference: https://developer.squareup.com/docs/oauth-api/receive-and-manage-tokens
+
+## Shared budget assumptions
+
+The native tour response includes optional `budget_plan` with `revision`, `updated_at`, `currency` and `plan`. `POST /api/native/projects/:id/tour/budget` saves reviewed merch totals/date, scenario rates, deductions and conditional funding. It requires fresh `budgets.mutate` membership, an owned tour, the current currency, an explicit nullable `expected_revision`, and a UUID `request_id`. A duplicate acknowledged request returns its saved record; stale edits return 409. The update and audit are transactional. Migration 0106 adds a nullable JSON column to existing tour details without changing money entries.
+
+Show guarantees, expected costs and shows remaining continue to come from the live dashboard; they are not copied into assumptions. Reviewed artist merch remains dated input, not automatic attribution of mixed-artist provider sales. Conditional funding is not received cash. Native clients must preserve failed-save drafts, retry explicitly with the same ID, and never present unacknowledged changes as shared. No real tour values belong in fixtures or public source.

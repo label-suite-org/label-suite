@@ -8,6 +8,7 @@ const MUTATION_EXPORT = /export const (?:(?:POST|PUT|PATCH|DELETE)\b|\{[^}]*\b(?
 const NAMED_CAPABILITY = /requireCapability\(locals, "[^"]+"\)/;
 
 const JUSTIFIED_EXCEPTIONS = new Map([
+  ["api/native/projects/[id]/tour/budget.ts", "scoped native bearer budget assumptions with fresh budgets.mutate membership, tour ownership, revision CAS, bounded input and atomic audit"],
   ["api/native/fan-drops.ts", "fresh native bearer workspace membership; owner/operator drafts and fan reads, owner-only publication/schedule/cancel; exact revisions and tenant RLS"],
   ["api/fans/signup.ts", "same-origin bounded public intake for an explicitly published Drop, explicit consent, durable rate limits and email verification"],
   ["api/fans/confirm.ts", "same-origin purpose-bound expiring HMAC confirmation; artist-scoped consent and stale revocation checks"],

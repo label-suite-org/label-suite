@@ -687,6 +687,13 @@
       "when": 1792877000000,
       "tag": "0105_fan_message_tests",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1792985000000,
+      "tag": "0106_tour_budget_plan",
+      "breakpoints": true
     }
   ]
 }

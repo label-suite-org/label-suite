@@ -38,6 +38,26 @@ describe.skipIf(!enabled)("tour daily flow on disposable PostgreSQL", () => {
     await sql.end();
     await (await import("../lib/db")).pool.end();
   });
+  it("persists shared budget assumptions, retries once, rejects stale and cross-tenant saves, and keeps live budget facts", async () => {
+    const { saveTourBudgetPlan } = await import("./tour-budget-plan");
+    const plan = { merch: 10000, fees: 100, low: 40000, expected: 45000, high: 67500, cut: 25, futureFee: 3.5, funding: null, fundingName: "Funding", fundingNote: null, sourceNote: null, reviewedThrough: "2026-10-19" };
+    const input = { request_id: randomUUID(), expected_revision: null, currency: "USD", plan };
+    const before = await dashboard.getNativeTourDashboard(org, project);
+    const saved = await saveTourBudgetPlan(org, project, actor, input);
+    expect(await saveTourBudgetPlan(org, project, actor, input)).toEqual(saved);
+    expect((await sql`select count(*)::int as n from label_suite.audit_logs where request_id=${input.request_id}`)[0].n).toBe(1);
+    const reopened = await dashboard.getNativeTourDashboard(org, project);
+    expect(reopened!.budget_plan).toEqual(saved);
+    expect(reopened!.money).toEqual(before!.money);
+    await expect(saveTourBudgetPlan(org, project, actor, { ...input, request_id: randomUUID() })).rejects.toThrow("changed");
+    await expect(saveTourBudgetPlan("other-tenant", project, actor, input)).rejects.toThrow("not found");
+    await expect(saveTourBudgetPlan(org, project, actor, { ...input, currency: "CAD" })).rejects.toThrow("currency changed");
+    const next = await saveTourBudgetPlan(org, project, actor, { ...input, request_id: randomUUID(), expected_revision: saved.revision, plan: { ...plan, merch: 0, fees: null } });
+    expect(next.plan.merch).toBe(0); expect(next.plan.fees).toBeNull();
+    await sql`update label_suite.budget_line_items set forecast_amount=120 where id=${allowance}`;
+    expect((await dashboard.getNativeTourDashboard(org, project))!.money.forecast_cost).toBe(12000);
+    await sql`update label_suite.budget_line_items set forecast_amount=100 where id=${allowance}`;
+  });
   const read = () => dashboard.getNativeTourDashboard(org, project, new Date("2026-10-19T20:00:00Z"));
 
   it("saves concurrent retries once across the ledger, allowance and audit", async () => {
