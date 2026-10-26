@@ -119,6 +119,14 @@ jobs:
           export DATABASE_URL="postgres://label_suite:label_suite@127.0.0.1:5432/$fixture_database"
           npm run db:migrate
           NATIVE_EVENTS_PROJECTS_INTEGRATION=1 TOUR_DAILY_INTEGRATION=1 npm exec vitest run src/server/native-events-projects.integration.test.ts src/server/tour-daily-flow.integration.test.ts -- --maxWorkers=1
+      - name: Verify native catalog creation and Work edits on disposable PostgreSQL
+        run: |
+          fixture_database=native_catalog_fixture
+          trap 'dropdb -h "$PGHOST" -U "$PGUSER" --if-exists native_catalog_fixture' EXIT
+          createdb -h "$PGHOST" -U "$PGUSER" "$fixture_database"
+          export DATABASE_URL="postgres://label_suite:label_suite@127.0.0.1:5432/$fixture_database"
+          npm run db:migrate
+          NATIVE_CATALOG_INTEGRATION=1 npm exec vitest run src/server/native-catalog-mutations.integration.test.ts -- --maxWorkers=1
       - name: Verify analytics source imports on migrated disposable PostgreSQL
         run: |
           fixture_database=analytics_fixture_ci

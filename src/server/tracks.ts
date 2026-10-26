@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { isDeepStrictEqual } from "node:util";
 import { and, asc, eq, getTableColumns, inArray, sql } from "drizzle-orm";
-import { releases, roles, samply_comment_links, samply_files, tracks, works } from "../db/schema";
+import { audit_events, orgs, releases, roles, samply_comment_links, samply_files, tracks, works } from "../db/schema";
 import { db } from "../lib/db";
 import {
   assertIsrcAvailableForWork,
@@ -8,7 +9,7 @@ import {
   maybeGenerateISRC,
   normalizeIsrcValue,
 } from "../lib/isrc";
-import { persistReleaseReadiness, persistTrackReadiness } from "../lib/readiness";
+import { computeClearanceProgress, persistReleaseReadiness, persistTrackReadiness } from "../lib/readiness";
 import { ConflictError, NotFoundError } from "./errors";
 import { recordAuditEvent } from "./integrations";
 import {
@@ -99,8 +100,26 @@ export async function listWorkOptions(orgId: string) {
     .orderBy(asc(works.title));
 }
 
-export async function createTrack(orgId: string, input: CreateTrackInput) {
-  return db.transaction(async (tx) => {
+export async function createTrack(orgId: string, input: CreateTrackInput, native?: {
+  id: string; newWorkId?: string; actorUserId: string; request: Record<string, unknown>;
+}) {
+  try { return await db.transaction(async (tx) => {
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
+    if (native) {
+      // Serialise this creation identity before allocating a Work or ISRC.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`native-track:${native.id}`}, 0))`);
+      const [existing] = await tx.select({ ...getTableColumns(tracks), revision: sql<string>`${tracks.updated_at}::text` })
+        .from(tracks).where(and(eq(tracks.id, native.id), eq(tracks.org_id, orgId)));
+      if (existing) {
+        const [proof] = await tx.select().from(audit_events).where(and(eq(audit_events.org_id, orgId),
+          eq(audit_events.object_id, native.id), eq(audit_events.event_type, "track.created")));
+        if (existing.release_id !== input.release_id || !proof ||
+            !isDeepStrictEqual(proof.metadata.request, native.request) || proof.metadata.track_revision !== existing.revision) {
+          throw new ConflictError("Track identity already exists or changed. Open the saved track before trying again.");
+        }
+        return { id: existing.id, work_id: existing.work_id, work_isrc: existing.isrc, ok: true };
+      }
+    }
     await assertReleaseInOrg(tx, orgId, input.release_id);
     const work = await resolveWork(
       tx,
@@ -109,6 +128,7 @@ export async function createTrack(orgId: string, input: CreateTrackInput) {
       input.work_id ?? null,
       input.new_work_title ?? null,
       input.isrc == null ? input.auto_isrc ?? true : false,
+      native?.newWorkId,
     );
 
     let trackIsrc = normalizeIsrcValue(work.isrc);
@@ -146,7 +166,8 @@ export async function createTrack(orgId: string, input: CreateTrackInput) {
       if (duration == null && workRow?.duration != null) duration = workRow.duration;
     }
 
-    const id = crypto.randomUUID();
+    const id = native?.id ?? crypto.randomUUID();
+    const clearance = await computeClearanceProgress(work.id, tx, orgId);
     await tx.insert(tracks).values({
       id,
       org_id: orgId,
@@ -158,19 +179,33 @@ export async function createTrack(orgId: string, input: CreateTrackInput) {
       isrc: trackIsrc,
       audio_url: audioUrl,
       duration,
+      clearance_pub: clearance.pub.progress, clearance_master: clearance.master.progress, clearance_progress: clearance.overall,
     });
 
     await persistTrackReadiness(id, tx, orgId);
     await persistReleaseReadiness(input.release_id, tx, orgId);
 
+    if (native) {
+      const [saved] = await tx.select({ ...getTableColumns(tracks), revision: sql<string>`${tracks.updated_at}::text` })
+        .from(tracks).where(and(eq(tracks.id, id), eq(tracks.org_id, orgId)));
+      await recordAuditEvent(orgId, { actor_user_id: native.actorUserId, event_type: "track.created", object_type: "track", object_id: id,
+        before: null, after: trackAudit(saved), metadata: { request: native.request, track_revision: saved.revision } }, tx);
+    }
     return { id, work_id: work.id, work_isrc: work.isrc, ok: true };
-  });
+  }); } catch (error) {
+    if ((error as { cause?: { code?: string }; code?: string }).cause?.code === "23505" || (error as { code?: string }).code === "23505") {
+      throw new ConflictError("Track, Work or identifier already exists. Check the saved record before retrying.");
+    }
+    throw error;
+  }
 }
 
 export async function updateTrack(orgId: string, input: UpdateTrackInput, native?: {
   releaseId: string | null; expectedRevision: string; actorUserId: string;
 }) {
   return db.transaction(async (tx) => {
+    // Coordinate Work identity edits with relinks before acquiring Track locks.
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
     const existing = (
       await tx.select({ ...getTableColumns(tracks), revision: sql<string>`${tracks.updated_at}::text` }).from(tracks).where(and(eq(tracks.id, input.id), eq(tracks.org_id, orgId))).for("update")
     )[0];
@@ -214,7 +249,7 @@ export async function updateTrack(orgId: string, input: UpdateTrackInput, native
       if (native && hasRequestedIsrc && requestedIsrc !== workIsrc) {
         throw new ConflictError("Edit the linked Work to change its ISRC. Track edits cannot change Work identifiers.");
       }
-      const nextIsrc = workIsrc ?? requestedIsrc ?? normalizeIsrcValue(existing.isrc);
+      const nextIsrc = hasOwn(input, "work_id") ? workIsrc ?? (!native ? requestedIsrc : null) : workIsrc ?? requestedIsrc ?? normalizeIsrcValue(existing.isrc);
       if (nextIsrc) {
         const safeIsrc = await assertIsrcAvailableForWork(tx, orgId, nextIsrc, workRows[0].id, input.id);
         updates.isrc = safeIsrc;
@@ -224,7 +259,7 @@ export async function updateTrack(orgId: string, input: UpdateTrackInput, native
             .set({ isrc: safeIsrc, updated_at: new Date() })
             .where(and(eq(works.id, workRows[0].id), eq(works.org_id, orgId)));
         }
-      } else if (hasRequestedIsrc) {
+      } else if (hasRequestedIsrc || hasOwn(input, "work_id")) {
         updates.isrc = null;
       }
     } else if (hasOwn(input, "work_id") || hasRequestedIsrc) {
@@ -234,6 +269,12 @@ export async function updateTrack(orgId: string, input: UpdateTrackInput, native
       updates.isrc = null;
     }
 
+    if (hasOwn(input, "work_id")) {
+      const clearance = workId ? await computeClearanceProgress(workId, tx, orgId) : null;
+      updates.clearance_pub = clearance?.pub.progress ?? 0;
+      updates.clearance_master = clearance?.master.progress ?? 0;
+      updates.clearance_progress = clearance?.overall ?? 0;
+    }
     if (Object.keys(updates).length) await tx.update(tracks).set(updates).where(and(eq(tracks.id, input.id), eq(tracks.org_id, orgId)));
     await persistTrackReadiness(input.id, tx, orgId);
 
@@ -291,6 +332,7 @@ async function resolveWork(
   workId: string | null,
   newWorkTitle: string | null,
   autoIsrc: boolean,
+  newWorkId?: string,
 ): Promise<{ id: string; isrc: string | null }> {
   if (workId) {
     const rows = await client
@@ -306,7 +348,7 @@ async function resolveWork(
   }
 
   if (newWorkTitle) {
-    const id = crypto.randomUUID();
+    const id = newWorkId ?? crypto.randomUUID();
     const isrc = autoIsrc ? await maybeGenerateISRC(orgId, undefined, client) : null;
     await client.insert(works).values({ id, org_id: orgId, title: newWorkTitle, isrc });
     return { id, isrc };

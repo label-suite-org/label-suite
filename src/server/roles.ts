@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { and, eq, getTableColumns, sql } from "drizzle-orm";
-import { roles, works } from "../db/schema";
+import { orgs, roles, works } from "../db/schema";
 import { db } from "../lib/db";
 import { lockWorkRoles, persistAfterRoleChange } from "../lib/readiness";
 import { assertPersonContactInOrg } from "./contacts";
@@ -43,6 +43,7 @@ export type DeleteRoleInput = z.infer<typeof deleteRoleSchema>;
 
 export async function createRole(orgId: string, input: CreateRoleInput, native?: { actorUserId: string; expectedWorkRevision: string }) {
   return db.transaction(async (tx) => {
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
     await lockWorkRoles(tx, orgId, input.work_id);
     if (native) {
       const [work] = await tx.select({ revision: sql<string>`${works.updated_at}::text` }).from(works)
@@ -80,6 +81,7 @@ export async function createRole(orgId: string, input: CreateRoleInput, native?:
 
 export async function updateRole(orgId: string, input: UpdateRoleInput, native?: { workId: string; expectedRevision: string; actorUserId: string }) {
   return db.transaction(async (tx) => {
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
     const [owner] = await tx.select({ work_id: roles.work_id }).from(roles).where(and(eq(roles.id, input.id), eq(roles.org_id, orgId)));
     if (owner?.work_id) await lockWorkRoles(tx, orgId, owner.work_id);
     const existing = (
@@ -123,6 +125,7 @@ export async function updateRole(orgId: string, input: UpdateRoleInput, native?:
 
 export async function deleteRole(orgId: string, input: DeleteRoleInput) {
   return db.transaction(async (tx) => {
+    await tx.select({ id: orgs.id }).from(orgs).where(eq(orgs.id, orgId)).for("no key update");
     const [owner] = await tx.select({ work_id: roles.work_id }).from(roles).where(and(eq(roles.id, input.id), eq(roles.org_id, orgId)));
     if (owner?.work_id) await lockWorkRoles(tx, orgId, owner.work_id);
     const existing = (
