@@ -34,12 +34,13 @@ describe.skipIf(process.env.NATIVE_ANALYTICS_INTEGRATION !== "1")("native Analyt
     await sql.end();
   });
   const read = (scope: unknown) => scoped({ orgId: org, userId: actor }, () => service.getNativeAnalytics(org, scope, new Date('2026-09-27T00:00:00Z')), { isolationLevel: 'repeatable read' });
-  it("keeps workspace, artist and release data scoped while preserving measured zero days", async () => {
+  it("keeps workspace, artist and release data scoped while withholding partial platform periods", async () => {
     const workspace = await read({});
-    expect(workspace.periods.find(p => p.key === 'all')?.streamTotal).toBe(40);
+    expect(workspace.periods).toEqual([]);
     const selected = await read({ artist_id: artist, release_id: release });
     expect(selected.scope).toMatchObject({ kind: 'release', artist: { id: artist }, release: { id: release } });
-    expect(selected.periods.find(p => p.key === 'all')?.dailyTrend.map(p => p.total)).toEqual([10, 0]);
+    expect(selected.periods).toEqual([]);
+    expect(selected.import_handoff.explanation).toContain("platform data is missing");
     expect(selected.sources).toMatchObject([{ rows: 2, source: 'sisense' }]);
     expect(selected.workspace_ingestion.scope).toBe('workspace');
     expect(selected.reporting).toMatchObject({ through: '2026-09-26', stale: false });
@@ -52,10 +53,10 @@ describe.skipIf(process.env.NATIVE_ANALYTICS_INTEGRATION !== "1")("native Analyt
     const empty = await read({ artist_id: emptyId });
     expect(empty.reporting).toMatchObject({ through: null, stale: null });
     expect(empty.sources).toEqual([]);
-    expect(empty.periods.every(period => period.trendState.kind === 'empty' && period.dailyTrend.length === 0)).toBe(true);
+    expect(empty.periods).toEqual([]);
     const stale = await scoped({ orgId: org, userId: actor }, () => service.getNativeAnalytics(org, { release_id: release }, new Date('2026-10-10T00:00:00Z')), { isolationLevel: 'repeatable read' });
     expect(stale.reporting).toMatchObject({ through: '2026-09-26', stale: true });
-    expect(stale.periods.find(period => period.key === 'all')?.dailyTrend.map(point => point.total)).toEqual([10, 0]);
+    expect(stale.periods).toEqual([]);
   });
   it("rejects foreign and mismatched selections rather than broadening scope", async () => {
     await expect(read({ artist_id: foreignArtist })).rejects.toMatchObject({ status: 404 });
