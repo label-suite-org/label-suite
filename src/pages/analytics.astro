@@ -1,5 +1,8 @@
 ---
 import AppLayout from "../layouts/AppLayout.astro";
+import NativeMusicCatalogues from "../components/analytics/NativeMusicCatalogues.astro";
+import NativeMusicImport from "../components/analytics/NativeMusicImport";
+import { listNativeMusicCatalogues } from "../server/native-music-import";
 import AnalyticsOperations from "../components/analytics/AnalyticsOperations";
 import AnalyticsCommandCenterView from "../components/analytics/AnalyticsCommandCenter";
 import DatedTrackSnapshotTable from "../components/analytics/DatedTrackSnapshotTable";
@@ -71,6 +74,7 @@ const [
   artists,
   latestSpotifyAudienceImports,
   latestSisenseTrackSnapshotImports,
+  nativeMusicCatalogues,
 ] = await Promise.all([
   listAnalyticsCommandCenter(orgId, filter),
   artistParam ? listDatedTrackSnapshotWorkspace(orgId, artistParam) : Promise.resolve(null),
@@ -89,6 +93,7 @@ const [
   listArtists(orgId),
   spotifyImportService.listLatestSpotifyAudienceImports(orgId),
   createProductionSisenseTrackSnapshotService().listLatestByArtist(orgId),
+  releaseParam ? Promise.resolve([]) : listNativeMusicCatalogues(orgId, artistParam),
 ]);
 ---
 
@@ -102,6 +107,7 @@ const [
 
     {activeSection === "overview" && (
       <>
+        <NativeMusicCatalogues catalogues={nativeMusicCatalogues.filter((catalogue) => !platforms?.length || platforms.includes(catalogue.provider === "spotify_for_artists" ? "spotify" : "apple"))} />
         <AnalyticsCommandCenterView client:only="react" command={commandCenter} section="overview" />
         <AnalyticsOperations client:only="react" royaltiesTimeseries={royaltiesTimeseries} topArtists={topArtists} topReleases={topReleases} campaignBreakdown={campaignBreakdown} opsBreakdown={opsBreakdown} />
       </>
@@ -148,6 +154,7 @@ const [
           </p>
         </div>
         <SpotifyCsvImport client:only="react" artists={artists} latestImports={latestSpotifyAudienceImports} />
+        <NativeMusicImport client:only="react" artists={artists} />
         <SisenseTrackSnapshotImport client:only="react" artists={artists} latestImports={latestSisenseTrackSnapshotImports} />
         <AnalyticsDataQuality client:only="react" report={dataQuality} />
         <div id="analytics-sync-runs">

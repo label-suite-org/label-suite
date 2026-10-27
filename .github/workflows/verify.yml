@@ -150,4 +150,5 @@ jobs:
           createdb -h "${PGHOST}" -U "${PGUSER}" "${fixture_database}"
           DATABASE_URL="$ANALYTICS_FIXTURE_DB_URL" npm run db:migrate
           npm run test:spotify-analytics-import
+          npm exec tsx scripts/native-music-import-fixture.ts
           npm run test:sisense-track-snapshot-import
