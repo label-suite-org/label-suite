@@ -1,12 +1,22 @@
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
+import NativeMusicImport from "../components/analytics/NativeMusicImport";
 import { describe, expect, it } from "vitest";
 
 describe("dashboard analytics signals", () => {
-  it("renders the native import fragment target on the server before its client-only island hydrates", () => {
+  it("renders the native import form and fragment target before hydration", () => {
     const page = readFileSync(new URL("./analytics.astro", import.meta.url), "utf8");
     const importer = readFileSync(new URL("../components/analytics/NativeMusicImport.tsx", import.meta.url), "utf8");
-    expect(page).toMatch(/<div id="native-music-import">\s*<NativeMusicImport\s+client:only="react"[^>]*\/>\s*<\/div>/);
+    expect(page).toMatch(/<div id="native-music-import">\s*<NativeMusicImport\s+client:load[^>]*\/>\s*<\/div>/);
     expect(importer).not.toContain('id="native-music-import"');
+    const html = renderToString(createElement(NativeMusicImport, {
+      artists: [{ id: "fixture-artist", name: "Fixture artist" }], selectedArtistId: "fixture-artist",
+    }));
+    expect(html).toContain("Native music snapshot import");
+    expect(html).toContain('<option value="fixture-artist" selected="">Fixture artist</option>');
+    expect(html).toContain('type="file"');
+    expect(html).toContain("Preview native snapshot");
   });
 
   it("uses the data-health-aware card selection for its rendered analytics list", () => {
