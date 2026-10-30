@@ -14,7 +14,7 @@ const initial: NonNullable<ComponentProps<typeof PitchEditor>["initial"]> = {
   id, org_id: "org", campaign_id: "campaign", sync_deal_id: null, release_id: "release", contact_id: "contact", task_id: null,
   version: 1, title: "Fixture pitch", message: "Hello", credits: "Writer", rights_note: "Pending clearance", reply_email: "reply@example.test", artist_name: "Artist", artwork_url: null, remote_project_id: "project",
   recordings: [{ file_id: "file", track_id: "track", box_id: "box", title: "Song", file_name: "Instrumental v2.wav", version: "Instrumental", isrc: null }],
-  downloads: false, token: "a".repeat(64), player_id: null, link_state: "draft", status: "draft", sent_date: null, response_note: "", created_at: new Date(), updated_at: new Date(),
+  downloads: false, token: "a".repeat(64), player_id: null, player_embed_id: null, link_state: "draft", status: "draft", sent_date: null, response_note: "", created_at: new Date(), updated_at: new Date(),
   recipient: "Recipient", recipient_email: "recipient@example.test", next_action: "", due_date: null, task_status: null, public_path: null,
 };
 

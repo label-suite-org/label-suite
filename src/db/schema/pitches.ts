@@ -22,7 +22,7 @@ export const pitches = schema.table("pitches", {
   artwork_url: text("artwork_url"), remote_project_id: text("remote_project_id").notNull(),
   recordings: jsonb("recordings").$type<PitchRecording[]>().notNull(),
   downloads: boolean("downloads").notNull().default(false),
-  token: text("token").notNull(), player_id: text("player_id"),
+  token: text("token").notNull(), player_id: text("player_id"), player_embed_id: text("player_embed_id"),
   link_state: text("link_state").notNull().default("draft"),
   status: text("status").notNull().default("draft"), sent_date: date("sent_date"),
   response_note: text("response_note").notNull().default(""),

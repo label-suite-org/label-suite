@@ -42,7 +42,8 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     provider.listSamplyProjectFiles.mockImplementation(async (_org: string, project: string) => [{ id: project, object: "file", name: "Instrumental v2.wav" }]);
     provider.listSamplyPlayers.mockImplementation(async () => [...players.values()]);
     provider.createSamplyPlayer.mockImplementation(async (_org: string, input: object) => {
-      const player = { ...input, id: randomUUID(), object: "player" } as SamplyPlayerSummary; players.set(player.id, player); return player;
+      const id = randomUUID();
+      const player = { ...input, id, playerUrl: `https://samply.app/p/${id}?token=share-${id}`, object: "player" } as SamplyPlayerSummary; players.set(player.id, player); return player;
     });
     provider.getSamplyPlayer.mockImplementation(async (_org: string, id: string) => players.get(id));
     provider.updateSamplyPlayer.mockImplementation(async (_org: string, id: string, patch: object) => { const next = { ...players.get(id)!, ...patch }; players.set(id, next); return next; });
@@ -68,6 +69,7 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     expect(provider.createSamplyPlayer).toHaveBeenLastCalledWith(org, expect.objectContaining({ public: false, boxids: [org], options: expect.objectContaining({ stacks: false, downloads: false, comments: false }) }));
     const publicPage = await asOrg(org, () => service.getPublicPitch(org, saved.token));
     expect(publicPage?.message).toBe(input.message);
+    expect(publicPage?.embed_url).toBe(`https://samply.app/embed/share-${ready.player_id}`);
     expect(JSON.stringify(publicPage)).not.toMatch(/private@example|recipient|response_note|remote_project_id/);
     await expect(asOrg(org, () => service.savePitch(org, { ...input, expected_version: ready.version }))).rejects.toMatchObject({ status: 409 });
     const sent = await asOrg(org, () => service.savePitchFollowup(org, { id: saved.id, expected_version: ready.version, status: "sent", sent_date: "2026-10-30", response_note: "Private response", next_action: "Follow up with supervisor", due_date: "2026-11-03" }));
@@ -76,6 +78,7 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     expect(task.rows[0]).toEqual({ linked_contact_id: org, linked_campaign_id: org });
     const revoked = await service.changePitchLink(org, "", saved.id, "revoke", sent.version);
     expect(revoked.link_state).toBe("revoked"); expect(players.get(revoked.player_id!)?.public).toBe(false);
+    expect(provider.updateSamplyPlayer).toHaveBeenLastCalledWith(org, ready.player_id, { public: false });
     expect(await asOrg(org, () => service.getPublicPitch(org, saved.token))).toBeNull();
   });
 

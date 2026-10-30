@@ -45,9 +45,11 @@ Documentation checked 2026-10-30:
   uploads and comments. The documented list does not include listening events.
 
 Samply hosts the audio in an embedded player; Label Suite hosts the message,
-recording list, credits and reply address. No new production dependency,
-provider credentials, or automatic outreach is introduced. Existing Samply
-configuration and release linking are prerequisites. This implements the web
+recording list, credits and reply address. No automatic outreach or new production
+dependency is introduced. Existing Samply
+configuration and release linking are prerequisites. A token can permit file
+uploads and player writes while rejecting project creation; in that case, create
+the project in Samply and link it in Label Suite. This implements the web
 workflow; native editor parity is outside this slice.
 
 ## Recovery and verification
@@ -55,7 +57,9 @@ workflow; native editor parity is outside this slice.
 The link route authenticates and checks origin through middleware, but owns its
 individual tenant-scoped transactions. It commits `preparing` before any remote
 write, so a process failure cannot silently erase the reservation. The unique
-provider name is `Label Suite pitch <pitch UUID>`. A retry finds that existing
+provider name is `Label Suite pitch <pitch UUID>`. Samply can return an internal
+player UUID and a separate public share ID in `playerUrl`. Store the share ID
+for the embed and retain the internal ID for readback and revocation. A retry finds that existing
 player and verifies its scope instead of creating another. An uncertain create
 with no visible matching player stops for investigation; it never auto-repeats
 the create. Do not reset that reservation without confirming the provider
@@ -84,3 +88,12 @@ Before live acceptance, use an owner-approved test selection to verify that
 Samply plays the selected individual versions (including an older version),
 honors downloads-off, and denies the direct player after revocation. Mocked
 provider tests are not evidence of those live provider behaviors.
+
+Live acceptance on 2026-10-30 used a disposable project with generated tones.
+The real API returned different internal and public player IDs, and the public
+share ID was required for the embed. Desktop Chrome played the selected tone.
+Selecting an older individual file showed
+only that three-second version while a newer five-second version and another
+track existed in the project. Revoking via Label Suite made the anonymous
+provider embed report that the project was unavailable. No catalogue audio or
+recipient messages were used.

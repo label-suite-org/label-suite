@@ -5,7 +5,7 @@ CREATE TABLE label_suite.pitches (
  task_id text REFERENCES label_suite.ops_tasks(id), version integer NOT NULL DEFAULT 1,
  title text NOT NULL, message text NOT NULL, credits text NOT NULL, rights_note text NOT NULL, reply_email text NOT NULL,
  artist_name text NOT NULL, artwork_url text, remote_project_id text NOT NULL, recordings jsonb NOT NULL,
- downloads boolean NOT NULL DEFAULT false, token text NOT NULL, player_id text,
+ downloads boolean NOT NULL DEFAULT false, token text NOT NULL, player_id text, player_embed_id text,
  link_state text NOT NULL DEFAULT 'draft', status text NOT NULL DEFAULT 'draft', sent_date date,
  response_note text NOT NULL DEFAULT '', created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now(),
  CONSTRAINT pitches_context CHECK(num_nonnulls(campaign_id, sync_deal_id) = 1),

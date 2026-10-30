@@ -192,6 +192,18 @@ async function changeReservedPitchLink(org: string, actor: string, id: string, a
     if (player.public) await updateSamplyPlayer(org, playerId, { public: false });
     throw new HttpError("Samply link contents or permissions differ from this pitch. Review the link in Samply before continuing.", 409);
   }
+  // API-created players can have an internal UUID and a different public share
+  // ID in playerUrl. Keep the internal ID for API updates and revocation.
+  let embedId = player.id;
+  if (player.playerUrl) {
+    const url = new URL(player.playerUrl);
+    const path = url.pathname.match(/^\/(?:p|player)\/([A-Za-z0-9_-]+)\/?$/);
+    const shareId = url.searchParams.get("token") ?? path?.[1];
+    if (url.origin !== "https://samply.app" || url.username || url.password || !path || !shareId || !/^[A-Za-z0-9_-]{1,160}$/.test(shareId)) {
+      throw new HttpError("Samply returned an unsupported listening link. Review the player before continuing.", 502);
+    }
+    embedId = shareId;
+  }
   await updateSamplyPlayer(org, playerId, { public: true });
   const verified = await getSamplyPlayer(org, playerId);
   if (!verified.public || !pitchPlayerMatches(verified, pitch)) {
@@ -199,18 +211,18 @@ async function changeReservedPitchLink(org: string, actor: string, id: string, a
     throw new HttpError("Samply did not confirm the selected files and access settings", 502);
   }
   return runWithDatabaseContext(context, async () => {
-    await db.update(pitches).set({ link_state: "ready", updated_at: new Date() }).where(and(wherePitch(org, id), eq(pitches.link_state, "preparing")));
+    await db.update(pitches).set({ link_state: "ready", player_embed_id: embedId, updated_at: new Date() }).where(and(wherePitch(org, id), eq(pitches.link_state, "preparing")));
     return getPitch(org, id);
   });
 }
 
 export async function getPublicPitch(org: string, token: string) {
   const [pitch] = await db.select().from(pitches).where(and(eq(pitches.org_id, org), eq(pitches.token, token), eq(pitches.link_state, "ready")));
-  if (!pitch?.player_id) return null;
+  if (!pitch?.player_id || !pitch.player_embed_id) return null;
   // Explicit projection: never expose recipient data, notes, tasks, deal terms,
   // or the provider project id to a bearer-link visitor.
   return { title: pitch.title, message: pitch.message, credits: pitch.credits, rights_note: pitch.rights_note, reply_email: pitch.reply_email,
     artist_name: pitch.artist_name, artwork_url: pitch.artwork_url, downloads: pitch.downloads,
     recordings: pitch.recordings.map(file => ({ title: file.title, file_name: file.file_name, version: file.version, isrc: file.isrc })),
-    embed_url: buildSamplyEmbedUrl(pitch.player_id) };
+    embed_url: buildSamplyEmbedUrl(pitch.player_embed_id) };
 }
