@@ -3,6 +3,7 @@ import { z } from "zod";
 import { analytics_metric_rows, artists, releases } from "../db/schema";
 import { db } from "../lib/db";
 import { listAnalyticsCommandCenter } from "./analytics";
+import { listNativeMusicCatalogues } from "./native-music-import";
 import { listAnalyticsDataQuality } from "./analytics-data-quality";
 import { HttpError, NotFoundError } from "./errors";
 import { ANALYTICS_IMPORT_STALE_AFTER_HOURS } from "../lib/analytics-workspace";
@@ -27,7 +28,7 @@ export async function getNativeAnalytics(orgId: string, raw: unknown, now = new 
       if (artist && release.artist_id !== artist.id) throw new HttpError("Release does not belong to the selected artist", 400);
     }
     const filter = { artistId: artist?.id, releaseId: release?.id };
-    const [command, quality, sources] = await Promise.all([
+    const [command, quality, sources, nativeCatalogues] = await Promise.all([
       listAnalyticsCommandCenter(orgId, filter),
       listAnalyticsDataQuality(orgId, now),
       tx.select({ source: analytics_metric_rows.source, widget: analytics_metric_rows.widget_key,
@@ -37,6 +38,8 @@ export async function getNativeAnalytics(orgId: string, raw: unknown, now = new 
         artist ? eq(analytics_metric_rows.artist_id, artist.id) : undefined,
         release ? eq(analytics_metric_rows.release_id, release.id) : undefined,
       )).groupBy(analytics_metric_rows.source, analytics_metric_rows.widget_key),
+      // Provider captures describe an artist catalogue, not an individual release.
+      release ? Promise.resolve([]) : listNativeMusicCatalogues(orgId, artist?.id),
     ]);
     // Existing native clients require numeric platform points. Withhold incomplete
     // periods rather than breaking decoding or inventing zeroes for missing data.
@@ -55,6 +58,7 @@ export async function getNativeAnalytics(orgId: string, raw: unknown, now = new 
       fetched_at: now.toISOString(),
       reporting: { through: reportingThrough, stale: reportingAgeHours === null ? null : reportingAgeHours > ANALYTICS_IMPORT_STALE_AFTER_HOURS, basis: "latest_scoped_daily_reporting_date" },
       periods,
+      native_catalogues: nativeCatalogues,
       catalog: { ...command.catalog, completeness: "Top 100 track snapshot rows; not a complete catalog total" },
       sources,
       provider_integrity: command.providerIntegrity ?? null,
