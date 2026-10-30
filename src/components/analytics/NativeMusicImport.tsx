@@ -51,7 +51,7 @@ export default function NativeMusicImport({ artists, selectedArtistId }: { artis
     finally { setBusy(false); }
   }
 
-  return <section id="native-music-import" className="space-y-3 border-t pt-6" aria-labelledby="native-music-import-heading" aria-busy={busy}>
+  return <section className="space-y-3 border-t pt-6" aria-labelledby="native-music-import-heading" aria-busy={busy}>
     <h2 id="native-music-import-heading" className="text-xl font-semibold">Native music snapshot import</h2>
     <p className="text-sm text-muted-foreground">These song totals refresh only when you import a new capture. Reloading Analytics reads saved data; it does not fetch new numbers from Spotify for Artists or Apple Music for Artists.</p>
     <p className="text-sm text-muted-foreground">Use a prepared snapshot JSON from a signed-in artist dashboard, with exact reporting dates, capture time, worldwide scope and provider song IDs. Provider CSV files are not supported here. Review the artist, dates and song sum before saving in the current workspace.</p>

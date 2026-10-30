@@ -154,7 +154,9 @@ const [
           </p>
         </div>
         <SpotifyCsvImport client:only="react" artists={artists} latestImports={latestSpotifyAudienceImports} />
-        <NativeMusicImport client:only="react" artists={artists} selectedArtistId={artistParam} />
+        <div id="native-music-import">
+          <NativeMusicImport client:only="react" artists={artists} selectedArtistId={artistParam} />
+        </div>
         <SisenseTrackSnapshotImport client:only="react" artists={artists} latestImports={latestSisenseTrackSnapshotImports} />
         <AnalyticsDataQuality client:only="react" report={dataQuality} />
         <div id="analytics-sync-runs">

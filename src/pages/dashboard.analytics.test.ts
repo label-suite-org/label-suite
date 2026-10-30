@@ -2,6 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("dashboard analytics signals", () => {
+  it("renders the native import fragment target on the server before its client-only island hydrates", () => {
+    const page = readFileSync(new URL("./analytics.astro", import.meta.url), "utf8");
+    const importer = readFileSync(new URL("../components/analytics/NativeMusicImport.tsx", import.meta.url), "utf8");
+    expect(page).toMatch(/<div id="native-music-import">\s*<NativeMusicImport\s+client:only="react"[^>]*\/>\s*<\/div>/);
+    expect(importer).not.toContain('id="native-music-import"');
+  });
+
   it("uses the data-health-aware card selection for its rendered analytics list", () => {
     const page = readFileSync(new URL("./dashboard.astro", import.meta.url), "utf8");
     expect(page).toContain('import { selectDashboardAnalyticsCards } from "../server/analytics-command-center-core"');
