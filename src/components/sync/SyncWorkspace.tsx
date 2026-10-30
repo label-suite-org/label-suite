@@ -422,6 +422,7 @@ export function SyncEditor({
           </p>
         )}
       </header>
+      {record && <a className="inline-block text-sm underline" href={`/pitches?sync=${encodeURIComponent(record.deal.id)}`}>Music pitches and recipient follow-up →</a>}
       {error && (
         <p
           role="alert"

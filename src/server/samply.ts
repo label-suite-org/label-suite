@@ -41,6 +41,7 @@ export interface SamplyProjectSummary {
 }
 
 export interface SamplyPlayerSummary {
+  playerUrl?: string;
   id: string;
   name: string;
   projectid: string;
@@ -272,18 +273,29 @@ export async function createSamplyPlayer(
   return samplyRequest<SamplyPlayerSummary>(orgId, "/players", {
     method: "POST",
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout(15_000),
   });
 }
 
 export async function listSamplyPlayers(orgId: string): Promise<SamplyPlayerSummary[]> {
-  return samplyRequest<SamplyPlayerSummary[]>(orgId, "/players");
+  return samplyRequest<SamplyPlayerSummary[]>(orgId, "/players", { signal: AbortSignal.timeout(15_000) });
+}
+
+export async function getSamplyPlayer(orgId: string, playerId: string): Promise<SamplyPlayerSummary> {
+  return samplyRequest(orgId, `/players/${encodeURIComponent(playerId)}`, { signal: AbortSignal.timeout(15_000) });
+}
+
+export async function updateSamplyPlayer(orgId: string, playerId: string, input: { public: boolean }): Promise<SamplyPlayerSummary> {
+  return samplyRequest(orgId, `/players/${encodeURIComponent(playerId)}`, {
+    method: "POST", body: JSON.stringify(input), signal: AbortSignal.timeout(15_000),
+  });
 }
 
 export async function listSamplyProjectFiles(
   orgId: string,
   projectId: string,
 ): Promise<SamplyBoxSummary[]> {
-  return samplyRequest<SamplyBoxSummary[]>(orgId, `/projects/${encodeURIComponent(projectId)}/all`);
+  return samplyRequest<SamplyBoxSummary[]>(orgId, `/projects/${encodeURIComponent(projectId)}/all`, { signal: AbortSignal.timeout(15_000) });
 }
 
 export async function getSamplyProjectFile(
