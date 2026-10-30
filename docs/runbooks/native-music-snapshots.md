@@ -2,7 +2,8 @@
 
 Analytics → Data health accepts a prepared JSON capture from a signed-in
 Spotify for Artists or Apple Music for Artists song catalogue. Select the local
-artist, preview the native artist, dates and song count, then import. Overview
+artist, preview the native artist, reporting dates, capture time, metric, song sum
+and any separate artist rollup, then import. Overview
 shows the latest observation for each artist and provider. This is an explicit
 import, not an automatic provider connection or an official CSV parser.
 
@@ -29,10 +30,19 @@ commits. Duplicate files do not create another run. Captures are immutable and
 read as whole runs, so an older upload or removed song cannot contaminate a newer
 observation. Preview SHA-256 binds the applied file to the reviewed bytes.
 
-This surface does not populate native mobile analytics, daily trends, geography,
-or local release totals. Those surfaces must retain their own source/coverage
-limitations. Dashboard access is not proof of unattended access or an analytics
-API authorization. Refresh requires another verified capture and import.
+Native mobile Analytics reads the same saved artist captures through its API.
+Reloading web or mobile Analytics reads saved data; it does not refresh the
+provider dashboard. Capture time describes when the source was observed;
+reporting dates describe the period counted. Import and page-load times do not
+advance that period. This surface does not populate daily trends, geography, or
+local release totals. Dashboard access is not proof of unattended access or an
+analytics API authorization. Refresh requires another verified capture and
+import at `/analytics?section=data-health#native-music-import` in the intended
+browser workspace.
+
+An exact duplicate is a no-op. Failed imports do not replace a completed capture.
+If the browser cannot confirm the response, review saved captures before retrying;
+the request may have completed. Keep the private source file for recovery.
 
 For recovery, prefer a reviewed application revert. No migration is introduced;
 preserve archived files and immutable imported rows. Do not delete source data
