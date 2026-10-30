@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 
 const { readCommand } = vi.hoisted(() => ({ readCommand: vi.fn() }));
+vi.mock("./native-music-import", () => ({ listNativeMusicCatalogues: async () => [] }));
 vi.mock("./analytics", () => ({ listAnalyticsCommandCenter: readCommand }));
 vi.mock("./analytics-data-quality", () => ({ listAnalyticsDataQuality: async () => ({ health: {
   coverage: "complete", stale: false, failedRuns: 0, lastSuccessfulRunAt: null, degradedReasons: [],
