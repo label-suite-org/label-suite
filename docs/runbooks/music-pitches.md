@@ -60,6 +60,9 @@ player and verifies its scope instead of creating another. An uncertain create
 with no visible matching player stops for investigation; it never auto-repeats
 the create. Do not reset that reservation without confirming the provider
 outcome. Draft preflight failures leave the draft editable. If the player ID is known but publication is unfinished, it can be revoked directly.
+An explicit 401/403 rejection of player creation also restores the draft, so
+the owner can correct token access and retry. Timeouts remain reserved because
+the provider may already have created the player.
 
 `0108_pitches.sql` is additive and enables forced tenant RLS, same-workspace
 foreign-reference checks and audit logging. Deploy through the usual public

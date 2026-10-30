@@ -5,7 +5,7 @@ import { artists, campaigns, contacts, ops_tasks, pitches, releases, sync_deals,
 import { pitchDraftSchema, pitchFollowupSchema, pitchPlayerInput, pitchPlayerMatches, pitchPublicPath, type PitchRecording } from "../lib/pitches";
 import { HttpError } from "./errors";
 import { getReleaseSamplyReview } from "./samply-release";
-import { buildSamplyEmbedUrl, createSamplyPlayer, getSamplyAvailability, getSamplyPlayer, listSamplyPlayers, listSamplyProjectFiles, updateSamplyPlayer } from "./samply";
+import { SamplyApiError, buildSamplyEmbedUrl, createSamplyPlayer, getSamplyAvailability, getSamplyPlayer, listSamplyPlayers, listSamplyProjectFiles, updateSamplyPlayer } from "./samply";
 
 const wherePitch = (org: string, id: string) => and(eq(pitches.org_id, org), eq(pitches.id, id));
 
@@ -128,6 +128,7 @@ export async function changePitchLink(org: string, actor: string, id: string, ac
 
 async function changeReservedPitchLink(org: string, actor: string, id: string, action: "create" | "revoke", expectedVersion: number) {
   const context = { orgId: org, userId: actor };
+  let preflightPlayers: Awaited<ReturnType<typeof listSamplyPlayers>> | undefined;
   const reservation = await runWithDatabaseContext(context, async () => {
     const [pitch] = await db.select().from(pitches).where(wherePitch(org, id)).for("update");
     if (!pitch) throw new HttpError("Pitch not found", 404);
@@ -145,6 +146,7 @@ async function changeReservedPitchLink(org: string, actor: string, id: string, a
       if (!pitch.recordings.every(recording => files.some(file => file.id === recording.box_id && file.object === "file" && !file.trashed))) {
         throw new HttpError("A selected Samply file is missing or is a folder/version stack. Sync the release and select its individual files.", 409);
       }
+      preflightPlayers = await listSamplyPlayers(org);
     }
     if (pitch.link_state === "draft") await db.update(pitches).set({ link_state: "preparing", version: pitch.version + 1, updated_at: new Date() }).where(wherePitch(org, id));
     return { pitch, create: pitch.link_state === "draft" };
@@ -164,9 +166,21 @@ async function changeReservedPitchLink(org: string, actor: string, id: string, a
   let playerId = pitch.player_id;
   if (!playerId) {
     const input = pitchPlayerInput(pitch);
-    const matches = (await listSamplyPlayers(org)).filter(player => player.name === input.name && player.projectid === input.projectid);
+    const matches = (preflightPlayers ?? await listSamplyPlayers(org)).filter(player => player.name === input.name && player.projectid === input.projectid);
     if (matches.length > 1) throw new HttpError("Multiple matching Samply links need review before continuing", 409);
-    const player = matches[0] ?? (reservation.create ? await createSamplyPlayer(org, input) : null);
+    let player = matches[0] ?? null;
+    if (!player && reservation.create) {
+      try { player = await createSamplyPlayer(org, input); }
+      catch (error) {
+        // An explicit authentication/permission rejection did not create a link.
+        // Keep timeouts and other uncertain outcomes reserved for recovery.
+        if (error instanceof SamplyApiError && [401, 403].includes(error.status)) {
+          await runWithDatabaseContext(context, () => db.update(pitches).set({ link_state: "draft", updated_at: new Date() }).where(and(wherePitch(org, id), eq(pitches.link_state, "preparing"))));
+          throw new HttpError("Samply denied link creation. Check the configured token's player-write access, then retry. Your draft is still editable.", error.status);
+        }
+        throw error;
+      }
+    }
     if (!player) throw new HttpError("The previous Samply create has an unconfirmed outcome. Check Samply before retrying; no duplicate link was created.", 409);
     playerId = player.id;
     await runWithDatabaseContext(context, async () => {

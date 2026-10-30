@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { SamplyPlayerSummary } from "./samply";
+import { SamplyApiError, type SamplyPlayerSummary } from "./samply";
 
 const provider = vi.hoisted(() => ({ createSamplyPlayer: vi.fn(), getSamplyPlayer: vi.fn(), listSamplyPlayers: vi.fn(), listSamplyProjectFiles: vi.fn(), updateSamplyPlayer: vi.fn() }));
 vi.mock("./samply", async importOriginal => ({ ...await importOriginal<typeof import("./samply")>(), ...provider, getSamplyAvailability: () => ({ configured: true }) }));
@@ -103,6 +103,23 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     const recovered = await service.changePitchLink(org, "", saved.id, "create", pending.version);
     expect(recovered.link_state).toBe("ready");
     expect(provider.createSamplyPlayer.mock.calls.length).toBe(before + 1);
+  });
+
+  it("keeps a draft editable after read failures or an explicit create permission rejection", async () => {
+    const saved = await asOrg(org, () => service.savePitch(org, draft()));
+    provider.listSamplyPlayers.mockRejectedValueOnce(new Error("Read unavailable"));
+    await expect(service.changePitchLink(org, "", saved.id, "create", saved.version)).rejects.toThrow("Read unavailable");
+    expect((await asOrg(org, () => service.getPitch(org, saved.id))).link_state).toBe("draft");
+    const count = players.size;
+    provider.createSamplyPlayer.mockRejectedValueOnce(new SamplyApiError("Insufficient permissions", 403));
+    await expect(service.changePitchLink(org, "", saved.id, "create", saved.version)).rejects.toMatchObject({ status: 403 });
+    const rejected = await asOrg(org, () => service.getPitch(org, saved.id));
+    expect(rejected.link_state).toBe("draft");
+    expect(rejected.player_id).toBeNull();
+    expect(players.size).toBe(count);
+    const ready = await service.changePitchLink(org, "", saved.id, "create", rejected.version);
+    expect(ready.link_state).toBe("ready");
+    expect(players.size).toBe(count + 1);
   });
 
   it("keeps missing files editable and refuses widened provider scopes", async () => {
