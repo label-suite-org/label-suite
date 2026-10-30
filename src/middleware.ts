@@ -29,7 +29,7 @@ export const onRequest = defineMiddleware((context, next) => {
           severity: "error",
           event: "request.completed",
           requestId,
-          route: context.url.pathname,
+          route: logRoute(context.url.pathname),
           orgId: context.locals.orgId,
           durationMs: elapsed(startedAt),
           outcome: "failed",
@@ -49,7 +49,7 @@ export const onRequest = defineMiddleware((context, next) => {
       severity: response.status >= 500 || durationMs > budgetMs ? "warn" : "info",
       event: "request.completed",
       requestId,
-      route: context.url.pathname,
+      route: logRoute(context.url.pathname),
       orgId: context.locals.orgId,
       durationMs,
       outcome: response.status < 400 ? "succeeded" : "failed",
@@ -73,6 +73,12 @@ async function handleRequest(
     requireSameOrigin(context.request);
   }
   const isPublic = publicPaths.includes(path);
+  if (/^\/listen\/[A-Za-z0-9_-]+\/[a-f0-9]{64}$/.test(path)) {
+    const response = withPrivateCachePolicy(await next());
+    response.headers.set("Referrer-Policy", "no-referrer");
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    return response;
+  }
   const isFanPublic = isFanWebhook || /^\/drops\/[A-Za-z0-9_-]+\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(path)
     || ["/fans/privacy", "/fans/confirm", "/fans/unsubscribe", "/api/fans/signup", "/api/fans/confirm", "/api/fans/unsubscribe"].includes(path);
   if (isFanPublic) {
@@ -182,6 +188,10 @@ async function handleRequest(
     });
   }
 
+  // This authenticated route commits a tenant-scoped reservation before its
+  // external write and uses explicit DB contexts for each subsequent step.
+  if (path === "/api/pitches/link" && context.request.method === "POST") return withPrivateCachePolicy(await next());
+
   const transactionOptions = requiresRepeatableRead(context.request.method)
     || isCampaignOsMutation(context.request.method, path)
     ? { isolationLevel: "repeatable read" as const }
@@ -195,6 +205,10 @@ async function handleRequest(
 
 function requiresRepeatableRead(method: string): boolean {
   return method.toUpperCase() === "GET";
+}
+
+function logRoute(path: string): string {
+  return path.startsWith("/listen/") ? "/listen/[org]/[token]" : path;
 }
 
 function isCampaignOsMutation(method: string, path: string): boolean {

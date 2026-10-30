@@ -1,0 +1,11 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { PitchEditor } from "../../components/pitches/PitchEditor";
+import { requireMutateRole } from "../../server/tenant";
+import { getPitch, pitchOptions } from "../../server/pitches";
+const org = requireMutateRole(Astro.locals);
+const id = Astro.params.id!;
+const initial = id === "new" ? null : await getPitch(org, id);
+const options = await pitchOptions(org, initial?.campaign_id ?? Astro.url.searchParams.get("campaign"), initial?.sync_deal_id ?? Astro.url.searchParams.get("sync"), initial?.release_id);
+---
+<AppLayout><PitchEditor client:load initial={initial} options={options} replyEmail={Astro.locals.user?.email ?? ""}/></AppLayout>

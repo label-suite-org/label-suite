@@ -1,0 +1,14 @@
+---
+import AppLayout from "../../layouts/AppLayout.astro";
+import { requireMutateRole } from "../../server/tenant";
+import { listPitches, pitchOptions } from "../../server/pitches";
+const org = requireMutateRole(Astro.locals);
+const campaign = Astro.url.searchParams.get("campaign"), sync = Astro.url.searchParams.get("sync");
+const options = await pitchOptions(org, campaign, sync);
+const rows = await listPitches(org, campaign, sync);
+const query = new URLSearchParams(campaign ? { campaign } : { sync: sync! }).toString();
+const parent = campaign ? `/campaigns/${encodeURIComponent(campaign)}?tab=pitches` : `/sync/${encodeURIComponent(sync!)}`;
+---
+<AppLayout><div class="mx-auto max-w-4xl space-y-6"><a href={parent} class="text-sm underline">← {options.contextTitle}</a><header class="flex flex-wrap items-center justify-between gap-3"><div><h1 class="text-2xl font-semibold">Pitches</h1><p class="text-muted-foreground">Music selections and follow-up for {options.contextTitle}.</p></div><a class="rounded-md bg-primary px-4 py-2 text-primary-foreground" href={`/pitches/new?${query}`}>New pitch</a></header>
+{rows.length ? <ul class="divide-y rounded-md border">{rows.map(row => <li class="space-y-1 p-4"><a class="font-semibold underline" href={`/pitches/${row.id}`}>{row.title}</a><p>{row.recipient} · {row.status} · Link: {row.link_state}</p>{row.sent_date && <p class="text-sm">Sent {row.sent_date}</p>}{row.next_action && <p class="text-sm text-muted-foreground">{row.next_action}{row.due_date ? ` · ${row.due_date}` : ""} · {row.task_status}</p>}</li>)}</ul> : <p class="rounded-md border p-6 text-muted-foreground">No pitches yet. Choose exact recordings and prepare the first listening page.</p>}
+</div></AppLayout>

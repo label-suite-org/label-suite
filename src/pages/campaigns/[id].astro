@@ -92,6 +92,7 @@ if (campaign && campaignAudienceSchemaAvailable) {
 const campaignTabs = [
   { key: "overview", label: "Overview" },
   { key: "outreach", label: "Outreach" },
+  ...(canMutate ? [{ key: "pitches", label: "Pitches" }] : []),
   { key: "creators", label: "Creators" },
   ...(campaign && canMutate && campaignAudienceSchemaAvailable ? [{ key: "audience", label: "Audience" }] : []),
   ...(campaign && !canMutate ? [{ key: "audience", label: "Audience" }] : []),
@@ -127,6 +128,8 @@ if (campaign && activeTab === "outreach" && campaignOutreachSchemaAvailable) {
       <CampaignContextRail client:load campaigns={campaignRailItems} selectedId={id} />
       <div class="min-w-0 flex-1 space-y-8 px-4 py-5 sm:px-6">
         <CampaignWorkspaceNavigation client:load campaignId={id} campaignName={campaign.campaign_name} status={campaign.status} activeTab={activeTab} sections={campaignTabs.map((tab) => ({ key: tab.key, label: tab.label }))} campaigns={campaignRailItems} />
+
+      {activeTab === "pitches" && canMutate && <section class="space-y-3"><h2 class="text-lg font-semibold">Music pitches</h2><p class="text-muted-foreground">Prepare exact recording selections and track recipient follow-up.</p><a class="underline" href={`/pitches?campaign=${encodeURIComponent(id)}`}>Open campaign pitches →</a></section>}
 
       {activeTab === "overview" && <>
         <CampaignWorkingTasks tasks={campaignWorkingTasks.map((task) => ({ id: task.id, title: task.task_name || "Untitled task", nextAction: task.next_action, dueDate: task.due_date }))} />

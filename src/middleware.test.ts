@@ -78,7 +78,7 @@ describe("Spotify import middleware boundary", () => {
     process.env.PUBLIC_SITE_URL = "https://labels.example";
   });
 
-  it.each(["/drops/org-a/tour-news", "/fans/privacy", "/fans/confirm?token=private", "/fans/unsubscribe?token=private"])("serves public fan route %s without selecting a browser workspace", async (path) => {
+  it.each([`/listen/org-a/${"a".repeat(64)}`, "/drops/org-a/tour-news", "/fans/privacy", "/fans/confirm?token=private", "/fans/unsubscribe?token=private"])("serves public fan route %s without selecting a browser workspace", async (path) => {
     const { onRequest } = await import("./middleware");
     const context = contextFor(new Request(`https://labels.example${path}`));
     const next = vi.fn().mockResolvedValue(new Response("fan page"));
@@ -165,6 +165,23 @@ describe("Spotify import middleware boundary", () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("route reached");
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("authenticates pitch link writes without enclosing their durable provider steps in a request transaction", async () => {
+    authBoundary.getSession.mockResolvedValue({ user: { id: "user-a" }, session: { id: crypto.randomUUID() } });
+    authBoundary.resolveActiveOrgForUser.mockResolvedValue({ org: { id: "org-a", name: "Org A", slug: "org-a", plan: null }, role: "operator" });
+    const { onRequest } = await import("./middleware");
+    const context = contextFor(new Request("https://labels.example/api/pitches/link", { method: "POST", headers: { origin: "https://labels.example" } }));
+    const next = vi.fn(async () => {
+      expect(databaseBoundary.activeContext).toBeUndefined();
+      expect(context.locals).toMatchObject({ orgId: "org-a", membershipRole: "operator", user: { id: "user-a" } });
+      return new Response("route reached");
+    });
+    expect((await onRequest(context as never, next) as Response).status).toBe(200);
+    expect(authBoundary.getSession).toHaveBeenCalledOnce();
+    const denied = contextFor(new Request("https://labels.example/api/pitches/link", { method: "POST", headers: { origin: "https://attacker.example" } }));
+    expect((await onRequest(denied as never, next) as Response).status).toBe(403);
     expect(next).toHaveBeenCalledOnce();
   });
 
