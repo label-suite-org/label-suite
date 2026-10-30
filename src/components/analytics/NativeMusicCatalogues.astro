@@ -9,19 +9,25 @@ const format = (value: number | null) => value === null ? "Unknown" : value.toLo
   <section class="space-y-6" aria-labelledby="native-music-heading">
     <div>
       <h2 id="native-music-heading" class="text-2xl font-semibold">Direct from your artist dashboards</h2>
-      <p class="text-sm text-muted-foreground">Dated native song totals. Each provider has its own reporting cutoff. These captures refresh when imported.</p>
+      <p class="text-sm text-muted-foreground">Saved artist-dashboard captures. Each provider has its own reporting cutoff. Reloading this page does not fetch new provider data.</p>
     </div>
     {catalogues.map((catalogue) => (
       <article class="space-y-3 rounded-lg border border-[var(--border)] p-5">
         <h3 class="text-lg font-semibold">{catalogue.artistName} · {catalogue.provider === "spotify_for_artists" ? "Spotify for Artists" : "Apple Music for Artists"}</h3>
-        <p>{catalogue.dateFrom}–{catalogue.dateThrough} · Worldwide · {catalogue.metric === "audio_streams" ? "Audio streams" : "Plays"}</p>
+        <p>Reporting window: {catalogue.dateFrom}–{catalogue.dateThrough} · Worldwide · {catalogue.metric === "audio_streams" ? "Audio streams" : "Plays"}</p>
         <p class="text-3xl font-semibold tabular-nums">{format(nativeCatalogueTotal(catalogue.rows))}</p>
-        <p class="text-sm text-muted-foreground">Selected-period total across {catalogue.rows.length} native song entries. Captured {catalogue.capturedAt.replace("T", " ").replace(/\.\d+Z$/, " UTC")}.</p>
+        <p class="text-sm text-muted-foreground">Selected-period song sum across {catalogue.rows.length} native song entries.</p>
+        <p class="text-sm text-muted-foreground">Captured: <time datetime={catalogue.capturedAt}>{new Date(catalogue.capturedAt).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC")}</time>. This is when the dashboard was observed, not when the file was imported.</p>
         {catalogue.artistTotal !== null && <p class="text-sm">Native artist rollup: {format(catalogue.artistTotal)} plays.
           {nativeCatalogueTotal(catalogue.rows) !== null && catalogue.artistTotal !== nativeCatalogueTotal(catalogue.rows) &&
             <> The native rollup differs from the song sum by {format(catalogue.artistTotal - nativeCatalogueTotal(catalogue.rows)!)} plays. This difference remains unresolved; neither value has been adjusted.</>}
         </p>}
         <p class="text-sm text-muted-foreground">Song entries retain their provider IDs and versions. Daily and geographic breakdowns are not included in this capture.</p>
+        <p class="text-sm text-muted-foreground">For newer numbers, capture the artist dashboard again and import the prepared JSON. The newest capture for each artist and provider is shown; importing an old file does not make its reporting period current.</p>
+        <div class="flex flex-wrap gap-4 text-sm">
+          <a href={catalogue.sourceUrl} target="_blank" rel="noopener noreferrer" class="underline">Open artist dashboard</a>
+          <a href={`/analytics?section=data-health&artist=${encodeURIComponent(catalogue.artistId)}#native-music-import`} class="underline">Import a new capture</a>
+        </div>
         <details>
           <summary class="cursor-pointer font-medium">All songs and provider links</summary>
           <div class="overflow-x-auto">

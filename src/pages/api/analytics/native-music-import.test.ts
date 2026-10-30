@@ -28,7 +28,8 @@ describe("native music import route", () => {
     const preview = await call(body);
     expect(preview.headers.get("cache-control")).toBe("private, no-store");
     const result = await preview.json();
-    expect(result).toMatchObject({ kind: "preview", rowCount: 1, total: 7 });
+    expect(result).toMatchObject({ kind: "preview", rowCount: 1, total: 7,
+      capturedAt: "2026-01-03T12:00:00Z", metric: "audio_streams", artistTotal: null });
     expect(importNativeMusicSnapshot).not.toHaveBeenCalled();
     body.set("action", "apply"); body.set("expected_sha256", result.sha256);
     expect((await call(body)).status).toBe(200);
