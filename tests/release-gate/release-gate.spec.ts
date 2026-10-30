@@ -474,7 +474,9 @@ test("release-blocker-to-exact-field", async ({ page }) => {
   await login(page);
   await page.goto(`/releases/${releaseId}`);
   await expect(page.getByRole("main")).toBeVisible();
-  await page.getByRole("button", { name: "Review checks", exact: true }).click();
+  const reviewChecks = page.getByRole("button", { name: "Review checks", exact: true });
+  await expect(reviewChecks.locator("xpath=ancestor::astro-island[1]")).not.toHaveAttribute("ssr", "");
+  await reviewChecks.click();
   await expect(page.getByRole("heading", { name: "Operations brief" })).toBeVisible({ timeout: 8_000 });
 
   const hasTrackBlocker = page.getByRole("button", { name: "Review tracks" }).first();
