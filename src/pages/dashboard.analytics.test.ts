@@ -9,6 +9,11 @@ describe("dashboard analytics signals", () => {
     const page = readFileSync(new URL("./analytics.astro", import.meta.url), "utf8");
     const importer = readFileSync(new URL("../components/analytics/NativeMusicImport.tsx", import.meta.url), "utf8");
     expect(page).toMatch(/<div id="native-music-import">\s*<NativeMusicImport\s+client:load[^>]*\/>\s*<\/div>/);
+    const dataHealth = page.slice(page.indexOf('{activeSection === "data-health"'));
+    const target = dataHealth.indexOf('<div id="native-music-import">');
+    expect(target).toBeGreaterThan(0);
+    // A client-only importer above the target shifts it after initial fragment navigation.
+    expect(dataHealth.slice(0, target)).not.toContain("client:only");
     expect(importer).not.toContain('id="native-music-import"');
     const html = renderToString(createElement(NativeMusicImport, {
       artists: [{ id: "fixture-artist", name: "Fixture artist" }], selectedArtistId: "fixture-artist",
