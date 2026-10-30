@@ -153,8 +153,10 @@ const [
             Review source coverage, freshness, duplicate candidates, unmatched rows, and sync outcomes. Missing or unmatched data remains visible until reviewed.
           </p>
         </div>
+        <div id="native-music-import">
+          <NativeMusicImport client:load artists={artists} selectedArtistId={artistParam} />
+        </div>
         <SpotifyCsvImport client:only="react" artists={artists} latestImports={latestSpotifyAudienceImports} />
-        <NativeMusicImport client:only="react" artists={artists} />
         <SisenseTrackSnapshotImport client:only="react" artists={artists} latestImports={latestSisenseTrackSnapshotImports} />
         <AnalyticsDataQuality client:only="react" report={dataQuality} />
         <div id="analytics-sync-runs">
