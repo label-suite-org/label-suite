@@ -17,6 +17,7 @@ if (!pitch) return new Response("This listening link is unavailable.", { status:
   </header>
   {pitch.message && <p class="whitespace-pre-wrap">{pitch.message}</p>}
   <iframe title={`Listen to ${pitch.title}`} src={pitch.embed_url} class="h-[480px] w-full rounded-lg border" allow="autoplay" referrerpolicy="no-referrer"></iframe>
+  {pitch.download_url && <p><a class="font-medium underline" href={pitch.download_url} target="_blank" rel="noopener noreferrer">Download recordings in Samply ↗</a></p>}
   <section><h2 class="text-lg font-semibold">Recordings</h2><ol class="mt-3 space-y-3">{pitch.recordings.map(file => <li><strong>{file.title}</strong><p class="text-sm text-muted-foreground">{file.file_name}{file.isrc ? ` · ISRC ${file.isrc}` : ""}</p></li>)}</ol></section>
   {pitch.credits && <section><h2 class="text-lg font-semibold">Credits</h2><p class="whitespace-pre-wrap">{pitch.credits}</p></section>}
   {pitch.rights_note && <section><h2 class="text-lg font-semibold">Rights information</h2><p class="whitespace-pre-wrap">{pitch.rights_note}</p></section>}

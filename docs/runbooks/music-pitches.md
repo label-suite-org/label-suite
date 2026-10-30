@@ -6,6 +6,8 @@ Open Campaign → Pitches, or a saved Sync opportunity → Music pitches. Create
 pitch, choose a recipient and a release, then select individual synced Samply
 files. Add the recipient message, credits, confirmed rights information, and a
 reply email. Downloads default to off.
+When enabled, the listening page links to Samply's full player for downloading;
+the embedded player itself only exposes playback controls.
 
 Save draft only stores Label Suite data. **Create listening link** freezes that
 content, creates a dedicated Samply player privately, verifies its selected
@@ -95,5 +97,7 @@ share ID was required for the embed. Desktop Chrome played the selected tone.
 Selecting an older individual file showed
 only that three-second version while a newer five-second version and another
 track existed in the project. Revoking via Label Suite made the anonymous
-provider embed report that the project was unavailable. No catalogue audio or
+provider embed report that the project was unavailable. A downloads-enabled
+comparison delivered the selected three-second WAV through Samply's full player.
+No catalogue audio or
 recipient messages were used.

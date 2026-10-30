@@ -70,6 +70,7 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     const publicPage = await asOrg(org, () => service.getPublicPitch(org, saved.token));
     expect(publicPage?.message).toBe(input.message);
     expect(publicPage?.embed_url).toBe(`https://samply.app/embed/share-${ready.player_id}`);
+    expect(publicPage?.download_url).toBeNull();
     expect(JSON.stringify(publicPage)).not.toMatch(/private@example|recipient|response_note|remote_project_id/);
     await expect(asOrg(org, () => service.savePitch(org, { ...input, expected_version: ready.version }))).rejects.toMatchObject({ status: 409 });
     const sent = await asOrg(org, () => service.savePitchFollowup(org, { id: saved.id, expected_version: ready.version, status: "sent", sent_date: "2026-10-30", response_note: "Private response", next_action: "Follow up with supervisor", due_date: "2026-11-03" }));
@@ -80,6 +81,15 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     expect(revoked.link_state).toBe("revoked"); expect(players.get(revoked.player_id!)?.public).toBe(false);
     expect(provider.updateSamplyPlayer).toHaveBeenLastCalledWith(org, ready.player_id, { public: false });
     expect(await asOrg(org, () => service.getPublicPitch(org, saved.token))).toBeNull();
+  });
+
+  it("offers the provider download page only when downloads are enabled", async () => {
+    const saved = await asOrg(org, () => service.savePitch(org, { ...draft(), downloads: true }));
+    const ready = await service.changePitchLink(org, "", saved.id, "create", saved.version);
+    expect(players.get(ready.player_id!)?.options?.downloads).toBe(true);
+    const page = await asOrg(org, () => service.getPublicPitch(org, saved.token));
+    expect(page?.download_url).toBe(`https://samply.app/p/share-${ready.player_id}`);
+    await service.changePitchLink(org, "", saved.id, "revoke", ready.version);
   });
 
   it("isolates recipient, context, files, edits and public tokens by workspace", async () => {

@@ -223,6 +223,7 @@ export async function getPublicPitch(org: string, token: string) {
   // or the provider project id to a bearer-link visitor.
   return { title: pitch.title, message: pitch.message, credits: pitch.credits, rights_note: pitch.rights_note, reply_email: pitch.reply_email,
     artist_name: pitch.artist_name, artwork_url: pitch.artwork_url, downloads: pitch.downloads,
+    download_url: pitch.downloads ? `https://samply.app/p/${encodeURIComponent(pitch.player_embed_id)}` : null,
     recordings: pitch.recordings.map(file => ({ title: file.title, file_name: file.file_name, version: file.version, isrc: file.isrc })),
     embed_url: buildSamplyEmbedUrl(pitch.player_embed_id) };
 }
