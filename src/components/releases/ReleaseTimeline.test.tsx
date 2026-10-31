@@ -10,7 +10,7 @@ import { buildReleaseTimeline } from "../../server/release-timeline-core";
 vi.mock("./ReleaseCalendar", () => ({ ReleaseCalendar: () => null }));
 
 const timeline = buildReleaseTimeline({ releaseDate: "2026-10-23", today: "2026-09-15", budgetItems: [], milestones: [], tasks: [
-  { id: "unphased", title: "Find artwork", phase: null, dueDate: null, owner: null, status: "todo", priority: "P2", milestoneId: null },
+  { id: "unphased", revision: 7, title: "Find artwork", phase: null, dueDate: null, owner: null, status: "todo", priority: "P2", milestoneId: null },
   { id: "overdue", title: "Approve master", phase: "assets_metadata", dueDate: "2026-09-01", owner: "Malthe", status: "todo", priority: "P2", milestoneId: null },
 ] });
 let root: Root;
@@ -45,7 +45,7 @@ describe("release workback UI", () => {
     expect(container.querySelector('[aria-label="Overdue"]')?.textContent).toContain("Approve master");
     await act(async () => (container.querySelector('[aria-label="Complete Find artwork"]') as HTMLButtonElement).click());
     expect(fetch.mock.calls[0][0]).toBe("/api/ops-tasks");
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ id: "unphased", status: "done" });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ id: "unphased", status: "done", expected_revision: 7 });
     expect(container.textContent).not.toContain("Find artwork");
   });
   it("offers retry without mutation controls when refresh fails", async () => {
@@ -126,4 +126,28 @@ it("adds suggested tasks by clicking the submit button", async () => {
   expect(onApply).toHaveBeenCalledOnce();
   expect(onApply.mock.calls[0][0]).toEqual(expect.arrayContaining([expect.objectContaining({ dueDate: expect.any(String), offsetDays: expect.any(Number) })]));
   expect(onClose).toHaveBeenCalledOnce();
+});
+
+
+it("keeps release task edits on conflict and offers an explicit reload with discard confirmation", async () => {
+  await render();
+  await act(async () => (container.querySelector('[aria-label="Edit Find artwork"]') as HTMLButtonElement).click());
+  const title = container.querySelector('form input') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(title, "Draft artwork request");
+    title.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  const fetch = vi.fn().mockResolvedValue(Response.json({ error: "Task changed" }, { status: 409 }));
+  const confirm = vi.fn().mockReturnValue(false);
+  vi.stubGlobal("fetch", fetch); vi.stubGlobal("confirm", confirm);
+  await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ id: "unphased", expected_revision: 7, task_name: "Draft artwork request" });
+  expect(title.value).toBe("Draft artwork request");
+  expect((container.querySelector('[aria-label="Complete Find artwork"]') as HTMLButtonElement).disabled).toBe(true);
+  expect((container.querySelector('[aria-label="Edit Find artwork"]') as HTMLButtonElement).disabled).toBe(true);
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain("have not been saved");
+  await act(async () => Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Reload latest schedule")!.click());
+  expect(confirm).toHaveBeenCalledWith(expect.stringContaining("discard your unsaved edits"));
+  expect(title.value).toBe("Draft artwork request");
+  expect(fetch).toHaveBeenCalledTimes(1);
 });
