@@ -29,7 +29,7 @@ export const pitchFollowupSchema = z.object({
   .refine(input => !input.due_date || Boolean(input.next_action), "Add the next action for this follow-up date");
 
 export interface PitchRecording {
-  file_id: string; track_id: string; box_id: string; title: string;
+  file_id: string; track_id: string | null; box_id: string; title: string;
   file_name: string; version: string | null; isrc: string | null;
 }
 
