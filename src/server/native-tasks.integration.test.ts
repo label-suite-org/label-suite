@@ -118,7 +118,7 @@ describe.skipIf(!enabled)("native Task audit and revision authority on disposabl
     const { updateOpsTask } = await import("./ops-tasks");
     const id = randomUUID();
     await sql`insert into label_suite.ops_tasks (id, org_id, task_name) values (${id}, ${orgA}, 'Interleaving fixture')`;
-    await runWithDatabaseContext({ userId: userA, orgId: orgA }, () => updateOpsTask(orgA, { id, task_name: "Web edit" }));
+    await runWithDatabaseContext({ userId: userA, orgId: orgA }, () => updateOpsTask(orgA, { id, expected_revision: 0, task_name: "Web edit" }));
     const [web] = await sql`select revision from label_suite.ops_tasks where id = ${id}`;
     expect(web.revision).toBe(1);
     await expect(runWithDatabaseContext({ userId: userA, orgId: orgA }, () => executeNativeTaskAction(orgA, id, { action: "complete", expected_revision: 0 }, userA))).rejects.toMatchObject({ status: 409 });
@@ -133,6 +133,21 @@ describe.skipIf(!enabled)("native Task audit and revision authority on disposabl
     expect(noop).toMatchObject({ no_change: true, task: { revision: 3 } });
     const [after] = await sql`select count(*)::int as count from label_suite.audit_events where object_id = ${id}`;
     expect(after.count).toBe(1);
+  });
+
+  it("rejects a stale full web form after native handoff and completion, then saves a reviewed edit", async () => {
+    const { createOpsTask, updateOpsTask, updateOpsTaskSchema } = await import("./ops-tasks");
+    const id = randomUUID();
+    const run = <T>(action: () => Promise<T>) => runWithDatabaseContext({ userId: userA, orgId: orgA }, action);
+    await run(() => createOpsTask(orgA, { id, task_name: "Arrange rehearsal", status: "todo", due_date: "2026-11-01", notes: "Saved note", assignee_ids: [userA] }));
+    const staleForm = updateOpsTaskSchema.parse({ id, expected_revision: 0, task_name: "Draft title", status: "todo", due_date: "2026-11-02", notes: "Unsaved web draft", assignee_ids: [userA] });
+    await run(() => executeNativeTaskAction(orgA, id, { action: "reassign", expected_revision: 0, assignee_ids: [userB] }, userA));
+    await run(() => executeNativeTaskAction(orgA, id, { action: "complete", expected_revision: 1 }, userA));
+    await expect(run(() => updateOpsTask(orgA, staleForm))).rejects.toMatchObject({ status: 409 });
+    expect(await canonicalTask(orgA, id)).toMatchObject({ task: { title: "Arrange rehearsal", status: "done", revision: 2, due_date: "2026-11-01", notes: "Saved note", assignee_ids: [userB] } });
+    expect(await run(() => updateOpsTask(orgA, { ...staleForm, expected_revision: 2, status: "done", assignee_ids: [userB] }))).toEqual({ ok: true, revision: 3 });
+    expect(await canonicalTask(orgA, id)).toMatchObject({ task: { title: "Draft title", status: "done", revision: 3, notes: "Unsaved web draft", assignee_ids: [userB] } });
+    await expect(run(() => executeNativeTaskAction(orgA, id, { action: "reschedule", expected_revision: 2, due_date: "2026-11-03" }, userA))).rejects.toMatchObject({ status: 409 });
   });
 
   it("does not expose a relationship that belongs to another tenant", async () => {

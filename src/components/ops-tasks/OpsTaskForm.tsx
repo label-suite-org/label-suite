@@ -9,6 +9,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
 export interface OpsTask {
   id?: string;
+  revision?: number;
   assignee_ids?: string[];
   labels?: string[];
   dependency_ids?: string[];
@@ -70,9 +71,12 @@ export function OpsTaskForm({
   const [nextAction, setNextAction] = useState(initial?.next_action || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [conflict, setConflict] = useState(false);
+  const [revision] = useState(initial?.revision);
 
   async function onSubmit(e: SubmitEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (conflict) return;
     setLoading(true);
     setError("");
     try {
@@ -97,9 +101,10 @@ export function OpsTaskForm({
       const res = await fetch("/api/ops-tasks", {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(isEdit ? { ...payload, id: initial!.id } : payload),
+        body: JSON.stringify(isEdit ? { ...payload, id: initial!.id, expected_revision: revision } : payload),
       });
       if (!res.ok) {
+        if (res.status === 409) setConflict(true);
         const data = await res.json();
         throw new Error(data.error || `Failed to ${isEdit ? "update" : "create"} task`);
       }
@@ -229,10 +234,11 @@ export function OpsTaskForm({
         <Textarea id={`${formId}-notes`} value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
           className="w-full px-3 py-2 border border-input rounded-lg text-sm bg-background" />
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {conflict && <div role="alert" className="space-y-2 text-sm"><p>This task changed elsewhere. Your edits are still here and have not been saved. Reload the latest task to review it before editing again.</p><Button type="button" variant="outline" onClick={() => { if (confirm("Reload the latest task and discard your unsaved edits?")) window.location.reload(); }}>Reload latest task</Button></div>}
+      {error && !conflict && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-2 justify-end">
         <Button variant="ghost" type="button" onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">Cancel</Button>
-        <Button type="submit" disabled={loading}
+        <Button type="submit" disabled={loading || conflict}
           className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50">
           {loading ? "Saving..." : isEdit ? "Save Changes" : "Create Task"}
         </Button>

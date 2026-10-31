@@ -28,6 +28,7 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [taskConflict, setTaskConflict] = useState(false);
 
   const [refreshing, setRefreshing] = useState(true);
   const [refreshError, setRefreshError] = useState("");
@@ -71,12 +72,15 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
   const completedTasks = tasks.filter((task) => !openStatus(task.status)).length;
 
   const mutate = async (url: string, method: string, payload: unknown) => {
-    if (busy) return false;
+    if (busy || taskConflict) return false;
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not save your change.");
+      if (!response.ok) {
+        if (url === "/api/ops-tasks" && response.status === 409) setTaskConflict(true);
+        throw new Error(body.error || "Could not save your change.");
+      }
       if (body.timeline) setTimeline(body.timeline);
       else {
         const refresh = await fetch(`/api/release-milestones?release_id=${encodeURIComponent(releaseId)}`);
@@ -95,7 +99,7 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
           const parent = item.kind === "task" ? milestones.find((entry) => entry.id === item.milestoneId) : null;
           const unfinished = item.kind === "milestone" ? tasks.filter((task) => task.milestoneId === item.id && openStatus(task.status)).length : 0;
           return <li key={`${item.kind}-${item.id}`} id={`task-${item.id}`} className="flex items-start gap-3 p-3">
-            <Button disabled={!canManage || busy} type="button" aria-label={`${done ? "Reopen" : "Complete"} ${item.title}`} title={unfinished ? `${unfinished} linked tasks still open; signing off remains your decision` : undefined} onClick={() => void mutate(item.kind === "task" ? "/api/ops-tasks" : "/api/release-milestones", "PUT", { id: item.id, status: done ? "todo" : "done" })} className={`grid size-6 shrink-0 place-items-center border disabled:opacity-50 ${done ? "border-emerald-600 bg-emerald-600 text-white" : "border-muted-foreground"}`}>{done && <Check className="size-4" />}</Button>
+            <Button disabled={!canManage || busy || taskConflict} type="button" aria-label={`${done ? "Reopen" : "Complete"} ${item.title}`} title={unfinished ? `${unfinished} linked tasks still open; signing off remains your decision` : undefined} onClick={() => void mutate(item.kind === "task" ? "/api/ops-tasks" : "/api/release-milestones", "PUT", { id: item.id, status: done ? "todo" : "done", ...(item.kind === "task" ? { expected_revision: item.revision } : {}) })} className={`grid size-6 shrink-0 place-items-center border disabled:opacity-50 ${done ? "border-emerald-600 bg-emerald-600 text-white" : "border-muted-foreground"}`}>{done && <Check className="size-4" />}</Button>
             <div className={`grid min-w-0 flex-1 gap-2 ${view === "Board" ? "" : "sm:grid-cols-[minmax(0,1fr)_auto]"}`}>
               <div><p className={`break-words text-sm font-medium ${done ? "text-muted-foreground line-through" : ""}`}>{item.title}{item.kind === "milestone" && <span className="ml-2 text-xs text-muted-foreground">Milestone{item.isBlocking ? " · Blocks release" : ""}</span>}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{timeline.phases.find((entry) => entry.key === item.phase)?.label ?? "No phase"}{parent ? ` · ${parent.title}` : ""}{unfinished ? ` · ${unfinished} linked tasks still open` : ""}</p>
@@ -105,14 +109,14 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
                   {knownTasks.filter((entry) => entry.dependencyIds.includes(item.id)).map((entry) => <p key={entry.id} className="text-xs text-muted-foreground">Blocks: <a className="underline" href={`/ops-tasks?task=${encodeURIComponent(entry.id)}`}>{entry.title}</a></p>)}
                 </div>}
               </div>
-              <div className="text-xs sm:text-right"><p className={workBucket(item, timeline.today) === "Overdue" ? "font-medium text-red-700 dark:text-red-300" : ""}>{item.dueDate ?? "No deadline"}{item.dueDate && timeline.releaseDate ? ` · ${daysBetween(timeline.releaseDate, item.dueDate) > 0 ? "+" : ""}${daysBetween(timeline.releaseDate, item.dueDate)}d from release` : ""}</p>{item.kind === "task" && item.offsetDays != null && <p className="mt-1 text-muted-foreground">Relative deadline</p>}{canManage && <Button variant="link" disabled={busy} type="button" className="min-h-8 underline" aria-label={`Edit ${item.title}`} onClick={() => edit(item.kind, item)}>Edit</Button>}</div>
+              <div className="text-xs sm:text-right"><p className={workBucket(item, timeline.today) === "Overdue" ? "font-medium text-red-700 dark:text-red-300" : ""}>{item.dueDate ?? "No deadline"}{item.dueDate && timeline.releaseDate ? ` · ${daysBetween(timeline.releaseDate, item.dueDate) > 0 ? "+" : ""}${daysBetween(timeline.releaseDate, item.dueDate)}d from release` : ""}</p>{item.kind === "task" && item.offsetDays != null && <p className="mt-1 text-muted-foreground">Relative deadline</p>}{canManage && <Button variant="link" disabled={busy || taskConflict} type="button" className="min-h-8 underline" aria-label={`Edit ${item.title}`} onClick={() => edit(item.kind, item)}>Edit</Button>}</div>
             </div>
           </li>;
   };
   return <section className="space-y-4 border border-border bg-background p-3 sm:p-4" aria-label="Release schedule">
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="font-semibold">Release schedule</h2><p className="mt-1 text-sm text-muted-foreground">{timeline.releaseDate ? `${timeline.releaseDate} · ${daysBetween(timeline.today, timeline.releaseDate) >= 0 ? `${daysBetween(timeline.today, timeline.releaseDate)} days to release` : `${-daysBetween(timeline.today, timeline.releaseDate)} days since release`}` : "Set a release date to plan backwards."}</p></div>
-      <div className="flex flex-wrap gap-2"><a className="min-h-9 border border-border px-3 py-2 text-xs" href="/ops-tasks">All tasks</a>{canManage && <Button disabled={busy || !timeline.releaseDate} className="min-h-9 bg-primary px-3 text-xs text-primary-foreground disabled:opacity-50" type="button" onClick={() => { setBuilder(!builder); setEditor(null); }}>Add suggested tasks</Button>}</div>
+      <div className="flex flex-wrap gap-2"><a className="min-h-9 border border-border px-3 py-2 text-xs" href="/ops-tasks">All tasks</a>{canManage && <Button disabled={busy || taskConflict || !timeline.releaseDate} className="min-h-9 bg-primary px-3 text-xs text-primary-foreground disabled:opacity-50" type="button" onClick={() => { setBuilder(!builder); setEditor(null); }}>Add suggested tasks</Button>}</div>
     </header>
     <ReleaseCalendar releaseId={releaseId} canManage={canManage} />
     <section aria-label="Release dates and milestones" className="overflow-x-auto border border-border">
@@ -138,17 +142,18 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
       {(timeline.unphasedTasks?.length ?? 0) > 0 && <Button variant="outline" type="button" aria-pressed={phase === "unphased"} onClick={() => setPhase("unphased")} className="min-h-9 border border-border px-3 text-xs">No phase ({timeline.unphasedTasks!.length})</Button>}
     </nav>
     {pending.length > 0 && <div className="border border-amber-300 bg-amber-50/30 p-3 text-sm"><p>{pending.length} relative deadlines differ from the current release date.</p><Button variant="link" className="min-h-9 underline" type="button" onClick={() => setShowReschedule(!showReschedule)}>Review deadline changes</Button>
-      {showReschedule && <div className="space-y-2"><ul>{pending.map((item) => <li key={item.id}>{item.title}: {item.dueDate || "No date"} → {item.newDate}{item.newDate < timeline.today ? " · Already past" : ""}</li>)}</ul><p className="text-xs">Fixed deadlines and completed tasks keep their dates.</p>{canManage && <Button disabled={busy} type="button" className="min-h-9 bg-primary px-3 text-primary-foreground disabled:opacity-50" onClick={async () => { if (await mutate("/api/release-workback", "POST", { action: "reschedule", releaseId, releaseDate: timeline.releaseDate, preview: pending })) setShowReschedule(false); }}>Apply deadline changes</Button>}</div>}
+      {showReschedule && <div className="space-y-2"><ul>{pending.map((item) => <li key={item.id}>{item.title}: {item.dueDate || "No date"} → {item.newDate}{item.newDate < timeline.today ? " · Already past" : ""}</li>)}</ul><p className="text-xs">Fixed deadlines and completed tasks keep their dates.</p>{canManage && <Button disabled={busy || taskConflict} type="button" className="min-h-9 bg-primary px-3 text-primary-foreground disabled:opacity-50" onClick={async () => { if (await mutate("/api/release-workback", "POST", { action: "reschedule", releaseId, releaseDate: timeline.releaseDate, preview: pending })) setShowReschedule(false); }}>Apply deadline changes</Button>}</div>}
     </div>}
-    {error && <p role="alert" className="border border-red-300 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
+    {taskConflict && <div role="alert" className="space-y-2 border border-red-300 p-3 text-sm"><p>This task changed elsewhere. Your edits are still here and have not been saved. Reload the latest schedule to review it before editing again.</p><Button type="button" variant="outline" onClick={() => { if (confirm("Reload the latest schedule and discard your unsaved edits?")) window.location.reload(); }}>Reload latest schedule</Button></div>}
+    {error && !taskConflict && <p role="alert" className="border border-red-300 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
     {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
-    {builder && timeline.releaseDate && <ReleaseWorkbackBuilder releaseDate={timeline.releaseDate} today={timeline.today} tasks={tasks} planningOptions={options} busy={busy} onClose={() => setBuilder(false)} onApply={(entries) => mutate("/api/release-workback", "POST", { action: "apply", releaseId, releaseDate: timeline.releaseDate, items: entries })} />}
+    {builder && timeline.releaseDate && <ReleaseWorkbackBuilder releaseDate={timeline.releaseDate} today={timeline.today} tasks={tasks} planningOptions={options} busy={busy || taskConflict} onClose={() => setBuilder(false)} onApply={(entries) => mutate("/api/release-workback", "POST", { action: "apply", releaseId, releaseDate: timeline.releaseDate, items: entries })} />}
     <div className="flex flex-wrap items-end justify-between gap-3 border-t border-border pt-3">
       <div className="flex flex-wrap gap-2"><label className="text-xs">Show<NativeSelect className="ml-2 min-h-9 border border-input bg-background px-2" value={filter} onChange={(event) => setFilter(event.target.value)}>{["Open", "All", ...buckets, "Blocked"].map((value) => <option key={value}>{value}</option>)}</NativeSelect></label>
       <label className="text-xs">Assignee<NativeSelect className="ml-2 min-h-9 max-w-48 border border-input bg-background px-2" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="">Everyone</option><option value="unassigned">Unassigned</option>{options.members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}{Array.from(new Set(items.map((item) => item.owner).filter((value): value is string => !!value?.trim()))).sort().map((value) => <option key={value}>{value}</option>)}</NativeSelect></label><label className="text-xs">Label<NativeSelect className="ml-2 min-h-9 border border-input bg-background px-2" value={label} onChange={(event) => setLabel(event.target.value)}><option value="">All labels</option>{Array.from(new Set(tasks.flatMap((task) => task.labels ?? []))).sort().map((value) => <option key={value}>{value}</option>)}</NativeSelect></label></div>
-      {canManage && <div className="flex gap-2"><Button disabled={busy} type="button" onClick={() => edit("milestone")} className="min-h-8 px-2 text-xs font-medium"><Plus className="mr-1 inline size-4" />Milestone</Button><Button disabled={busy} type="button" onClick={() => edit("task")} className="min-h-8 px-2 text-xs font-medium"><Plus className="mr-1 inline size-4" />Task</Button></div>}
+      {canManage && <div className="flex gap-2"><Button disabled={busy || taskConflict} type="button" onClick={() => edit("milestone")} className="min-h-8 px-2 text-xs font-medium"><Plus className="mr-1 inline size-4" />Milestone</Button><Button disabled={busy || taskConflict} type="button" onClick={() => edit("task")} className="min-h-8 px-2 text-xs font-medium"><Plus className="mr-1 inline size-4" />Task</Button></div>}
     </div>
-    {editor && <ReleaseWorkItemForm key={`${editor.kind}-${editor.item?.id ?? "new"}`} kind={editor.kind} item={editor.item} phase={phaseDetail?.key ?? ""} releaseDate={timeline.releaseDate} milestones={milestones} planningOptions={{ ...options, tasks: knownTasks }} busy={busy} onClose={closeEditor} onSave={(payload) => mutate(editor.kind === "task" ? "/api/ops-tasks" : "/api/release-milestones", editor.item ? "PUT" : "POST", { ...payload, ...(editor.item ? { id: editor.item.id } : editor.kind === "task" ? { linked_release_id: releaseId } : { release_id: releaseId }) })} />}
+    {editor && <ReleaseWorkItemForm key={`${editor.kind}-${editor.item?.id ?? "new"}`} kind={editor.kind} item={editor.item} phase={phaseDetail?.key ?? ""} releaseDate={timeline.releaseDate} milestones={milestones} planningOptions={{ ...options, tasks: knownTasks }} busy={busy || taskConflict} onClose={closeEditor} onSave={(payload) => mutate(editor.kind === "task" ? "/api/ops-tasks" : "/api/release-milestones", editor.item ? "PUT" : "POST", { ...payload, ...(editor.item ? { id: editor.item.id, ...(editor.item.kind === "task" ? { expected_revision: editor.item.revision } : {}) } : editor.kind === "task" ? { linked_release_id: releaseId } : { release_id: releaseId }) })} />}
     {!visible.length && <p className="py-5 text-sm text-muted-foreground">{items.length ? "No work matches these filters." : "No work planned yet. Add a task or add suggested tasks to get started."}</p>}
     {view === "Board" ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{[{ key: "todo", title: "To do" }, { key: "in_progress", title: "In progress" }, { key: "blocked", title: "Blocked" }, { key: "done", title: "Done" }].map((column) => {
       const rows = visible.filter((item) => item.kind === "task" && boardStatus(item) === column.key);
