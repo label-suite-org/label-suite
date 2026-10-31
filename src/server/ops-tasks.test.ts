@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => {
   const inserted: Array<Record<string, unknown>> = [];
   const updated: Array<Record<string, unknown>> = [];
   const existingRows: Array<Record<string, unknown>> = [];
-  const updateRows: Array<Record<string, unknown>> = [];
+  const updateRows: Array<Array<Record<string, unknown>>> = [];
   const db = {
     transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(db)),
     execute: vi.fn(async () => []),
