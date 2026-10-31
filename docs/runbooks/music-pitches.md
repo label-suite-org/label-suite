@@ -6,6 +6,9 @@ Open Campaign → Pitches, or a saved Sync opportunity → Music pitches. Create
 pitch, choose a recipient and a release, then select individual synced Samply
 files. Add the recipient message, credits, confirmed rights information, and a
 reply email. Downloads default to off.
+Imported files can be pitched before they are mapped to catalogue tracks. They
+use their Samply filenames as titles; publishing does not create catalogue
+tracks or works. Existing mappings supply track titles and ISRCs when available.
 When enabled, the listening page links to Samply's full player for downloading;
 the embedded player itself only exposes playback controls.
 

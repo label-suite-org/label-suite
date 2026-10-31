@@ -92,6 +92,23 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     await service.changePitchLink(org, "", saved.id, "revoke", ready.version);
   });
 
+  it("pitches an imported file without a catalogue mapping while excluding missing files", async () => {
+    const fileId = `${org}-unmapped`, missingId = `${org}-missing`;
+    await admin.query("insert into label_suite.samply_files(id,org_id,samply_project_id,remote_box_id,file_name,sync_status) values($1,$2,$2,$1,'Demo v1.wav','unmatched'),($3,$2,$2,$3,'Missing.wav','missing_remote')", [fileId, org, missingId]);
+    const options = await asOrg(org, () => service.pitchOptions(org, org, null));
+    expect(options.files.map(file => file.id)).toContain(fileId);
+    expect(options.files.map(file => file.id)).not.toContain(missingId);
+    await expect(asOrg(org, () => service.savePitch(org, { ...draft(), file_ids: [missingId] }))).rejects.toMatchObject({ status: 400 });
+    const saved = await asOrg(org, () => service.savePitch(org, { ...draft(), file_ids: [fileId] }));
+    expect(saved.recordings).toEqual([expect.objectContaining({ track_id: null, title: "Demo v1.wav", box_id: fileId, isrc: null })]);
+    provider.listSamplyProjectFiles.mockResolvedValueOnce([{ id: fileId, object: "file", name: "Demo v1.wav" }]);
+    const ready = await service.changePitchLink(org, "", saved.id, "create", saved.version);
+    expect(players.get(ready.player_id!)?.boxids).toEqual([fileId]);
+    expect((await asOrg(org, () => service.getPublicPitch(org, saved.token)))?.recordings[0].title).toBe("Demo v1.wav");
+    expect((await admin.query("select count(*)::int as count from label_suite.tracks where org_id=$1", [org])).rows[0].count).toBe(1);
+    await service.changePitchLink(org, "", saved.id, "revoke", ready.version);
+  });
+
   it("isolates recipient, context, files, edits and public tokens by workspace", async () => {
     const input = draft(); const saved = await asOrg(org, () => service.savePitch(org, input));
     for (const patch of [{ contact_id: other }, { campaign_id: other }, { file_ids: [other] }, { release_id: other }]) await expect(asOrg(org, () => service.savePitch(org, { ...draft(), ...patch }))).rejects.toBeTruthy();
