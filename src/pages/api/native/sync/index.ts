@@ -4,12 +4,11 @@ import { resolveNativeActor } from "../../../../lib/native-workspace";
 import { hasCapability } from "../../../../server/native-capabilities";
 import { handleApiError, json, parseJson } from "../../../../server/api";
 import {
-  getSyncDeal,
-  listSyncDeals,
+  getNativeSyncDeal,
+  listSyncDealsPage,
   recordSyncReceipt,
   saveSyncDeal,
   syncMutationSchema,
-  syncOptions,
 } from "../../../../server/sync";
 export const prerender = false;
 const handle: APIRoute = async ({ request, url }) => {
@@ -24,12 +23,25 @@ const handle: APIRoute = async ({ request, url }) => {
         const org = actor.workspace.org.id;
         if (request.method === "GET") {
           const id = url.searchParams.get("id");
-          return json({
-            ...(id
-              ? { record: await getSyncDeal(org, id) }
-              : { items: await listSyncDeals(org) }),
-            options: await syncOptions(org),
-          });
+          const limit = Number(url.searchParams.get("limit") ?? 25);
+          return json(
+            id
+              ? {
+                  record: await getNativeSyncDeal(org, id, {
+                    limit,
+                    receipts_cursor:
+                      url.searchParams.get("receipts_cursor") ?? undefined,
+                    revisions_cursor:
+                      url.searchParams.get("revisions_cursor") ?? undefined,
+                  }),
+                }
+              : await listSyncDealsPage(org, {
+                  limit,
+                  cursor: url.searchParams.get("cursor") ?? undefined,
+                  artist: url.searchParams.get("artist") ?? undefined,
+                  release: url.searchParams.get("release") ?? undefined,
+                }),
+          );
         }
         const body = await parseJson(request, syncMutationSchema);
         return json(

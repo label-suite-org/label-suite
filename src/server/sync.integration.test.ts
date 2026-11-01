@@ -69,6 +69,7 @@ describe.skipIf(!enabled)("sync persistence on disposable PostgreSQL", () => {
       "sync_deals",
       "ops_tasks",
       "documents",
+      "releases",
       "artists",
       "audit_logs",
     ]) {
@@ -149,10 +150,15 @@ describe.skipIf(!enabled)("sync persistence on disposable PostgreSQL", () => {
       server.saveSyncDeal(org, "fixture", accepted),
     );
     expect(review.deal.details.contract_status).toBe("needs_review");
+    const taskBefore = await admin.query(
+      "select revision from label_suite.ops_tasks where id=$1",
+      [created.deal.task_id],
+    );
     const approved = await asOrg(org, () =>
       server.saveSyncDeal(org, "fixture", {
         ...accepted,
         expected_version: 2,
+        next_action: "Review signed agreement",
         details: {
           ...review.deal.details,
           commercial_status: "accepted_in_principle",
@@ -166,6 +172,21 @@ describe.skipIf(!enabled)("sync persistence on disposable PostgreSQL", () => {
       }),
     );
     expect(approved.deal.details.publishing_status).toBe("pending");
+    const taskAfter = await admin.query(
+      "select revision,task_name from label_suite.ops_tasks where id=$1",
+      [created.deal.task_id],
+    );
+    expect(taskAfter.rows[0].revision).toBe(taskBefore.rows[0].revision + 1);
+    expect(taskAfter.rows[0].task_name).toBe("Review signed agreement");
+    const persisted = await asOrg(org, () =>
+      server.getNativeSyncDeal(org, input.id),
+    );
+    expect(persisted.deal.details.signed_date).toBe("2026-10-25");
+    expect(persisted.deal.details.contract_status).toBe("signed");
+    expect(persisted.references.contract_document).toEqual({
+      id: org,
+      label: "Fixture agreement",
+    });
     const receipt = {
       id: randomUUID(),
       deal_id: input.id,
@@ -223,5 +244,159 @@ describe.skipIf(!enabled)("sync persistence on disposable PostgreSQL", () => {
       [org],
     );
     expect(result.rows[0].count).toBe(0);
+  });
+  it("pages precise timestamp ties and applies artist/release filters before limiting with RLS isolation", async () => {
+    const asOrg = <T>(id: string, fn: () => Promise<T>) =>
+      database.runWithDatabaseContext({ orgId: id, userId: "" }, fn);
+    const ids = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    const details = {
+      ...syncDraft(),
+      recording_title: "Paging fixture",
+      version_name: "Exact version",
+      provenance: "Synthetic",
+    };
+    await admin.query(
+      "insert into label_suite.releases(id,org_id,title) values($1,$2,'Paging release')",
+      [org, org],
+    );
+    for (let i = 0; i < ids.length; i++) {
+      await admin.query(
+        "insert into label_suite.sync_deals(id,org_id,production,artist_id,release_id,details,updated_at) values($1,$2,$3,$4,$5,$6,$7)",
+        [
+          ids[i],
+          org,
+          `Page ${i}`,
+          i === 3 ? null : org,
+          i === 3 ? null : org,
+          details,
+          i === 2 ? "2026-10-31 12:00:00.123455" : "2026-10-31 12:00:00.123456",
+        ],
+      );
+    }
+    const expected = [ids[0], ids[1]].sort().reverse().concat(ids[2]);
+    const actual: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await asOrg(org, () =>
+        server.listSyncDealsPage(org, {
+          limit: 1,
+          artist: org,
+          release: org,
+          cursor,
+        }),
+      );
+      actual.push(...page.items.map((row) => row.deal.id));
+      expect(page.has_more).toBe(page.next_cursor !== null);
+      cursor = page.next_cursor ?? undefined;
+    } while (cursor);
+    expect(actual).toEqual(expected);
+    expect(
+      (await asOrg(other, () => server.listSyncDealsPage(org))).items,
+    ).toEqual([]);
+    expect(
+      (await asOrg(org, () => server.listSyncDealsPage(org, { artist: other })))
+        .items,
+    ).toEqual([]);
+    await expect(
+      asOrg(org, () => server.listSyncDealsPage(org, { cursor: "garbage" })),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      asOrg(org, () =>
+        server.listSyncDealsPage(org, {
+          cursor: Buffer.from(
+            JSON.stringify({ updated_at: "invalid", id: ids[0] }),
+          ).toString("base64url"),
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    for (const limit of [NaN, 0, 51, 1.5]) {
+      await expect(
+        asOrg(org, () => server.listSyncDealsPage(org, { limit })),
+      ).rejects.toThrow();
+    }
+  });
+  it("bounds receipt and revision history while aggregating all exact currency amounts and resolving only tenant evidence", async () => {
+    const asOrg = <T>(id: string, fn: () => Promise<T>) =>
+      database.runWithDatabaseContext({ orgId: id, userId: "" }, fn);
+    const id = randomUUID();
+    const details = {
+      ...syncDraft(),
+      recording_title: "History fixture",
+      version_name: "Instrumental",
+      provenance: "Synthetic",
+      fee_amount: "100",
+      currency: "USD",
+      fee_basis: "master_only",
+      commercial_status: "accepted_in_principle",
+      contract_document_id: org,
+      invoice_document_id: other,
+    };
+    await admin.query(
+      "insert into label_suite.sync_deals(id,org_id,production,artist_id,details) values($1,$2,'History fixture',$2,$3)",
+      [id, org, details],
+    );
+    await admin.query(
+      "insert into label_suite.sync_receipts(id,org_id,deal_id,amount,currency,received_date,reference,document_id,actor_id) select gen_random_uuid()::text,$1,$2,case when n<=51 then 0.10000001 else 999999999999.99999999 end,case when n<=51 then 'USD' else 'EUR' end,'2026-10-31','Receipt '||n,case when n=53 then null else $1 end,'fixture' from generate_series(1,53) n",
+      [org, id],
+    );
+    await admin.query(
+      "insert into label_suite.sync_revisions(id,org_id,deal_id,version,snapshot,actor_id) select gen_random_uuid()::text,$1,$2,n,$3,'fixture' from generate_series(1,53) n",
+      [org, id, { details }],
+    );
+    const first = await asOrg(org, () => server.getNativeSyncDeal(org, id));
+    expect(first.receipts).toHaveLength(25);
+    expect(first.revisions).toHaveLength(25);
+    expect(first.revisions[0]).not.toHaveProperty("snapshot");
+    expect(first.money).toEqual({
+      totals: { USD: "5.10000051", EUR: "1999999999999.99999998" },
+      balance: "94.89999949",
+      status: "part_received",
+    });
+    expect(first.references.artist).toEqual({
+      id: org,
+      label: "Fixture Artist",
+    });
+    expect(first.references.contract_document).toEqual({
+      id: org,
+      label: "Fixture agreement",
+    });
+    expect(first.references.invoice_document).toBeNull();
+    const receipts = [...first.receipts];
+    const revisions = [...first.revisions];
+    let page = first;
+    while (page.receipts_page.has_more || page.revisions_page.has_more) {
+      page = await asOrg(org, () =>
+        server.getNativeSyncDeal(org, id, {
+          receipts_cursor: page.receipts_page.next_cursor!,
+          revisions_cursor: page.revisions_page.next_cursor!,
+        }),
+      );
+      expect(page.money).toEqual(first.money);
+      receipts.push(...page.receipts);
+      revisions.push(...page.revisions);
+    }
+    expect(new Set(receipts.map((r) => r.id)).size).toBe(53);
+    expect(revisions.map((r) => r.version)).toEqual(
+      Array.from({ length: 53 }, (_, i) => 53 - i),
+    );
+    expect(
+      receipts.find((r) => r.document_id === null)?.document_label,
+    ).toBeNull();
+    expect(receipts.find((r) => r.document_id === org)?.document_label).toBe(
+      "Fixture agreement",
+    );
+    await expect(
+      asOrg(other, () => server.getNativeSyncDeal(org, id)),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      asOrg(org, () =>
+        server.getNativeSyncDeal(org, id, { receipts_cursor: "bad" }),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      asOrg(org, () =>
+        server.getNativeSyncDeal(org, id, { revisions_cursor: "bad" }),
+      ),
+    ).rejects.toMatchObject({ status: 400 });
   });
 });
