@@ -248,13 +248,15 @@ export function revisedSyncDetails(
     throw new Error("Cue-sheet status needs evidence");
   return d;
 }
+// Receipt amounts allow 20 significant digits; totals need room to grow.
+const MoneyDecimal = Decimal.clone({ precision: 40 });
 export function syncMoney(
   details: SyncDetails,
   receipts: { amount: string; currency: string }[],
 ) {
   const totals: Record<string, string> = {};
   for (const r of receipts)
-    totals[r.currency] = new Decimal(totals[r.currency] ?? 0)
+    totals[r.currency] = new MoneyDecimal(totals[r.currency] ?? 0)
       .plus(r.amount)
       .toFixed();
   const comparable =
@@ -263,7 +265,7 @@ export function syncMoney(
     ["master_only", "publishing_only"].includes(details.fee_basis) &&
     details.commercial_status === "accepted_in_principle";
   const balance = comparable
-    ? new Decimal(details.fee_amount)
+    ? new MoneyDecimal(details.fee_amount)
         .minus(totals[details.currency] ?? 0)
         .toFixed()
     : null;
@@ -272,7 +274,7 @@ export function syncMoney(
     balance,
     status:
       balance !== null
-        ? new Decimal(balance).lte(0)
+        ? new MoneyDecimal(balance).lte(0)
           ? "received"
           : totals[details.currency]
             ? "part_received"

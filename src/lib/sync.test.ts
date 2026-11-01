@@ -93,6 +93,14 @@ describe("sync deal evidence and money", () => {
       }).success,
     ).toBe(false);
   });
+  it("retains all eight fractional digits when valid receipt totals exceed twenty significant digits", () => {
+    const input = fixture();
+    Object.assign(input.details, { fee_amount: "999999999999.99999999", currency: "USD", fee_basis: "master_only", commercial_status: "accepted_in_principle" });
+    expect(syncMoney(input.details, [
+      { amount: "999999999999.99999999", currency: "USD" },
+      { amount: "999999999999.99999999", currency: "USD" },
+    ])).toEqual({ totals: { USD: "1999999999999.99999998" }, balance: "-999999999999.99999999", status: "received" });
+  });
   it("requires delivery of an identified file and settlement evidence", () => {
     const input = fixture();
     input.details.delivery_status = "delivered";
