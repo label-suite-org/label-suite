@@ -9,7 +9,8 @@ export default function NativeMusicHistory({ captures }: { captures: NativeMusic
   const hasBothPlatforms = new Set(captures.map(capture => capture.provider)).size === 2;
   const first = daily.map(capture => capture.dateFrom!).sort()[0];
   const last = daily.map(capture => capture.dateThrough!).sort().at(-1);
-  const [from, setFrom] = useState(first ?? "");
+  const recentFrom = last ? new Date(Date.parse(last) - 27 * 86_400_000).toISOString().slice(0, 10) : "";
+  const [from, setFrom] = useState(first && first > recentFrom ? first : recentFrom);
   const [through, setThrough] = useState(last ?? "");
   const [grain, setGrain] = useState<MusicGrain>("day");
   const [provider, setProvider] = useState("");
@@ -26,6 +27,7 @@ export default function NativeMusicHistory({ captures }: { captures: NativeMusic
   return <section className="space-y-4 rounded-lg border p-5" aria-label="Song history">
     <h2 className="text-2xl font-semibold">Song history</h2>
     <p className="text-sm text-muted-foreground">Daily observations from Spotify and Apple. Weeks start Monday; months and years follow the calendar in UTC. Missing observations remain gaps.</p>
+    <p className="text-sm text-muted-foreground">Captured dates: {first}–{last}. Coverage differs by song and platform.</p>
     <div className="flex flex-wrap gap-3">
       <label>Platform <select value={provider} onChange={event => { setProvider(event.target.value); setSong(""); }} className="rounded border bg-transparent p-2">
         <option value="">{hasBothPlatforms ? "Spotify + Apple" : "Available platforms"}</option><option value="spotify_for_artists">Spotify</option><option value="apple_music_for_artists">Apple Music</option>

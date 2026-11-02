@@ -33,6 +33,14 @@ it("keeps the screen usable after an out-of-range typed date and recovers the ex
     expect(container.querySelector('[role="status"]')).toBeNull();
     expect(container.textContent).toContain("1 of 1 song histories");
     expect(container.querySelector("tbody tr td")?.textContent).toBe("7");
+    // A newly imported older window must not expand the initial view into years
+    // of missing coverage on the other platform.
+    await act(async () => root.render(<NativeMusicHistory key="older" captures={[capture, {
+      ...capture, runId: "old", dateFrom: "2024-01-01", dateThrough: "2024-01-01",
+      rows: [{ ...capture.rows[0], daily: [{ date: "2024-01-01", value: 7 }] }],
+    }]} />));
+    expect(container.querySelector<HTMLInputElement>('input[type="date"]')?.value).toBe("2026-01-05");
+    expect(container.textContent).toContain("Captured dates: 2024-01-01–2026-02-01");
   } finally {
     await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals();
   }
