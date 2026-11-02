@@ -370,12 +370,14 @@ function LineRow({
             body: JSON.stringify(editing === "spend_month" ? { id: l.id, spend_month: value || null } : { id: l.id, [`${editing}_amount`]: value }),
       });
       if (!res.ok) setSaveError("Could not save this change.");
-      else if (onChanged) onChanged();
+      else {
+        onChanged?.();
+        setEditing(null);
+      }
     } catch {
       setSaveError("Could not save this change.");
     } finally {
       setSaving(false);
-      setEditing(null);
     }
   }
 
