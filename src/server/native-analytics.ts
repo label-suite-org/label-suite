@@ -58,7 +58,10 @@ export async function getNativeAnalytics(orgId: string, raw: unknown, now = new 
       fetched_at: now.toISOString(),
       reporting: { through: reportingThrough, stale: reportingAgeHours === null ? null : reportingAgeHours > ANALYTICS_IMPORT_STALE_AFTER_HOURS, basis: "latest_scoped_daily_reporting_date" },
       periods,
-      native_catalogues: nativeCatalogues,
+      // Keep dated captures compatible with older clients requiring date strings.
+      native_catalogues: nativeCatalogues.filter(capture => !capture.periodKind),
+      native_all_time_catalogues: nativeCatalogues.filter(capture => capture.periodKind === "all_time"),
+      native_daily_catalogues: nativeCatalogues.filter(capture => capture.periodKind === "daily"),
       catalog: { ...command.catalog, completeness: "Top 100 track snapshot rows; not a complete catalog total" },
       sources,
       provider_integrity: command.providerIntegrity ?? null,

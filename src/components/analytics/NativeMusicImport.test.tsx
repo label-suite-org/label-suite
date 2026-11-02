@@ -66,6 +66,13 @@ it("reports duplicate replay as a no-op instead of a newly saved capture", async
   expect(container.querySelector('[role="status"]')?.textContent).toBe("This exact file was already imported. No new capture was saved.");
 });
 
+it("shows the provider lifetime scope and cutoff before import", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(reply({ ...preview, periodKind: "all_time" })));
+  await chooseFile();
+  await click("Preview native snapshot");
+  expect(container.textContent).toContain("All-time totals reported by the provider, through 2026-01-02");
+});
+
 it("clears a previous preview after a failed re-preview and never leaves an apply action", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(reply(preview)).mockResolvedValueOnce(reply({ error: "Snapshot no longer available" }, 503)));
   await chooseFile();
