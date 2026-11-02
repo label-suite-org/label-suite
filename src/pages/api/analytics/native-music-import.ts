@@ -21,6 +21,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const parsed = parseNativeMusicSnapshot(bytes);
     if (action === "preview") return json({ kind: "preview", sha256: parsed.sha256, provider: parsed.snapshot.provider,
       artistName: parsed.snapshot.artistName, dateFrom: parsed.snapshot.dateFrom, dateThrough: parsed.snapshot.dateThrough,
+      periodKind: parsed.snapshot.periodKind,
       capturedAt: parsed.snapshot.capturedAt, metric: parsed.snapshot.metric, artistTotal: parsed.snapshot.artistTotal,
       rowCount: parsed.snapshot.rows.length, total: parsed.total });
     const expectedSha256 = form.get("expected_sha256");

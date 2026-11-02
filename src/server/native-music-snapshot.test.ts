@@ -10,6 +10,14 @@ const snapshot = () => ({ version: 1, provider: "spotify_for_artists", providerA
 const parse = (value: unknown) => parseNativeMusicSnapshot(new TextEncoder().encode(JSON.stringify(value)));
 
 describe("native music catalogue observations", () => {
+  it("requires explicit source lifetime scope instead of inferring it from the date range", () => {
+    const longWindow = { ...snapshot(), dateFrom: "2015-06-30" };
+    expect(parse(longWindow).snapshot.periodKind).toBeUndefined();
+    expect(parse({ ...longWindow, periodKind: "all_time" }).snapshot.periodKind).toBe("all_time");
+    expect(parse({ ...longWindow, periodKind: "all_time", dateFrom: null, dateThrough: null }).snapshot.dateThrough).toBeNull();
+    expect(() => parse({ ...longWindow, dateThrough: null })).toThrow();
+    expect(() => parse({ ...longWindow, periodKind: "daily" })).toThrow();
+  });
   it("retains distinct IDs with identical titles and preserves period scope", () => {
     const input = snapshot();
     input.rows.push({ ...input.rows[0], recordingId: "C".repeat(22), sourceUrl: input.rows[0].sourceUrl.replace(recording, "C".repeat(22)), value: 3 });
@@ -39,5 +47,13 @@ describe("native music catalogue observations", () => {
       sourceUrl: "https://artists.apple.com/ui/measure/artist/ami:identity:fixture/your-music/songs",
       rows: [{ recordingId: "12345", title: "Song (Club)", value: 12, sourceUrl: "https://artists.apple.com/ui/measure/artist/ami:identity:fixture/your-music/song/12345" }] };
     expect(parse(input).total).toBe(12);
+  });
+  it("binds daily observations to exact dates and reconciles complete series", () => {
+    const input = { ...snapshot(), periodKind: "daily", dateFrom: "2026-10-12", dateThrough: "2026-10-13",
+      rows: [{ ...snapshot().rows[0], value: 17, daily: [{ date: "2026-10-12", value: 17 }, { date: "2026-10-13", value: 0 }] }] };
+    expect(parse(input).snapshot.rows[0].daily).toHaveLength(2);
+    expect(() => parse({ ...input, rows: [{ ...input.rows[0], value: 18 }] })).toThrow(/reconcile/);
+    expect(() => parse({ ...input, rows: [{ ...input.rows[0], daily: [input.rows[0].daily[0], input.rows[0].daily[0]] }] })).toThrow(/duplicate/);
+    expect(() => parse({ ...input, periodKind: undefined })).toThrow(/Daily/);
   });
 });

@@ -5,7 +5,8 @@ const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullab
 const previewSchema = z.object({
   kind: z.literal("preview"), sha256: z.string().regex(/^[a-f0-9]{64}$/),
   provider: z.enum(["spotify_for_artists", "apple_music_for_artists"]), artistName: z.string().min(1),
-  dateFrom: z.iso.date(), dateThrough: z.iso.date(), capturedAt: z.iso.datetime(),
+  dateFrom: z.iso.date().nullable(), dateThrough: z.iso.date().nullable(), capturedAt: z.iso.datetime(),
+  periodKind: z.enum(["all_time", "daily"]).optional(),
   metric: z.enum(["audio_streams", "plays"]), artistTotal: count,
   rowCount: z.number().int().positive(), total: count,
 });
@@ -66,7 +67,9 @@ export default function NativeMusicImport({ artists, selectedArtistId }: { artis
     <button type="button" className="rounded border px-3 py-2 disabled:opacity-50" disabled={busy || !file || !artistId} onClick={() => void submit("preview")}>Preview native snapshot</button>
     {preview && <div className="space-y-2 rounded border p-3">
       <p>{preview.artistName} · {preview.provider.replaceAll("_", " ")}</p>
-      <p>Reporting window: {preview.dateFrom}–{preview.dateThrough} · Worldwide</p>
+      {preview.periodKind === "all_time" && <p>All-time totals reported by the provider{preview.dateThrough ? `, through ${preview.dateThrough}.` : ". Reporting cutoff not stated by the provider."}</p>}
+      {preview.periodKind === "daily" && <p>Daily song observations. Missing dates remain unknown in day, week and month views.</p>}
+      {preview.dateFrom && preview.dateThrough && <p>Reporting window: {preview.dateFrom}–{preview.dateThrough} · Worldwide</p>}
       <p>Captured: {new Date(preview.capturedAt).toLocaleString()} · {preview.rowCount} song entries</p>
       <p>Song sum: {preview.total === null ? "Unknown" : preview.total.toLocaleString("en-US")} {preview.metric === "audio_streams" ? "audio streams" : "plays"}</p>
       {preview.artistTotal !== null && <p>Separate artist rollup: {preview.artistTotal.toLocaleString("en-US")} plays. It may differ from the song sum; neither figure is adjusted.</p>}

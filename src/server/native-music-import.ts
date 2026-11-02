@@ -28,14 +28,15 @@ export async function importNativeMusicSnapshot(input: Input, dependencies = pro
   const parsed = parseNativeMusicSnapshot(input.bytes);
   if (parsed.sha256 !== input.expectedSha256) throw new HttpError("Native music preview no longer matches the selected file", 409);
   const snapshot = parsed.snapshot;
-  const range = `${snapshot.dateFrom}..${snapshot.dateThrough}`;
+  const range = snapshot.dateFrom && snapshot.dateThrough ? `${snapshot.dateFrom}..${snapshot.dateThrough}` : "All time; reporting cutoff not stated";
+  const aggregation = snapshot.periodKind === "all_time" ? "All time" : snapshot.periodKind === "daily" ? "Daily" : "Period";
   const { rows: _rows, ...scope } = snapshot;
-  const runEvidence = { artist_id: input.artistId, requested_date_range: range, requested_aggregation: "Period", metadata: { ...scope, sha256: parsed.sha256, reporting_through: snapshot.dateThrough } };
+  const runEvidence = { artist_id: input.artistId, requested_date_range: range, requested_aggregation: aggregation, metadata: { ...scope, sha256: parsed.sha256, reporting_through: snapshot.dateThrough } };
   const fileEvidence = {
     artist_id: input.artistId, widget_key: NATIVE_MUSIC_WIDGET, widget_title: "Native song catalogue",
-    requested_date_range: range, requested_aggregation: "Period", file_name: input.fileName,
+    requested_date_range: range, requested_aggregation: aggregation, file_name: input.fileName,
     sha256: parsed.sha256, byte_size: input.bytes.length, row_count: snapshot.rows.length,
-    headers: ["recordingId", "title", "value", "sourceUrl"],
+    headers: ["recordingId", "title", "value", "sourceUrl", ...(snapshot.periodKind === "daily" ? ["daily"] : [])],
   };
   return runAnalyticsSourceImport({
     database: dependencies.database, source: snapshot.provider, lock: "wait",
@@ -64,17 +65,18 @@ export async function importNativeMusicSnapshot(input: Input, dependencies = pro
     fileEvidence: () => fileEvidence,
     archive: (value) => dependencies.archive(value, parsed.sha256),
     persistRows: async (tx, _context, runId) => {
-      // Each capture is immutable. The read model selects exactly one complete run;
-      // later captures never silently blend with older catalogue membership.
+      // Each capture is immutable. Catalogue reads select a complete run;
+      // daily history resolves overlapping observations per recording and date.
       for (let offset = 0; offset < snapshot.rows.length; offset += 500) {
       await tx.insert(analytics_metric_rows).values(snapshot.rows.slice(offset, offset + 500).map((row) => ({
         id: `amr_${randomUUID()}`, org_id: input.orgId, artist_id: input.artistId,
         source: snapshot.provider, widget_key: NATIVE_MUSIC_WIDGET,
         row_key: `${input.artistId}:${runId}:${row.recordingId}`,
         row_hash: createHash("sha256").update(JSON.stringify(row)).digest("hex"),
-        requested_date_range: range, requested_aggregation: "Period",
+        requested_date_range: range, requested_aggregation: aggregation,
         dimensions: { recording_id: row.recordingId, title: row.title, source_url: row.sourceUrl },
-        metrics: { value: row.value }, raw_row: { ...row, value: row.value === null ? null : String(row.value) },
+        metrics: { value: row.value }, raw_row: { recordingId: row.recordingId, title: row.title, sourceUrl: row.sourceUrl,
+          value: row.value === null ? null : String(row.value), ...(row.daily ? { daily: JSON.stringify(row.daily) } : {}) },
         first_seen_run_id: runId, last_seen_run_id: runId,
       })));
       }
@@ -104,18 +106,24 @@ export async function listNativeMusicCatalogues(orgId: string, artistId?: string
   // displace a newer native observation.
   runs.sort((a, b) => Date.parse(String(b.metadata?.capturedAt)) - Date.parse(String(a.metadata?.capturedAt)));
   for (const run of runs) {
-    const key = `${run.artistId}:${run.metadata?.provider}`;
-    if (!run.artistId || seen.has(key)) continue;
-    const rows = await database.select({ dimensions: analytics_metric_rows.dimensions, metrics: analytics_metric_rows.metrics })
+    // An all-time observation and a selected-period observation answer different
+    // questions. Uploading either must preserve access to the other.
+    const daily = run.metadata?.periodKind === "daily";
+    const key = `${run.artistId}:${run.metadata?.provider}:${run.metadata?.periodKind ?? "period"}`;
+    // Daily files may cover different songs or overlap dates. Retain each run;
+    // the history read model resolves observations by recording and date.
+    if (!run.artistId || (!daily && seen.has(key))) continue;
+    const rows = await database.select({ dimensions: analytics_metric_rows.dimensions, metrics: analytics_metric_rows.metrics, raw: analytics_metric_rows.raw_row })
       .from(analytics_metric_rows).where(and(eq(analytics_metric_rows.org_id, orgId), eq(analytics_metric_rows.last_seen_run_id, run.runId),
         eq(analytics_metric_rows.widget_key, NATIVE_MUSIC_WIDGET)));
     if (rows.length !== run.rowCount) throw new HttpError("Native music catalogue is incomplete; re-import its archived source", 500);
     const { sha256: _sha, reporting_through: _through, ...scope } = run.metadata ?? {};
     const parsed = parseNativeMusicSnapshot(new TextEncoder().encode(JSON.stringify({ ...scope, rows: rows.map((row) => ({
       recordingId: row.dimensions.recording_id, title: row.dimensions.title, sourceUrl: row.dimensions.source_url, value: row.metrics.value,
+      ...(row.raw.daily ? { daily: JSON.parse(row.raw.daily) } : {}),
     })) })));
     result.push({ ...parsed.snapshot, artistId: run.artistId, runId: run.runId });
-    seen.add(key);
+    if (!daily) seen.add(key);
   }
   return result;
 }

@@ -5,6 +5,7 @@ import { Pool } from "pg";
 import * as schema from "../src/db/schema";
 import { importNativeMusicSnapshot, listNativeMusicCatalogues } from "../src/server/native-music-import";
 import { parseNativeMusicSnapshot } from "../src/server/native-music-snapshot";
+import { groupNativeMusicDays } from "../src/lib/native-music-history";
 import { assertDisposableMigratedAnalyticsFixtureTarget } from "./sisense-fixture-safety";
 
 assertDisposableMigratedAnalyticsFixtureTarget({ databaseUrl: process.env.ANALYTICS_FIXTURE_DB_URL,
@@ -52,6 +53,31 @@ try {
   assert.equal(latest.capturedAt, "2026-01-04T12:00:00Z");
   assert.deepEqual(latest.rows, [row("B".repeat(22), null)]);
   assert.equal(Number((await pool.query('select count(*) from label_suite.analytics_metric_rows where org_id=$1', [orgId])).rows[0].count), 4);
+
+  const lifetime = { ...capture("2026-01-05T12:00:00Z", [row("B".repeat(22), 100)]), periodKind: "all_time" };
+  await importNativeMusicSnapshot(input(lifetime), dependencies);
+  const separatePeriods = await listNativeMusicCatalogues(orgId, artistId, database);
+  assert.equal(separatePeriods.length, 2);
+  assert.equal(separatePeriods.find(item => item.periodKind === "all_time")?.rows[0].value, 100);
+  assert.equal(separatePeriods.find(item => !item.periodKind)?.runId, latest.runId);
+
+  const daily = (recordingId: string, value: number) => ({
+    ...capture("2026-01-06T12:00:00Z", []), periodKind: "daily",
+    rows: [{ ...row(recordingId, value), daily: [{ date: "2026-01-01", value }, { date: "2026-01-02", value: 0 }] }],
+  });
+  await importNativeMusicSnapshot(input(daily("B".repeat(22), 7)), dependencies);
+  await importNativeMusicSnapshot(input(daily("C".repeat(22), 3)), dependencies);
+  const dailyRuns = (await listNativeMusicCatalogues(orgId, artistId, database)).filter(item => item.periodKind === "daily");
+  assert.equal(dailyRuns.length, 2, "Separate songs sharing a date window must both survive retrieval");
+  assert.deepEqual(dailyRuns.find(item => item.rows[0].recordingId === "B".repeat(22))?.rows[0].daily,
+    [{ date: "2026-01-01", value: 7 }, { date: "2026-01-02", value: 0 }]);
+  assert.equal(groupNativeMusicDays(dailyRuns, { from: "2026-01-01", through: "2026-01-02", grain: "day" }).total, 10);
+  await importNativeMusicSnapshot(input(daily("B".repeat(22), 8)), dependencies);
+  const conflicts = (await listNativeMusicCatalogues(orgId, artistId, database)).filter(item => item.periodKind === "daily");
+  assert.equal(conflicts.length, 3, "Equal observation timestamps must retain conflicting source evidence");
+  const conflicted = groupNativeMusicDays(conflicts, { from: "2026-01-01", through: "2026-01-02", grain: "day" });
+  assert.equal(conflicted.total, null);
+  assert.deepEqual(conflicted.points.map(point => point.value), [null, 0]);
 
   await pool.query('delete from label_suite.analytics_metric_rows where org_id=$1 and last_seen_run_id=$2', [orgId, latest.runId]);
   await assert.rejects(listNativeMusicCatalogues(orgId, artistId, database), /catalogue is incomplete/);
