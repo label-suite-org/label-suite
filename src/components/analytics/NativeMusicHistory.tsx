@@ -32,7 +32,7 @@ export default function NativeMusicHistory({ captures }: { captures: NativeMusic
       <label>Platform <select value={provider} onChange={event => { setProvider(event.target.value); setSong(""); }} className="rounded border bg-transparent p-2">
         <option value="">{hasBothPlatforms ? "Spotify + Apple" : "Available platforms"}</option><option value="spotify_for_artists">Spotify</option><option value="apple_music_for_artists">Apple Music</option>
       </select></label>
-      <label>Song <select value={song} onChange={event => setSong(event.target.value)} className="max-w-full rounded border bg-transparent p-2">
+      <label className="min-w-0 max-w-full">Song <select value={song} onChange={event => setSong(event.target.value)} className="max-w-full rounded border bg-transparent p-2">
         <option value="">All songs</option>{songs.map(item => <option key={item.key} value={item.key}>{item.title} · {item.provider === "spotify_for_artists" ? "Spotify" : "Apple"}</option>)}
       </select></label>
       <label>Group by <select value={grain} onChange={event => setGrain(event.target.value as MusicGrain)} className="rounded border bg-transparent p-2">
