@@ -25,7 +25,7 @@ export async function pitchOptions(org: string, campaignId: string | null, syncI
     campaignId, syncId, contextTitle: "campaign_name" in context ? context.campaign_name : context.production,
     releaseId: selectedRelease ?? "", releases: releaseRows, contacts: contactRows,
     contactId: "contact_id" in context ? context.contact_id : null,
-    files: review?.inventory.filter(file => file.trackId && file.syncStatus === "synced") ?? [],
+    files: review?.inventory.filter(file => ["synced", "unmatched"].includes(file.syncStatus)) ?? [],
     configured: getSamplyAvailability(org).configured,
   };
 }
@@ -61,10 +61,10 @@ export async function savePitch(org: string, raw: unknown) {
     const recordings: PitchRecording[] = [];
     for (const id of input.file_ids) {
       const file = options.files.find(f => f.id === id);
-      if (!file?.trackId) throw new HttpError("A selected recording is unavailable; sync the release and select it again", 400);
-      const [track] = await tx.select().from(tracks).where(and(eq(tracks.id, file.trackId), eq(tracks.org_id, org), eq(tracks.release_id, input.release_id)));
-      if (!track) throw new HttpError("Recording does not belong to this release", 400);
-      recordings.push({ file_id: id, track_id: track.id, box_id: file.remoteBoxId, title: track.title, file_name: file.fileName, version: file.version, isrc: track.isrc });
+      if (!file) throw new HttpError("A selected recording is unavailable; sync the release and select it again", 400);
+      const [track] = file.trackId ? await tx.select().from(tracks).where(and(eq(tracks.id, file.trackId), eq(tracks.org_id, org), eq(tracks.release_id, input.release_id))) : [];
+      if (file.trackId && !track) throw new HttpError("Recording does not belong to this release", 400);
+      recordings.push({ file_id: id, track_id: track?.id ?? null, box_id: file.remoteBoxId, title: track?.title ?? file.fileName, file_name: file.fileName, version: file.version, isrc: track?.isrc ?? null });
     }
     const [release] = await tx.select({ artwork: releases.cover_art_url, artist: artists.name }).from(releases)
       .leftJoin(artists, and(eq(artists.id, releases.artist_id), eq(artists.org_id, org)))
