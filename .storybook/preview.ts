@@ -1,8 +1,11 @@
 import type { Preview } from "@storybook/react-vite";
 import "../src/styles/global.css";
+import { createElement, Fragment } from "react";
+import { DevFeedback } from "../src/components/DevFeedback";
 
 const preview: Preview = {
   tags: ["autodocs"],
+  decorators: [(Story) => createElement(Fragment, null, createElement(Story), createElement(DevFeedback))],
   parameters: {
     layout: "padded",
     controls: { expanded: true },

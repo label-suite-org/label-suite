@@ -13,6 +13,7 @@ const config: StorybookConfig = {
   features: { componentsManifest: true },
   core: { disableTelemetry: true },
   async viteFinal(config) {
+    config.envPrefix = ["VITE_", "STORYBOOK_", "PUBLIC_VISUAL_FEEDBACK"];
     config.optimizeDeps = {
       ...config.optimizeDeps,
       include: [
