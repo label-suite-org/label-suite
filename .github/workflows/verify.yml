@@ -87,6 +87,9 @@ jobs:
           cache: npm
       - name: Install release-gate system tools
         run: |
+          # The Azure mirror can trickle packages without triggering APT failover.
+          # Keep the runner's official Ubuntu archive/security fallbacks.
+          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-client curl
       - name: Set the checked-out revision artifact
