@@ -205,3 +205,26 @@ persistence. No merge or deployment is part of this extraction.
 Storybook is the working component reference. The earlier Builder navigation
 experiment remains a historical fixture under Library / Workspace language;
 it is not the design-language entry point. Penpot is not required in this workflow.
+
+## Catalog lists and creation
+
+Artists and Releases keep the existing search, filters, quiet rows, readiness
+links and Details disclosures. Group headings use the 18px section size; row
+metadata uses 12px; names wrap rather than disappearing on narrow screens.
+Toolbars use 12px action gaps and rows use 16px vertical spacing. The Artist
+Browse/Compare choice, search, relationship, activity and sort travel in the URL,
+following the existing Release list convention so browser Back restores them.
+
+Both routes render their roster component even when empty. Storybook therefore
+uses the same first-record and filtered-empty states as the actual pages.
+Filtered-empty states offer Clear filters without changing the chosen sort/view.
+Create dialogs use the installed Dialog header, description, fields and buttons;
+form actions share a quiet divider and 12px gap. Existing optional fields,
+validation and save/retry behavior remain in the actual forms.
+
+**Catalog / Working views / Artist List** and **Release List** are manual review
+entries. Creation, cancellation/focus return, retained drafts on failure, read-only
+browsing and empty states are covered by adjacent stories. The disposable
+`catalog-journey.spec.ts` checks real persistence, linking a release to its artist,
+browser Back, cancel without writes, and read-only access at desktop, 390px and
+320px. Story mocks do not stand in for this integrated check.

@@ -2,7 +2,6 @@
 import AppLayout from "../../layouts/AppLayout.astro";
 import { listArtistOptions } from "../../server/artists";
 import { listReleaseRoster } from "../../server/releases";
-import { ReleaseCreateDialog } from "../../components/releases/ReleaseCreateDialog";
 import { ReleaseRoster } from "../../components/releases/ReleaseRoster";
 import { serializeClientCapabilities } from "../../server/tenant";
 
@@ -16,16 +15,6 @@ const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "me
   <div class="space-y-6">
     <h1 class="text-base font-semibold md:sr-only">Releases</h1>
 
-    {!releaseRows.length ? (
-      <div class="py-12 text-center text-muted-foreground">
-        <p class="text-base font-medium text-foreground">No releases yet.</p>
-        <p class="mt-1 text-sm">Create the first release to connect tracks, budgets, DSP pitches, and royalty records.</p>
-        <div class="mt-5 flex justify-center">
-          {canMutate ? <ReleaseCreateDialog client:load artists={artistRowsForForm} /> : <p class="text-sm">Read-only for your role</p>}
-        </div>
-      </div>
-    ) : (
-      <ReleaseRoster client:load releases={releaseRows} artists={artistRowsForForm} canMutate={canMutate} />
-    )}
+    <ReleaseRoster client:load releases={releaseRows} artists={artistRowsForForm} canMutate={canMutate} />
   </div>
 </AppLayout>

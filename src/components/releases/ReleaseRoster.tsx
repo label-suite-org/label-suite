@@ -14,6 +14,7 @@ import type { Release } from "./ReleaseForm";
 import type { ReleaseRosterRow } from "../../server/releases";
 import { resolveFileUrl } from "../../lib/storage-client";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -172,9 +173,9 @@ export function ReleaseRoster({
   }, [filter, query, releases, sort]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <section className="border-b border-border pb-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -186,7 +187,7 @@ export function ReleaseRoster({
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Select value={filter} onValueChange={value => setFilter((value ?? "all") as FilterMode)} aria-label="Filter releases by status" className="max-sm:w-full" options={[{ value: "all", label: "All records" }, { value: "upcoming", label: "Upcoming" }, { value: "ready", label: "Ready" }, { value: "attention", label: "Needs care" }, { value: "released", label: "Released" }]} />
             <Select value={sort} onValueChange={value => setSort((value ?? "date") as SortMode)} aria-label="Sort releases" className="max-sm:w-full" options={[{ value: "date", label: "Release date" }, { value: "readiness", label: "Most urgent" }, { value: "budget", label: "Budget" }, { value: "title", label: "Title" }]} />
             {canMutate ? <ReleaseCreateDialog artists={artists} parentReleases={releases} /> : <ReadOnlyNotice />}
@@ -198,8 +199,9 @@ export function ReleaseRoster({
         <ReleaseRows releases={visible} artists={artists} canMutate={canMutate} />
       ) : (
         <div className="py-12 text-center">
-          <p className="text-sm font-medium text-foreground">No releases match this catalog view.</p>
-          <p className="mt-1 text-sm text-muted-foreground">Adjust search or filters to bring the records back.</p>
+          <p className="text-sm font-medium text-foreground">{releases.length ? "No releases match this catalog view." : "No releases yet."}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{releases.length ? "Adjust search or filters to bring the records back." : "Create the first release to connect tracks, budgets, DSP pitches, and royalty records."}</p>
+          {releases.length > 0 && <Button variant="outline" className="mt-4" onClick={() => { setQuery(""); setFilter("all"); }}>Clear filters</Button>}
         </div>
       )}
     </div>
@@ -220,12 +222,12 @@ function ReleaseRows({
       {releases.map((release) => {
         const status = statusStyle(release);
         return (
-          <article key={release.id} className="py-3">
+          <article key={release.id} className="py-4">
             <Item className="px-0 py-0">
               <ItemMedia><a href={`/releases/${release.id}`} aria-label={`Open ${release.title}`}><CoverThumb release={release} /></a></ItemMedia>
               <ItemContent className="min-w-0">
-                <ItemTitle><a href={`/releases/${release.id}`} className="hover:underline">{release.title}</a></ItemTitle>
-                <ItemDescription>{release.artist_name || "No artist"} · {release.format || "No format"}</ItemDescription>
+                <ItemTitle className="line-clamp-none w-full break-words"><a href={`/releases/${release.id}`} className="hover:underline">{release.title}</a></ItemTitle>
+                <ItemDescription className="text-xs">{release.artist_name || "No artist"} · {release.format || "No format"}</ItemDescription>
               </ItemContent>
               <Badge variant={status.variant}>{status.label}</Badge>
               <span className="hidden text-xs text-muted-foreground sm:block">{dateLabel(release.release_date)}</span>
