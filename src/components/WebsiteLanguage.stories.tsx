@@ -9,8 +9,8 @@ const artist = { id: "preview-artist", name: "Artist name" };
 const release = { id: "preview-release", title: "Release title", artist_name: artist.name, format: "EP", status: "draft", release_ready: false };
 const releases = [release, { ...release, id: "preview-ready", title: "Ready release", release_ready: true }];
 const tracks = [
-  { id: "preview-track-1", title: "Track title", position: 1, track_ready: true },
-  { id: "preview-track-2", title: "Track awaiting clearance", position: 2, track_ready: false },
+  { id: "preview-track-1", release_id: release.id, title: "Track title", position: 1, track_ready: true },
+  { id: "preview-track-2", release_id: release.id, title: "Track awaiting clearance", position: 2, track_ready: false },
 ];
 
 const meta = {
@@ -28,7 +28,7 @@ const meta = {
   }}><Story /></main>],
 } satisfies Meta;
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<{ onShowAll?: () => void }>;
 
 export const Reference: Story = {
   render: () => <>
@@ -81,7 +81,7 @@ export const ReleaseNavigation: Story = {
     await userEvent.click(tracks);
     await expect(tracks).toHaveAttribute("aria-current", "page");
     await userEvent.click(canvas.getByRole("button", { name: "More release sections" }));
-    await userEvent.click(within(canvasElement.ownerDocument.body).getByRole("menuitem", { name: "Details", exact: true }));
+    await userEvent.click(within(canvasElement.ownerDocument.body).getByRole("menuitem", { name: "Details" }));
     await expect(canvas.getByText("Selected release section: details")).toBeVisible();
   },
 };
