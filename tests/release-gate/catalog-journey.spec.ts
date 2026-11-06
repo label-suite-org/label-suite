@@ -124,6 +124,7 @@ test("create artist and linked release, recover a failed save, and return to fil
 test("create a work, retain a failed draft, and return from its rights editor to the selected queue", async ({ page }, info) => {
   await login(page);
   const title = `Catalog journey work with a long readable title ${info.project.name} ${Date.now()}`;
+  const isrc = `DKAAA${Date.now().toString().slice(-7)}`;
   await openList(page, "works");
   await page.getByRole("button", { name: "New Work", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -132,7 +133,7 @@ test("create a work, retain a failed draft, and return from its rights editor to
   await dialog.getByRole("button", { name: "Create Work", exact: true }).click();
   expect(await titleField.evaluate((el: HTMLInputElement) => el.validity.valueMissing)).toBe(true);
   await titleField.fill(title);
-  await dialog.getByRole("textbox", { name: "ISRC", exact: true }).fill("DKAAA2600001");
+  await dialog.getByRole("textbox", { name: "ISRC", exact: true }).fill(isrc);
   await dialog.getByRole("textbox", { name: "ISWC", exact: true }).fill("T-000.000.001-0");
   await dialog.getByRole("spinbutton", { name: "Duration (seconds)" }).fill("210");
   await dialog.getByRole("textbox", { name: "Genre", exact: true }).fill("Indie pop");
@@ -154,7 +155,7 @@ test("create a work, retain a failed draft, and return from its rights editor to
   await choose(page, "Sort works", "Title");
   await fits(page);
   await page.getByRole("button", { name: `Clearance & details for ${title}`, exact: true }).click();
-  await expect(page.getByText("ISRC · DKAAA2600001", { exact: true })).toBeVisible();
+  await expect(page.getByText(`ISRC · ${isrc}`, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(dialog.getByRole("textbox", { name: "Work Title *", exact: true })).toHaveValue(title);
   await expect(dialog.getByRole("textbox", { name: "ISWC", exact: true })).toHaveValue("T-000.000.001-0");
