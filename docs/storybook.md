@@ -10,7 +10,7 @@ Start visual review at **Existing website / Design language / Reference**, then
 and which component to use for each purpose. Actions, Fields, Patterns and
 Layers show meaningful states; Navigation, Artists and Catalog show actual consumers.
 Catalog stories cover list filtering, evidence disclosures, comparison, release
-rollout selection, and creation-dialog Escape with focus return. Artist List and Release List are
+rollout selection, Works clearance queues, and creation-dialog Escape with focus return. Artist List, Release List and Work List are
 manual review entries using the production roster components; adjacent stories
 cover first-record empty states, clearing filters, and retained creation drafts
 after a simulated save failure.

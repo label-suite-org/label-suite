@@ -1,27 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { WorkForm, type Work } from "./WorkForm";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogHeader, DialogDescription } from "@/components/ui/dialog";
 export function WorkCreateDialog() {
   const [open, setOpen] = useState(false);
 
-  if (!open) {
-    return (
-      <Button
-        onClick={() => setOpen(true)}
-      >
-        + New Work
-      </Button>
-    );
-  }
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg" aria-describedby={undefined}>
-        <DialogTitle>New Work</DialogTitle>
+      <DialogTrigger render={<Button />}>
+        <Plus aria-hidden="true" />
+        New Work
+      </DialogTrigger>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader className="pr-8">
+          <DialogTitle>New Work</DialogTitle>
+          <DialogDescription>Start with a title. You can add recordings and rights details later.</DialogDescription>
+        </DialogHeader>
         <WorkForm onClose={() => setOpen(false)} />
       </DialogContent>
     </Dialog>

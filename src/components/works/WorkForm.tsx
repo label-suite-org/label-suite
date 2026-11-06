@@ -131,7 +131,7 @@ export function WorkForm({
 
       {error && <FieldError>{error}</FieldError>}
 
-      <div className="flex gap-2 justify-end">
+      <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
         <Button variant="ghost" type="button" onClick={onClose}
          >
           Cancel
