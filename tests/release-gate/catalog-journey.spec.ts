@@ -125,6 +125,7 @@ test("create a work, retain a failed draft, and return from its rights editor to
   await login(page);
   const title = `Catalog journey work with a long readable title ${info.project.name} ${Date.now()}`;
   const isrc = `DKAAA${Date.now().toString().slice(-7)}`;
+  const iswc = `T-${Date.now().toString().slice(-10)}`;
   await openList(page, "works");
   await page.getByRole("button", { name: "New Work", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -134,7 +135,7 @@ test("create a work, retain a failed draft, and return from its rights editor to
   expect(await titleField.evaluate((el: HTMLInputElement) => el.validity.valueMissing)).toBe(true);
   await titleField.fill(title);
   await dialog.getByRole("textbox", { name: "ISRC", exact: true }).fill(isrc);
-  await dialog.getByRole("textbox", { name: "ISWC", exact: true }).fill("T-000.000.001-0");
+  await dialog.getByRole("textbox", { name: "ISWC", exact: true }).fill(iswc);
   await dialog.getByRole("spinbutton", { name: "Duration (seconds)" }).fill("210");
   await dialog.getByRole("textbox", { name: "Genre", exact: true }).fill("Indie pop");
   await fits(page);
@@ -144,10 +145,10 @@ test("create a work, retain a failed draft, and return from its rights editor to
   await expect(titleField).toHaveValue(title);
   await expect(dialog.getByRole("textbox", { name: "Genre", exact: true })).toHaveValue("Indie pop");
   const saved = page.waitForResponse(r => r.url().endsWith("/api/works") && r.request().method() === "POST");
-  await Promise.all([page.waitForEvent("load"), dialog.getByRole("button", { name: "Create Work", exact: true }).click()]);
+  await dialog.getByRole("button", { name: "Create Work", exact: true }).click();
   expect((await saved).status()).toBe(201);
-  await hydratedList(page, "works");
   await expect(dialog).toHaveCount(0);
+  await hydratedList(page, "works");
   const search = page.getByRole("textbox", { name: "Search works" });
   await search.fill(title);
   await page.getByRole("combobox", { name: "Filter works", exact: true }).click();
@@ -158,7 +159,7 @@ test("create a work, retain a failed draft, and return from its rights editor to
   await expect(page.getByText(`ISRC · ${isrc}`, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(dialog.getByRole("textbox", { name: "Work Title *", exact: true })).toHaveValue(title);
-  await expect(dialog.getByRole("textbox", { name: "ISWC", exact: true })).toHaveValue("T-000.000.001-0");
+  await expect(dialog.getByRole("textbox", { name: "ISWC", exact: true })).toHaveValue(iswc);
   await expect(dialog.getByRole("spinbutton", { name: "Duration (seconds)" })).toHaveValue("210");
   await expect(dialog.getByRole("textbox", { name: "Genre", exact: true })).toHaveValue("Indie pop");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
