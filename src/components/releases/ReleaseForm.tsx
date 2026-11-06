@@ -128,7 +128,7 @@ export function ReleaseForm({ initial, artists, parentReleases = [], onClose }: 
         </div>
       </div>
       {error && <FieldError>{error}</FieldError>}
-      <div className="flex gap-2 justify-end">
+      <div className="flex flex-wrap justify-end gap-3 border-t border-border pt-4">
         <Button variant="ghost" type="button" onClick={onClose}>Cancel</Button>
         <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : isEdit ? "Save Changes" : "Create Release"}

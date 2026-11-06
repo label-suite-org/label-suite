@@ -193,6 +193,38 @@ export function ArtistRoster({
   const [sort, setSort] = useState<SortMode>("name");
   const [view, setView] = useState<ViewMode>("browse");
 
+  const [routeReady, setRouteReady] = useState(false);
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search);
+      setQuery(params.get("q") || "");
+      const nextFilter = params.get("filter") as FilterMode;
+      const nextRelationship = params.get("relationship") as RelationshipMode;
+      const nextSort = params.get("sort") as SortMode;
+      const nextView = params.get("view") as ViewMode;
+      setFilter(["all", "active", "attention", "quiet"].includes(nextFilter) ? nextFilter : "all");
+      setRelationship(["all", "roster", "collaborator", "unclassified"].includes(nextRelationship) ? nextRelationship : "all");
+      setSort(["name", "followers", "releases", "attention"].includes(nextSort) ? nextSort : "name");
+      setView(nextView === "ops" ? "ops" : "browse");
+    };
+    restore();
+    setRouteReady(true);
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+  useEffect(() => {
+    if (!routeReady) return;
+    const url = new URL(window.location.href);
+    for (const [key, value] of [
+      ["q", query], ["filter", filter === "all" ? "" : filter],
+      ["relationship", relationship === "all" ? "" : relationship],
+      ["sort", sort === "name" ? "" : sort], ["view", view === "browse" ? "" : view],
+    ]) {
+      if (value) url.searchParams.set(key, value); else url.searchParams.delete(key);
+    }
+    window.history.replaceState(window.history.state, "", url);
+  }, [query, filter, relationship, sort, view, routeReady]);
+
   const stats = useMemo(() => {
     const roster = artists.filter((artist) => artistRelationship(artist) === "roster").length;
     const collaborators = artists.filter((artist) => artistRelationship(artist) === "collaborator").length;
@@ -244,7 +276,7 @@ export function ArtistRoster({
   }), [visible]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {!canMutate && <p className="text-sm text-muted-foreground">Read-only for your role</p>}
       <Accordion>
         <AccordionItem value="summary">
@@ -261,7 +293,7 @@ export function ArtistRoster({
         </AccordionItem>
       </Accordion>
 
-      <div className="flex flex-col gap-3 border-y border-border py-3">
+      <div className="flex flex-col gap-3 border-b border-border pb-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -274,7 +306,7 @@ export function ArtistRoster({
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Select value={relationship} onValueChange={value => setRelationship((value ?? "all") as RelationshipMode)} aria-label="Filter artists by relationship" className="max-sm:w-full" options={[{ value: "all", label: "All relationships" }, { value: "roster", label: "Roster artists" }, { value: "collaborator", label: "Collaborators" }, { value: "unclassified", label: "Unclassified" }]} />
             <Select value={filter} onValueChange={value => setFilter((value ?? "all") as FilterMode)} aria-label="Filter artists by activity state" className="max-sm:w-full" options={[{ value: "all", label: "All artists" }, { value: "active", label: "Active work" }, { value: "attention", label: "Needs attention" }, { value: "quiet", label: "Quiet roster" }]} />
             <Select value={sort} onValueChange={value => setSort((value ?? "name") as SortMode)} aria-label="Sort artists" className="max-sm:w-full" options={[{ value: "name", label: "Name" }, { value: "followers", label: "Followers" }, { value: "releases", label: "Releases" }, { value: "attention", label: "Attention" }]} />
@@ -334,8 +366,9 @@ export function ArtistRoster({
         <ArtistOpsTable artists={visible} contactOptions={contactOptions} canMutate={canMutate} />
       ) : (
         <div className="py-12 text-center">
-          <p className="text-sm font-medium text-foreground">No artists match this view.</p>
-          <p className="mt-1 text-sm text-muted-foreground">Adjust the search or roster filter.</p>
+          <p className="text-sm font-medium text-foreground">{artists.length ? "No artists match this view." : "No artists yet."}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{artists.length ? "Adjust the search or roster filter." : "Create the first roster profile to connect releases, assets, campaigns, and royalty records."}</p>
+          {artists.length > 0 && <Button variant="outline" className="mt-4" onClick={() => { setQuery(""); setFilter("all"); setRelationship("all"); }}>Clear filters</Button>}
         </div>
       )}
     </div>
@@ -353,9 +386,9 @@ function RosterGroup({
 }) {
   return (
     <section className="space-y-3">
-      <div className="flex flex-col gap-1 border-b border-border pb-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex items-baseline justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <p className="sr-only">{detail}</p>
         </div>
         <span className="text-sm font-medium text-muted-foreground">{artists.length}</span>
@@ -382,7 +415,7 @@ function ArtistRosterLine({
   const readinessHref = primaryReadinessHref(artist);
 
   return (
-    <article className="py-3">
+    <article className="py-4">
       <Item className="px-0 py-0">
         <ItemMedia>
           <a href={openArtistHref} className="size-12 overflow-hidden rounded-lg" aria-label={`Open ${artist.name} artist workspace`}>
@@ -390,8 +423,8 @@ function ArtistRosterLine({
           </a>
         </ItemMedia>
         <ItemContent className="min-w-0">
-          <ItemTitle><a href={openArtistHref} className="inline-flex min-h-6 items-center hover:underline">{artist.name}</a></ItemTitle>
-          <ItemDescription>
+          <ItemTitle className="line-clamp-none w-full break-words"><a href={openArtistHref} className="inline-flex min-h-6 items-center hover:underline">{artist.name}</a></ItemTitle>
+          <ItemDescription className="text-xs">
             {releaseHref ? <a href={releaseHref} className="inline-flex min-h-6 items-center">{linkedReleaseTitle(artist)}</a> : "No release linked"}
           </ItemDescription>
         </ItemContent>

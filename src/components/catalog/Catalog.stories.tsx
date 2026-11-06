@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within, waitFor } from "storybook/test";
+import { ArtistCreateDialog } from "../artists/ArtistCreateDialog";
 import { ArtistRoster } from "../artists/ArtistRoster";
 import { ReleaseRoster } from "../releases/ReleaseRoster";
 import { WorksList } from "../works/WorksList";
@@ -12,7 +13,23 @@ import type { WorkPriorityRow } from "../../server/works";
 
 const meta = {
   title: "Catalog/Working views",
-  parameters: { docs: { description: { component: "Actual Catalog lists and forms using the shared component baseline. Fictional records; browsing tests never submit mutations. Identity and the next useful action stay visible, while evidence and metadata open through disclosures." } } },
+  beforeEach: () => {
+    const originalUrl = window.location.href;
+    const originalFetch = window.fetch;
+    const url = new URL(originalUrl);
+    for (const key of ["q", "filter", "relationship", "sort", "view"]) url.searchParams.delete(key);
+    window.history.replaceState(null, "", url);
+    window.fetch = async (input, init) => {
+      const target = new URL(input instanceof Request ? input.url : input, window.location.href);
+      if (target.origin === "http://localhost:4747") return originalFetch(input, init);
+      return Response.json({ error: "Preview save failed. Your draft is still here." }, { status: 503 });
+    };
+    return () => {
+      window.history.replaceState(null, "", originalUrl);
+      window.fetch = originalFetch;
+    };
+  },
+  parameters: { docs: { description: { component: "Actual Catalog lists and forms using the shared component baseline. Fictional records; save attempts fail locally without sending mutations. Identity and the next useful action stay visible, while evidence and metadata open through disclosures." } } },
 } satisfies Meta;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -105,7 +122,7 @@ export const ReleaseEditor: Story = {
 export const CreateRelease: Story = {
   render: () => <ReleaseCreateDialog artists={[artist]} parentReleases={[release]} />,
   play: async ({ canvasElement, canvas }) => {
-    const trigger = canvas.getByRole("button", { name: "+ New Release" });
+    const trigger = canvas.getByRole("button", { name: "New Release" });
     await userEvent.click(trigger);
     const body = within(canvasElement.ownerDocument.body);
     await waitFor(() => expect(body.getByRole("dialog")).toBeVisible());
@@ -117,4 +134,71 @@ export const CreateRelease: Story = {
 };
 export const WorkEditor: Story = {
   render: () => <div className="max-w-lg"><WorkForm initial={work} onClose={() => {}} /></div>,
+};
+
+// Manual review states render the exact list and dialog components used by the routes.
+export const ArtistList: Story = {
+  render: () => <ArtistRoster artists={[artist, { ...artist, id: "story-long-artist", name: "An artist with a long name that still needs to be readable on a phone", relationship: "collaborator" }]} />,
+};
+export const ReleaseList: Story = {
+  render: () => <ReleaseRoster releases={[release, { ...release, id: "story-long-release", title: "A release with a long title that still needs to be readable on a phone", status: "in_production" }]} artists={[artist]} />,
+};
+export const EmptyArtists: Story = { render: () => <ArtistRoster artists={[]} /> };
+export const EmptyReleases: Story = { render: () => <ReleaseRoster releases={[]} artists={[]} /> };
+export const ClearArtistFilters: Story = {
+  render: () => <ArtistRoster artists={[artist]} canMutate={false} />,
+  play: async ({ canvas }) => {
+    await userEvent.type(canvas.getByRole("textbox", { name: "Search artists" }), "No matching name");
+    await expect(canvas.getByText("No artists match this view.")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Clear filters" }));
+    await expect(canvas.getByRole("link", { name: artist.name })).toBeVisible();
+  },
+};
+export const ClearReleaseFilters: Story = {
+  render: () => <ReleaseRoster releases={[release]} artists={[artist]} canMutate={false} />,
+  play: async ({ canvas }) => {
+    await userEvent.type(canvas.getByRole("textbox", { name: "Search releases" }), "No matching title");
+    await expect(canvas.getByText("No releases match this catalog view.")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Clear filters" }));
+    await expect(canvas.getByRole("link", { name: release.title })).toBeVisible();
+  },
+};
+export const CreateArtist: Story = {
+  render: () => <ArtistCreateDialog />,
+  play: async ({ canvasElement, canvas }) => {
+    const trigger = canvas.getByRole("button", { name: "New Artist" });
+    await userEvent.click(trigger);
+    const body = within(canvasElement.ownerDocument.body);
+    await waitFor(() => expect(body.getByRole("dialog")).toBeVisible());
+    await waitFor(() => expect(body.getByRole("textbox", { name: "Name *" })).toHaveFocus());
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
+export const ArtistSaveFailure: Story = {
+  render: () => <ArtistCreateDialog />,
+  play: async ({ canvasElement, canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "New Artist" }));
+    const body = within(canvasElement.ownerDocument.body);
+    const name = await body.findByRole("textbox", { name: "Name *" });
+    await userEvent.type(name, "Draft artist");
+    await userEvent.click(body.getByRole("button", { name: "Create Artist" }));
+    await expect(await body.findByRole("alert")).toHaveTextContent("Your draft is still here.");
+    await expect(name).toHaveValue("Draft artist");
+    await expect(body.getByRole("button", { name: "Create Artist" })).toBeEnabled();
+  },
+};
+export const ReleaseSaveFailure: Story = {
+  render: () => <ReleaseCreateDialog artists={[artist]} parentReleases={[release]} />,
+  play: async ({ canvasElement, canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "New Release" }));
+    const body = within(canvasElement.ownerDocument.body);
+    const title = await body.findByRole("textbox", { name: "Title *" });
+    await userEvent.type(title, "Draft release");
+    await userEvent.click(body.getByRole("button", { name: "Create Release" }));
+    await expect(await body.findByRole("alert")).toHaveTextContent("Your draft is still here.");
+    await expect(title).toHaveValue("Draft release");
+    await expect(body.getByRole("button", { name: "Create Release" })).toBeEnabled();
+  },
 };
