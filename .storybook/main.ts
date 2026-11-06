@@ -11,8 +11,15 @@ const config: StorybookConfig = {
     "@storybook/addon-mcp",
   ],
   features: { componentsManifest: true },
-  core: { disableTelemetry: true },
+  core: {
+    disableTelemetry: true,
+    allowedHosts: ["malthes-macbook-pro.taila338b3.ts.net"],
+  },
   async viteFinal(config) {
+    config.server = {
+      ...config.server,
+      allowedHosts: ["malthes-macbook-pro.taila338b3.ts.net"],
+    };
     config.envPrefix = ["VITE_", "STORYBOOK_", "PUBLIC_VISUAL_FEEDBACK"];
     config.optimizeDeps = {
       ...config.optimizeDeps,

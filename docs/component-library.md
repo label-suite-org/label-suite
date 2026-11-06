@@ -7,8 +7,9 @@ migrated or owner-approved. The governing layout rules remain in `DESIGN.md`.
 
 ## Foundations
 
-- Geist throughout the signed-in workspace. Record titles use `text-2xl` or
-  `text-xl`; working headings `text-base`; body and controls `text-sm`;
+- Geist throughout the signed-in workspace. Artist/release identity uses
+  `text-2xl sm:text-3xl` (24/30 px); compact titles use `text-xl`;
+  record section headings `text-lg`, supporting headings `text-base`; body and controls `text-sm`;
   supporting metadata `text-xs`. Avoid uppercase labels and oversized headings.
 - Use 4/8/12 px gaps within controls and rows, 16/24/32 px between meaningful
   groups. Keep mobile content readable; allow long names to wrap.
@@ -43,7 +44,20 @@ migrated or owner-approved. The governing layout rules remain in `DESIGN.md`.
 
 ## Review in Storybook
 
-Start at **Library / Patterns / Foundations**, then review:
+Start at **Existing website / Design language / Reference** for the actual artist
+and release headers and rows. Its companion stories cover both navigation
+patterns, long names, empty lists and the four-release selection. **Artist header**
+and **Release header** cover editing permissions and header actions.
+
+Then open **Library / Patterns / Foundations** for shared tokens.
+
+The Foundations story is the living visual reference: semantic swatches from
+the actual stylesheet, typography, spacing, state, action hierarchy and fluid
+layout rules. Its theme switch is local to the example. See
+[design-language.md](design-language.md) for live-site provenance and how these
+patterns connect across routes.
+
+Then review:
 
 - **Actions:** hierarchy, disabled and saving controls.
 - **Fields:** editable, invalid, disabled and provider-owned values.

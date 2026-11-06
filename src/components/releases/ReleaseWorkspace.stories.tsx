@@ -69,6 +69,7 @@ export const Review: Story = {};
 
 export const CorrectAndConfirm: Story = {
   play: async ({ canvas }) => {
+    await expect(canvas.getByRole("button", { name: "Edit Low Tide" })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "Review checks" }));
     const trigger = canvas.getByRole("button", { name: "Correct UPC/EAN" });
     await userEvent.click(trigger);
@@ -101,6 +102,7 @@ export const SaveFailure: Story = {
 export const ReadOnly: Story = {
   args: { canManage: false },
   play: async ({ canvas }) => {
+    await expect(canvas.queryByRole("button", { name: "Edit Low Tide" })).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: "Review checks" }));
     await userEvent.click(canvas.getByRole("button", { name: "Inspect UPC/EAN" }));
     await expect(canvas.getByText(/You have read-only access/)).toBeVisible();

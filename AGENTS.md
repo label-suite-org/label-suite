@@ -61,6 +61,11 @@ Never print credentials. Verify the host, user, working directory, and applicabl
 instructions before environment changes. Preserve a private rollback copy of
 live configuration before an authorized change.
 
+For UI work, read `DESIGN.md` and `docs/design-language.md`, then inspect the
+current route and its existing Storybook components. Extend the shared tokens
+and patterns; preserve responsive layout, selection, drafts, focus and return
+paths. A story preview does not replace verification of the integrated route.
+
 ## Development
 
 Use `astro dev --background`; manage it with `astro dev status`, `astro dev logs`,

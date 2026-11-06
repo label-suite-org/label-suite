@@ -4,7 +4,8 @@ Storybook uses the app's React components and `global.css`, including installed
 shadcn components. Stories contain fictional records and do not connect to a
 catalog database or load production credentials.
 
-Start visual review at **Library / Patterns / Foundations**. The shared
+Start visual review at **Existing website / Design language / Reference**, then
+**Library / Patterns / Foundations**. The shared
 [component baseline](component-library.md) records sizing, typography, state
 and which component to use for each purpose. Actions, Fields, Patterns and
 Layers show meaningful states; Navigation, Artists and Catalog show actual consumers.
@@ -39,8 +40,8 @@ supports development and static builds.
 
 ## Review loop
 
-Read `DESIGN.md` and the component documentation before changing UI. Use
-researched screenshots, ImageGen and Google Stitch for visual proposals. Add or
+Read `DESIGN.md`, `docs/design-language.md` and the component documentation before
+changing UI. Start from the current website and reuse its actual components. Add or
 update a story for the meaningful state being changed; inspect it on desktop and
 phone and run relevant interaction checks. Then verify the integrated route.
 Storybook checks shared appearance and component behavior; it does not prove
@@ -102,7 +103,10 @@ npm run storybook:test -- src/components/releases/ReleaseWorkspace.stories.tsx
 npm exec tsc -- --noEmit -p .storybook/tsconfig.json
 ```
 
-### Bounded Builder trial
+### Optional Builder trial
+
+The artist/release design language uses Storybook and the actual page components.
+Builder is an optional comparison experiment, not part of the delivery workflow.
 
 Use Builder's local-repository mode on a clean branch of this public repository.
 Keep the trial on the fictional Storybook fixture; do not configure a production

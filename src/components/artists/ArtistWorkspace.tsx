@@ -339,7 +339,7 @@ export function ArtistWorkspace({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       {canMutate && initialFocusField ? (
         <ArtistEditDialog
           artist={artist}
@@ -350,28 +350,19 @@ export function ArtistWorkspace({
         />
       ) : null}
       {!canMutate && <p className="text-sm text-muted-foreground">Read-only for your role</p>}
-      <header className="flex flex-wrap items-center gap-4 border-b border-border pb-5">
-        <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-24">
-          <ArtistHeroImage artist={artist} imageLink={heroImageLink} />
-        </div>
-        <div className="min-w-0 flex-1 basis-44">
-          <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">{artist.name}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{relationship.detail}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{releases.length} {releases.length === 1 ? "release" : "releases"} · {health.complete}% profile complete</p>
-        </div>
-        {canMutate && <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" onClick={jumpToImageUploader}><ImageIcon aria-hidden />{hasPrimaryImage ? "Manage images" : "Add artist image"}</Button>
-          <ArtistEditButton artist={artist} contactOptions={contactOptions} />
-          <a href={`/artists/${encodeURIComponent(artist.id)}/portal`} className={buttonVariants({ variant: "ghost" })}>Artist archive & form</a>
-          <ArtistDeleteButton artist={artist} />
-        </div>}
-      </header>
-      <Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)} className="gap-5 min-w-0">
-        <div className="overflow-x-auto border-b border-border">
-          <TabsList variant="line" aria-label="Artist sections" className="h-11">
-            {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key} className="px-3">{tab.label}</TabsTrigger>)}
-          </TabsList>
-        </div>
+      <ArtistHeader
+        artist={artist}
+        heroImageLink={heroImageLink}
+        relationshipDetail={relationship.detail}
+        releaseCount={releases.length}
+        profileComplete={health.complete}
+        canMutate={canMutate}
+        hasPrimaryImage={hasPrimaryImage}
+        contactOptions={contactOptions}
+        onManageImages={jumpToImageUploader}
+      />
+      <Tabs value={activeTab} onValueChange={value => setActiveTab(value as TabKey)} className="min-w-0 gap-6">
+        <ArtistSectionNavigation />
         <TabsContent value={activeTab}>
           {activeTab === "overview" && (
             <OverviewTab
@@ -387,7 +378,7 @@ export function ArtistWorkspace({
           {activeTab === "visuals" && (
             <ImagesTab artist={artist} releases={releases} assets={assets} canMutate={canMutate} />
           )}
-          {activeTab === "releases" && <ReleaseSection releases={releases} />}
+          {activeTab === "releases" && <ArtistReleaseSection releases={releases} />}
           {activeTab === "team" && <TeamTab primaryContact={primaryContact} rights={rights} />}
           {activeTab === "rights" && <RightsTab rights={rights} documents={documents} />}
           {activeTab === "campaigns" && <CampaignsTab campaigns={campaigns} tasks={tasks} />}
@@ -412,15 +403,15 @@ function OverviewTab({ artist, releases, tasks, canMutate, onReadinessAction, he
     reviewStatus: artist.bio_review_status === "reviewed" ? "reviewed" : "draft",
     reviewedHash: artist.bio_reviewed_hash ?? null,
   });
-  return <div className="space-y-7">
-    <ReleaseSection releases={releases} onShowAll={onShowReleases} />
+  return <div className="space-y-6">
+    <ArtistReleaseSection releases={releases} onShowAll={onShowReleases} />
     {openTasks.length > 0 && <TaskList tasks={openTasks} />}
     <Accordion>
       <AccordionItem value="profile" className="border-y border-border">
         <AccordionTrigger>Profile details and checks <span className="ml-auto mr-3 text-muted-foreground">{health.missing.length ? `${health.missing.length} missing` : "Complete"}</span></AccordionTrigger>
         <AccordionContent className="space-y-5 pt-3">
           <section className="max-w-prose">
-            <h2 className="mb-2 font-medium">Biography <span className="ml-2 text-xs text-muted-foreground" data-testid="artist-bio-state">{bioDisplay.state}</span></h2>
+            <h2 className="mb-2 text-base font-semibold">Biography <span className="ml-2 text-xs text-muted-foreground" data-testid="artist-bio-state">{bioDisplay.state}</span></h2>
             {bioDisplay.state === "missing" ? <p className="text-muted-foreground">No bio has been added yet.</p> : <RichText data-testid="artist-bio-rendered" html={bioDisplay.html} className="min-w-0 break-words text-sm leading-6 text-muted-foreground [&_a]:break-all [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5" />}
           </section>
           <ReadinessCard artist={artist} canMutate={canMutate} health={health} onReadinessAction={onReadinessAction} />
@@ -439,10 +430,21 @@ function ImagesTab({ artist, releases, assets, canMutate }: { artist: ArtistDeta
   );
 }
 
-function ReleaseSection({ releases, onShowAll }: { releases: ArtistRelease[]; onShowAll?: () => void }) {
+/** The line-tab strip used by the artist page; render inside its Tabs root. */
+export function ArtistSectionNavigation() {
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
+    <div className="overflow-x-auto border-b border-border">
+      <TabsList variant="line" aria-label="Artist sections" className="h-11 p-0 group-data-horizontal/tabs:h-11">
+        {TABS.map(tab => <TabsTrigger key={tab.key} value={tab.key} className="rounded-none px-3 group-data-horizontal/tabs:after:bottom-0">{tab.label}</TabsTrigger>)}
+      </TabsList>
+    </div>
+  );
+}
+
+export function ArtistReleaseSection({ releases, onShowAll }: { releases: ArtistRelease[]; onShowAll?: () => void }) {
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-tight">Releases</h2>
         {onShowAll && releases.length > 4 ? <Button variant="ghost" onClick={onShowAll}>View all {releases.length} releases</Button> : <span className="text-sm text-muted-foreground">{releases.length}</span>}
       </div>
@@ -466,8 +468,8 @@ function TeamTab({ primaryContact, rights }: { primaryContact: ArtistContact | n
 
   return (
     <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold tracking-tight">Primary contact</h2>
+      <section className="space-y-4">
+        <h2 className="text-base font-semibold">Primary contact</h2>
         <p className="text-sm text-muted-foreground">Who to contact about the artist. Collaborators below come from linked work credits.</p>
         {primaryContact ? (
           <div className="mt-3 space-y-2">
@@ -481,8 +483,8 @@ function TeamTab({ primaryContact, rights }: { primaryContact: ArtistContact | n
         )}
       </section>
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">Contributors</h2>
           <span className="text-sm text-muted-foreground">{contributors.length}</span>
         </div>
@@ -512,7 +514,7 @@ function RightsTab({ rights, documents }: { rights: ArtistRight[]; documents: Ar
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <section id="artist-rights-panel" tabIndex={-1} className="space-y-3 scroll-mt-24">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">Rights and credits</h2>
           <span className="text-sm text-muted-foreground">{rights.length}</span>
         </div>
@@ -547,8 +549,8 @@ function RightsTab({ rights, documents }: { rights: ArtistRight[]; documents: Ar
 function CampaignsTab({ campaigns, tasks }: { campaigns: ArtistCampaign[]; tasks: ArtistTask[] }) {
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">Campaigns</h2>
           <span className="text-sm text-muted-foreground">{campaigns.length}</span>
         </div>
@@ -585,6 +587,42 @@ function AnalyticsTab({ artist, releases, campaigns }: { artist: ArtistDetail; r
   );
 }
 
+/** The existing artist page header, also rendered directly in Storybook. */
+export function ArtistHeader({
+  artist, heroImageLink, relationshipDetail, releaseCount, profileComplete,
+  canMutate = false, hasPrimaryImage = false, contactOptions = [], onManageImages,
+}: {
+  artist: ArtistDetail;
+  heroImageLink: string | null;
+  relationshipDetail: string;
+  releaseCount: number;
+  profileComplete: number;
+  canMutate?: boolean;
+  hasPrimaryImage?: boolean;
+  contactOptions?: ContactOption[];
+  onManageImages?: () => void;
+}) {
+  return (
+      <header className="flex flex-wrap items-center gap-4 border-b border-border pb-5">
+        <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-muted sm:size-24">
+          <ArtistHeroImage artist={artist} imageLink={heroImageLink} />
+        </div>
+        <div className="min-w-0 flex-1 basis-44">
+          <h1 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">{artist.name}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{relationshipDetail}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{releaseCount} {releaseCount === 1 ? "release" : "releases"} · {profileComplete}% profile complete</p>
+        </div>
+        {canMutate && <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" onClick={onManageImages}><ImageIcon aria-hidden />{hasPrimaryImage ? "Manage images" : "Add artist image"}</Button>
+          <ArtistEditButton artist={artist} contactOptions={contactOptions} />
+          <a href={`/artists/${encodeURIComponent(artist.id)}/portal`} className={buttonVariants({ variant: "ghost" })}>Artist archive & form</a>
+          <a href={`/sync?artist=${encodeURIComponent(artist.id)}`} className={buttonVariants({ variant: "ghost" })}>Sync deals</a>
+          <ArtistDeleteButton artist={artist} />
+        </div>}
+      </header>
+  );
+}
+
 function ArtistHeroImage({ artist, imageLink }: { artist: ArtistDetail; imageLink: string | null }) {
   const [url, setUrl] = useResolvedImage(imageLink, 800);
 
@@ -612,7 +650,7 @@ function ReleaseGrid({ releases }: { releases: ArtistRelease[] }) {
   return (
     <div className="divide-y divide-border">
       {releases.map((release) => (
-        <a key={release.id} href={`/releases/${release.id}`} className="group block rounded-md py-4 transition hover:bg-muted/25">
+        <a key={release.id} href={`/releases/${release.id}`} className="group block rounded-md py-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <div className="flex items-start gap-3">
             <ReleaseCover release={release} />
             <div className="min-w-0 flex-1">
@@ -708,7 +746,7 @@ function ArtistAssetUploader({ artist, releases }: { artist: ArtistDetail; relea
       <div className="mb-4 space-y-2">
         <div className="flex items-center gap-2">
           <Upload className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold tracking-tight">Change artist image</h2>
+          <h2 className="text-base font-semibold">Change artist image</h2>
         </div>
         <p className="text-sm leading-5 text-muted-foreground">
           Upload a press photo or paste an image link. Leave "Use as primary artist image" checked to update the artist photo.
@@ -758,7 +796,7 @@ function ArtistAssetUploader({ artist, releases }: { artist: ArtistDetail; relea
           />
           Use as primary artist image
         </label>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <Button
           type="submit"
           disabled={loading}
@@ -782,9 +820,9 @@ function ArtistAssetGallery({ artist, assets }: { artist: ArtistDetail; assets: 
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">Visual kit</h2>
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Visual kit</h2>
         <span className="text-sm text-muted-foreground">{assets.length}</span>
       </div>
       <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -870,9 +908,9 @@ function ReadinessCard({
   onReadinessAction: (destination: ReadinessDestination) => void;
 }) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">Profile readiness</h2>
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Profile readiness</h2>
         <span className="text-sm font-medium">{health.complete}%</span>
       </div>
       <div className="mt-3 space-y-2">
@@ -945,9 +983,9 @@ function ReadinessCard({
 
 function TaskList({ tasks }: { tasks: ArtistTask[] }) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">Tasks</h2>
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold tracking-tight">Tasks</h2>
         <span className="text-sm text-muted-foreground">{tasks.length}</span>
       </div>
       <SimpleList
@@ -966,8 +1004,8 @@ function TaskList({ tasks }: { tasks: ArtistTask[] }) {
 function DocumentList({ documents }: { documents: ArtistDocument[] }) {
   return (
     <section id="artist-documents-panel" tabIndex={-1} className="space-y-3 scroll-mt-24">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-tight">Documents</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Documents</h2>
         <span className="text-sm text-muted-foreground">{documents.length}</span>
       </div>
       <SimpleList
@@ -1060,7 +1098,7 @@ function Metric({
 }) {
   return (
     <div className="py-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{label}</p>
         <span className="text-muted-foreground">{icon}</span>
       </div>
