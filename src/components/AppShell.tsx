@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { CommandPalette } from "@/components/command-palette/CommandPalette";
 import { AppSidebar } from "./AppSidebar";
 import { BottomNav } from "./BottomNav";
+import { DevFeedback } from "./DevFeedback";
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { ClientAccessContext, type ClientCapabilityMap } from "../lib/client-capabilities";
@@ -74,6 +75,7 @@ export function AppShell({ children, orgName, membershipRole, capabilities, isPa
 
             {isPayee ? null : <BottomNav />}
             {isPayee ? null : <CommandPalette />}
+            <DevFeedback />
           </TooltipProvider>
         </SidebarProvider>
       </div>

@@ -61,32 +61,83 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Foundations: Story = {
-  render: () => (
-    <>
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Label Suite</h1>
+  name: "Foundations",
+  render: function DesignLanguage() {
+    const [dark, setDark] = useState(false);
+    return (
+    <div className={`${dark ? "dark" : ""} space-y-8 bg-background p-4 text-foreground sm:p-6`}>
+      <header className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Label Suite · Living reference</p>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Design language</h1>
+          </div>
+          <Button variant="outline" aria-pressed={dark} onClick={() => setDark(!dark)}>
+            Dark preview
+          </Button>
+        </div>
         <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-          A light workspace for your artists, releases and the work around them.
-          Artwork carries identity; controls and information share one visual
-          language.
+          Drawn from the current website: quiet working surfaces, artwork-led
+          identity, clear actions and details that open when needed. These are
+          the app’s actual tokens and components. The theme switch affects only
+          this reference.
         </p>
       </header>
       <section className="space-y-4">
-        <h2 className="text-base font-semibold">Typography & spacing</h2>
+        <h2 className="text-base font-semibold">One type hierarchy</h2>
         <div className="space-y-2">
-          <p className="text-2xl font-semibold tracking-tight">June Vale</p>
-          <p className="text-base font-semibold">Upcoming releases</p>
-          <p className="text-sm">Low Tide · EP</p>
+          <p className="text-2xl font-semibold tracking-tight sm:text-3xl">Artist name</p>
+          <p className="text-lg font-semibold tracking-tight">Releases</p>
+          <p className="text-sm">Release title · EP</p>
           <p className="text-xs text-muted-foreground">
-            Updated today · supporting metadata
+            Supporting metadata
           </p>
         </div>
         <p className="text-sm text-muted-foreground">
-          Tight related groups. More space between tasks. Geist throughout.
+          Geist throughout. Identity 24 → 30px, record section 18px, body 14px,
+          metadata 12px. Record names wrap; controls stay readable.
         </p>
       </section>
       <section className="space-y-4 border-t pt-6">
-        <h2 className="text-base font-semibold">Surfaces & state</h2>
+        <h2 className="text-base font-semibold">A shared rhythm</h2>
+        <div className="flex flex-wrap items-end gap-6" aria-label="Spacing scale in pixels">
+          {[4, 8, 12, 16, 24, 32].map((size) => (
+            <div key={size} className="space-y-2 text-center">
+              <div className="mx-auto bg-primary" style={{ width: size, height: size }} aria-hidden="true" />
+              <p className="text-xs text-muted-foreground">{size}px</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          12px between header actions; 4–8px for tighter relationships. 16–32px between meaningful groups.
+          Quiet dividers separate rows; ordinary content stays flat.
+        </p>
+      </section>
+      <section className="space-y-4 border-t pt-6">
+        <h2 className="text-base font-semibold">Colour has a job</h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {[
+            ["background", "Working canvas"],
+            ["muted", "Quiet grouping"],
+            ["border", "Separation"],
+            ["primary", "Principal action"],
+            ["accent", "Selection"],
+            ["ring", "Keyboard focus"],
+          ].map(([token, label]) => (
+            <div key={token} className="min-w-0 space-y-2">
+              <div className="h-10 rounded-lg border" style={{ backgroundColor: `var(--${token})` }} aria-hidden="true" />
+              <p className="text-sm">{label}</p>
+              <code className="block break-words text-xs text-muted-foreground">--{token}</code>
+            </div>
+          ))}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Swatches read the shared stylesheet directly. Pair each surface with
+          its foreground token; do not invent a palette for a page.
+        </p>
+      </section>
+      <section className="space-y-4 border-t pt-6">
+        <h2 className="text-base font-semibold">State stays explicit</h2>
         <div className="flex flex-wrap gap-3">
           <Badge variant="secondary">Draft</Badge>
           <Badge variant="success">Approved</Badge>
@@ -95,7 +146,8 @@ export const Foundations: Story = {
           <Badge variant="outline">Not connected</Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          Status always has a name. Color reinforces its meaning.
+          Status always has a name. Colour reinforces its meaning. Empty,
+          loading, failed and read-only states each need their own explanation.
         </p>
       </section>
       <section className="space-y-4 border-t pt-6">
@@ -106,11 +158,55 @@ export const Foundations: Story = {
           <Button variant="ghost">View history</Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          The primary action is clear. Additional controls remain quiet.
+          One principal action per task. Supporting actions stay quiet. These
+          controls illustrate hierarchy; they do not submit a record.
         </p>
       </section>
-    </>
-  ),
+      <section className="space-y-4 border-t pt-6">
+        <h2 className="text-base font-semibold">The same page grammar</h2>
+        <ol className="space-y-4 text-sm">
+          {[
+            ["Identity", "Artwork or fallback, record name, short metadata and relevant actions."],
+            ["Views", "Line tabs for the selected record; More for secondary destinations."],
+            ["Next useful action", "A relevant blocker with a way to resolve it, close to the work."],
+            ["Working content", "Rows for records, a table for comparison, labelled fields for editing."],
+            ["Supporting detail", "Evidence, setup and history in their tab, disclosure or context sheet."],
+          ].map(([title, description], index) => (
+            <li key={title} className="flex gap-3">
+              <span className="text-muted-foreground" aria-hidden="true">{index + 1}.</span>
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium">{title}</p>
+                <p className="text-muted-foreground">{description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <section className="space-y-3 border-t pt-6">
+        <h2 className="text-base font-semibold">Fluid means keeping your place</h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Reflow fields and actions as space narrows. Let names wrap. Keep wide
+          tables and tab scrolling inside their own region. Use the existing
+          phone navigation and context sheets. Preserve selection, drafts,
+          return paths and keyboard focus when moving between views.
+        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Continue with Release Rows, Views And Details, Fields and Layers in
+          this library, then the actual Artist and Catalog workspaces. Check the
+          integrated page as well as its story.
+        </p>
+      </section>
+    </div>
+    );
+  },
+  play: async ({ canvas }) => {
+    const toggle = canvas.getByRole("button", { name: "Dark preview" });
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(canvas.getByRole("heading", { name: "Design language" })).toBeVisible();
+    await userEvent.click(toggle);
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  },
 };
 
 export const ReleaseRows: Story = {
