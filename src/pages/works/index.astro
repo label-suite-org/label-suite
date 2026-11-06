@@ -1,7 +1,6 @@
 ---
 import AppLayout from "../../layouts/AppLayout.astro";
 import { listWorkPriorities } from "../../server/works";
-import { WorkCreateDialog } from "../../components/works/WorkActionButtons";
 import { WorksList } from "../../components/works/WorksList";
 import { serializeClientCapabilities } from "../../server/tenant";
 
@@ -13,15 +12,6 @@ const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "me
 <AppLayout>
   <div class="space-y-6">
     <h1 class="text-base font-semibold md:sr-only">Works</h1>
-    {!workRows.length ? (
-      <div class="py-12 text-center text-muted-foreground">
-        <p class="text-base font-medium">No works yet.</p>
-        <div class="mt-5 flex justify-center">
-          {canMutate ? <WorkCreateDialog client:load /> : <p class="text-sm">Read-only for your role</p>}
-        </div>
-      </div>
-    ) : (
-      <WorksList client:load works={workRows} canMutate={canMutate} />
-    )}
+    <WorksList client:load works={workRows} canMutate={canMutate} />
   </div>
 </AppLayout>

@@ -208,6 +208,16 @@ it is not the design-language entry point. Penpot is not required in this workfl
 
 ## Catalog lists and creation
 
+Works follows the same list and creation language while retaining its priority
+queues, payout summary, clearance meters and rights-editor links. Search, queue
+and sort travel in the URL so reload and browser Back restore the chosen view.
+Clear filters shows all works without changing the chosen sort, including when
+the default Priority queue is empty but cleared works exist. The empty route
+uses the same `WorksList` as Storybook. New Work uses the shared Dialog trigger
+so Cancel and Escape return keyboard focus, and failed saves retain the draft.
+**Catalog / Working views / Work List**, **Create Work**, **Empty Works** and
+**Work Save Failure** render these actual components.
+
 Artists and Releases keep the existing search, filters, quiet rows, readiness
 links and Details disclosures. Group headings use the 18px section size; row
 metadata uses 12px; names wrap rather than disappearing on narrow screens.

@@ -7,6 +7,7 @@ import { WorksList } from "../works/WorksList";
 import { ReleaseCreateDialog } from "../releases/ReleaseCreateDialog";
 import { ReleaseForm } from "../releases/ReleaseForm";
 import { WorkForm } from "../works/WorkForm";
+import { WorkCreateDialog } from "../works/WorkActionButtons";
 import type { ArtistRosterRow } from "../../server/artists";
 import type { ReleaseRosterRow } from "../../server/releases";
 import type { WorkPriorityRow } from "../../server/works";
@@ -134,6 +135,51 @@ export const CreateRelease: Story = {
 };
 export const WorkEditor: Story = {
   render: () => <div className="max-w-lg"><WorkForm initial={work} onClose={() => {}} /></div>,
+};
+
+export const WorkList: Story = {
+  render: () => <WorksList works={[work, { ...work, id: "story-long-work", title: "A work with a long title that still needs to be readable on a phone", payoutRows: 0, payoutNet: 0 }]} />,
+};
+export const EmptyWorks: Story = { render: () => <WorksList works={[]} /> };
+export const ClearWorkFilters: Story = {
+  render: () => <WorksList works={[{ ...work, pubProgress: 100, masterProgress: 100, priorityScore: 0, payoutRows: 0, payoutNet: 0 }]} canMutate={false} />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("No works match this view.")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Clear filters" }));
+    await expect(canvas.getByRole("link", { name: work.title })).toBeVisible();
+    await expect(canvas.getByRole("combobox", { name: "Filter works" })).toHaveTextContent("All (1)");
+  },
+};
+export const CreateWork: Story = {
+  render: () => <WorkCreateDialog />,
+  play: async ({ canvasElement, canvas }) => {
+    const trigger = canvas.getByRole("button", { name: "New Work" });
+    await userEvent.click(trigger);
+    const body = within(canvasElement.ownerDocument.body);
+    await waitFor(() => expect(body.getByRole("textbox", { name: "Work Title *" })).toHaveFocus());
+    await userEvent.type(body.getByRole("textbox", { name: "Work Title *" }), "Cancelled draft");
+    await userEvent.click(body.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await userEvent.click(trigger);
+    await expect(body.getByRole("textbox", { name: "Work Title *" })).toHaveValue("");
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(body.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
+export const WorkSaveFailure: Story = {
+  render: () => <WorkCreateDialog />,
+  play: async ({ canvasElement, canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "New Work" }));
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.type(body.getByRole("textbox", { name: "Work Title *" }), "Retained work draft");
+    await userEvent.type(body.getByRole("textbox", { name: "Genre" }), "Indie pop");
+    await userEvent.click(body.getByRole("button", { name: "Create Work" }));
+    await expect(await body.findByRole("alert")).toHaveTextContent("Preview save failed. Your draft is still here.");
+    await expect(body.getByRole("textbox", { name: "Work Title *" })).toHaveValue("Retained work draft");
+    await expect(body.getByRole("textbox", { name: "Genre" })).toHaveValue("Indie pop");
+  },
 };
 
 // Manual review states render the exact list and dialog components used by the routes.

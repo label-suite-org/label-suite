@@ -21,7 +21,7 @@ async function login(page: Page, readOnly = false) {
   await Promise.all([page.waitForURL("**/dashboard"), page.getByRole("button", { name: "Sign in", exact: true }).click()]);
 }
 async function hydratedList(page: Page, path: string) {
-  const component = path === "artists" ? "ArtistRoster" : "ReleaseRoster";
+  const component = path === "artists" ? "ArtistRoster" : path === "works" ? "WorksList" : "ReleaseRoster";
   await page.locator(`astro-island[component-export="${component}"]:not([ssr])`).waitFor();
 }
 async function openList(page: Page, path: string) {
@@ -121,11 +121,72 @@ test("create artist and linked release, recover a failed save, and return to fil
   await fits(page);
 });
 
+test("create a work, retain a failed draft, and return from its rights editor to the selected queue", async ({ page }, info) => {
+  await login(page);
+  const title = `Catalog journey work with a long readable title ${info.project.name} ${Date.now()}`;
+  const isrc = `DKAAA${Date.now().toString().slice(-7)}`;
+  const iswc = `T-${Date.now().toString().slice(-10)}`;
+  await openList(page, "works");
+  await page.getByRole("button", { name: "New Work", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const titleField = dialog.getByRole("textbox", { name: "Work Title *", exact: true });
+  await expect(titleField).toBeFocused();
+  await dialog.getByRole("button", { name: "Create Work", exact: true }).click();
+  expect(await titleField.evaluate((el: HTMLInputElement) => el.validity.valueMissing)).toBe(true);
+  await titleField.fill(title);
+  await dialog.getByRole("textbox", { name: "ISRC", exact: true }).fill(isrc);
+  await dialog.getByRole("textbox", { name: "ISWC", exact: true }).fill(iswc);
+  await dialog.getByRole("spinbutton", { name: "Duration (seconds)" }).fill("210");
+  await dialog.getByRole("textbox", { name: "Genre", exact: true }).fill("Indie pop");
+  await fits(page);
+  await page.route("**/api/works", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Temporary fixture failure. Try again." }) }), { times: 1 });
+  await dialog.getByRole("button", { name: "Create Work", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toContainText("Temporary fixture failure");
+  await expect(titleField).toHaveValue(title);
+  await expect(dialog.getByRole("textbox", { name: "Genre", exact: true })).toHaveValue("Indie pop");
+  const saved = page.waitForResponse(r => r.url().endsWith("/api/works") && r.request().method() === "POST");
+  await dialog.getByRole("button", { name: "Create Work", exact: true }).click();
+  expect((await saved).status()).toBe(201);
+  await expect(dialog).toHaveCount(0);
+  await hydratedList(page, "works");
+  const search = page.getByRole("textbox", { name: "Search works" });
+  await search.fill(title);
+  await page.getByRole("combobox", { name: "Filter works", exact: true }).click();
+  await page.getByRole("option", { name: /^All \(/ }).click();
+  await choose(page, "Sort works", "Title");
+  await fits(page);
+  await page.getByRole("button", { name: `Clearance & details for ${title}`, exact: true }).click();
+  await expect(page.getByText(`ISRC · ${isrc}`, { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(dialog.getByRole("textbox", { name: "Work Title *", exact: true })).toHaveValue(title);
+  await expect(dialog.getByRole("textbox", { name: "ISWC", exact: true })).toHaveValue(iswc);
+  await expect(dialog.getByRole("spinbutton", { name: "Duration (seconds)" })).toHaveValue("210");
+  await expect(dialog.getByRole("textbox", { name: "Genre", exact: true })).toHaveValue("Indie pop");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("link", { name: "Open rights editor", exact: true }).click();
+  await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  await page.goBack();
+  await hydratedList(page, "works");
+  await expect(search).toHaveValue(title);
+  await expect(page.getByRole("combobox", { name: "Filter works" })).toContainText("All (");
+  await expect(page.getByRole("combobox", { name: "Sort works" })).toContainText("Title");
+  await page.reload();
+  await hydratedList(page, "works");
+  await expect(search).toHaveValue(title);
+  await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
+  await search.fill("No matching fixture work");
+  await page.getByRole("button", { name: "Clear filters", exact: true }).click();
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("combobox", { name: "Sort works" })).toContainText("Title");
+  await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
+  await fits(page);
+});
+
 test("create dialogs cancel without a mutation and return keyboard focus", async ({ page }) => {
   await login(page);
   let posts = 0;
-  page.on("request", request => { if (request.method() === "POST" && /\/api\/(artists|releases)$/.test(request.url())) posts++; });
-  for (const [path, entity, field] of [["artists", "Artist", "Name *"], ["releases", "Release", "Title *"]]) {
+  page.on("request", request => { if (request.method() === "POST" && /\/api\/(artists|releases|works)$/.test(request.url())) posts++; });
+  for (const [path, entity, field] of [["artists", "Artist", "Name *"], ["releases", "Release", "Title *"], ["works", "Work", "Work Title *"]]) {
     await openList(page, path);
     const trigger = page.getByRole("button", { name: `New ${entity}`, exact: true });
     await trigger.click();
@@ -146,14 +207,14 @@ test("create dialogs cancel without a mutation and return keyboard focus", async
 
 test("read-only lists keep browsing available without create or edit controls", async ({ page }) => {
   await login(page, true);
-  for (const path of ["artists", "releases"]) {
+  for (const path of ["artists", "releases", "works"]) {
     await openList(page, path);
     await expect(page.getByText("Read-only for your role", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^New (Artist|Release)$/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^New (Artist|Release|Work)$/ })).toHaveCount(0);
     await expect(page.getByRole("textbox", { name: `Search ${path}` })).toBeVisible();
     if (path === "artists") await page.getByRole("button", { name: "Compare", exact: true }).click();
-    else await page.getByRole("button", { name: /^Details for/ }).first().click();
-    await expect(page.getByRole("button", { name: /^(Edit|Delete) / })).toHaveCount(0);
+    else await page.getByRole("button", { name: path === "works" ? /^Clearance & details for/ : /^Details for/ }).first().click();
+    await expect(page.getByRole("button", { name: /^(Edit|Delete)( |$)/ })).toHaveCount(0);
     await fits(page);
   }
 });
