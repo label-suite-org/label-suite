@@ -74,7 +74,7 @@ test("create artist and linked release, recover a failed save, and return to fil
   await page.getByRole("button", { name: "Compare", exact: true }).click();
   await expect(page.getByRole("table")).toBeVisible();
   await fits(page);
-  await page.getByRole("link", { name: artistName, exact: true }).click();
+  await page.getByRole("link", { name: artistName }).click();
   await expect(page.getByRole("heading", { name: artistName, exact: true })).toBeVisible();
   await page.goBack();
   await expect(searchArtists).toHaveValue(artistName);
