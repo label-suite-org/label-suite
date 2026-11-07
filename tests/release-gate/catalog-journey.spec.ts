@@ -151,6 +151,7 @@ test("create a work, retain a failed draft, and return from its rights editor to
   await hydratedList(page, "works");
   const search = page.getByRole("textbox", { name: "Search works" });
   await search.fill(title);
+  await expect(page).toHaveURL(url => url.searchParams.get("q") === title);
   await page.getByRole("combobox", { name: "Filter works", exact: true }).click();
   await page.getByRole("option", { name: /^All \(/ }).click();
   await choose(page, "Sort works", "Title");
