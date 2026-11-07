@@ -156,6 +156,10 @@ test("create a work, retain a failed draft, and return from its rights editor to
   await choose(page, "Sort works", "Title");
   await fits(page);
   await page.getByRole("button", { name: `Clearance & details for ${title}`, exact: true }).click();
+  // WebKit can scroll the clipped panel while it expands, moving Edit between pointer events.
+  await page.getByRole("region", { name: `Clearance & details for ${title}`, exact: true }).evaluate(async element => {
+    await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished));
+  });
   await expect(page.getByText(`ISRC · ${isrc}`, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(dialog.getByRole("textbox", { name: "Work Title *", exact: true })).toHaveValue(title);
