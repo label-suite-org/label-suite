@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
-import { createRoot } from "react-dom/client";
+import { hydrateRoot } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 import { WorksList } from "./WorksList";
 
@@ -8,10 +9,14 @@ it("restores work search and queues after navigation while preserving other URL 
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   window.history.replaceState({ retained: true }, "", "/works?q=Saved&filter=payout&sort=revenue&source=review#list");
   const host = document.createElement("div"); document.body.append(host);
-  const root = createRoot(host);
+  const view = <WorksList works={[]} canMutate={false} />;
+  host.innerHTML = renderToString(view);
+  expect(host.querySelector<HTMLInputElement>("input")!.disabled).toBe(true);
+  let root!: ReturnType<typeof hydrateRoot>;
   try {
-    await act(async () => root.render(<WorksList works={[]} canMutate={false} />));
+    await act(async () => { root = hydrateRoot(host, view); });
     const search = host.querySelector<HTMLInputElement>("input")!;
+    expect(search.disabled).toBe(false);
     expect(search.value).toBe("Saved");
     expect(host.querySelector('[aria-label="Filter works"]')?.textContent).toContain("Payout blocked");
     expect(host.querySelector('[aria-label="Sort works"]')?.textContent).toContain("Blocked money");
