@@ -80,7 +80,7 @@ it("terminates a stalled owned browser and preserves the acquisition failure", a
   const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   vi.spyOn(chromium, "launchServer").mockResolvedValue({
     wsEndpoint: () => "ws://127.0.0.1/owned-browser", close, kill,
-  } as Awaited<ReturnType<typeof chromium.launchServer>>);
+  } as unknown as Awaited<ReturnType<typeof chromium.launchServer>>);
   vi.spyOn(chromium, "connect").mockRejectedValue(new Error("Fixture browser connection failed"));
   vi.stubEnv("SISENSE_WIDGETS_JSON", JSON.stringify([{ key: "apple-streams-source", title: "Apple Streams by Source" }]));
   vi.stubEnv("SISENSE_PROVIDER_ARTIST_FILTER", "Fixture artist");

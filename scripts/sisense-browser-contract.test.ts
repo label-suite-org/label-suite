@@ -1048,7 +1048,7 @@ describe("Sisense browser contract", () => {
         downloadDir: directory,
         widgets: [{ key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" }],
       });
-      expect(result.status).toBe(0);
+      expect(result.status, result.output).toBe(0);
       expect(result.output).toContain("Skipped tracks-by-growth-rate: No uniquely observable export action was available after opening the scoped widget menu.");
       expect(result.output).not.toContain("Downloaded tracks-by-growth-rate");
       const { runDir, manifest } = await readScrapeRun(directory);
@@ -1074,7 +1074,7 @@ describe("Sisense browser contract", () => {
         downloadDir: directory,
         widgets: [{ key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" }],
       });
-      expect(result.status).toBe(0);
+      expect(result.status, result.output).toBe(0);
       expect(result.output).toContain("Skipped tracks-by-growth-rate: No uniquely observable export action was available after opening the scoped widget menu.");
       expect(result.output).not.toContain("Downloaded tracks-by-growth-rate");
       const { runDir, manifest } = await readScrapeRun(directory);
