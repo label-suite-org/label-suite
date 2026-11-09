@@ -45,12 +45,14 @@ interface Props {
   tracks: TrackRow[];
   works: Array<{ id: string; title: string; isrc: string | null }>;
   canMutate?: boolean;
+  initialSearch?: string;
 }
 
 type FilterKey = "all" | "needs-work" | "missing-audio" | "ready";
 type TrackFocus = "audio" | "isrc" | "work";
 
-export function TrackEditorWorkspace({ release, tracks, works, canMutate = true }: Props) {
+export function TrackEditorWorkspace({ release, tracks, works, canMutate = true, initialSearch = "" }: Props) {
+  const [fromToday, setFromToday] = useState(() => new URLSearchParams(initialSearch).get("returnTo") === "today");
   const [selectedId, setSelectedId] = useState(tracks.find((track) => !track.track_ready)?.id ?? tracks[0]?.id ?? "");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [assigningIsrcs, setAssigningIsrcs] = useState(false);
@@ -115,6 +117,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
         setFilter("all");
       }
       currentLocation.current = window.location.href;
+      setFromToday(new URLSearchParams(window.location.search).get("returnTo") === "today");
       setPendingTrackFocus(route.focus);
     };
     applyRoute();
@@ -172,6 +175,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
                 setPendingTrackFocus(parseTrackRoute(new URL(pendingSelection.url).search).focus);
                 window.history.pushState(null, "", pendingSelection.url);
                 currentLocation.current = pendingSelection.url;
+                setFromToday(new URL(pendingSelection.url).searchParams.get("returnTo") === "today");
               }
               setPendingSelection(null);
             }}>Discard changes</Button>
@@ -181,7 +185,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true 
       {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only for fundraiser</p>}
       <header className="border-b border-border pb-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <a href={`/releases/${release.id}`} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
+          <a href={`/releases/${release.id}${fromToday ? "?section=details&returnTo=today#release-readiness" : ""}`} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
             Back to release
           </a>

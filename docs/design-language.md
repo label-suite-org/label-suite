@@ -139,10 +139,14 @@ A failed save retains the draft. Success follows confirmation, not the click.
    then check the integrated route and its navigation/persistence behaviour.
 
 Existing inconsistencies remain in the continuity checklist. For example,
-Dashboard's uppercase section labels differ from the quieter record views,
-and the release-to-tracks route can lose the return-to-Today context. Do not
-turn either into a new design convention. Address adoption one workflow at a
+Dashboard's uppercase section labels differ from the quieter record views.
+Do not turn that into a new design convention. Address adoption one workflow at a
 time; the language provides a shared reference throughout that work.
+
+The release-to-track-editor journey preserves `returnTo=today` through track
+rows, Manage tracks and release/track evidence links. Back to release returns
+those visits to the readiness checks with Back to Today available. Ordinary
+catalog visits keep their existing return destination.
 
 ## Website-to-Storybook workflow
 

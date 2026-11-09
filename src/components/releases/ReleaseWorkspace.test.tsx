@@ -6,8 +6,45 @@ import { describe, expect, it, vi } from "vitest";
 import ReleaseSisensePanel from "../analytics/ReleaseSisensePanel";
 import { ReleaseDataPanel, ReleaseWorkspace } from "./ReleaseWorkspace";
 import { buildReleaseCockpit } from "../../server/analytics-command-center-core";
+import { TrackEditorWorkspace } from "../tracks/TrackEditorWorkspace";
 
 describe("ReleaseWorkspace", () => {
+  it("keeps the Today return path through release track links and the track editor", () => {
+    const props = {
+      release: { id: "release-1", title: "Fixture" },
+      tracks: [{ id: "track-1", release_id: "release-1", title: "Fixture track", position: 1, track_ready: false, track_missing: "Audio file" }],
+      budgetItems: [], pitches: [], works: [], artists: [], cockpit: null,
+      samplyReview: null, canManage: true, timeline: null, parentReleases: [],
+      campaigns: [], documents: [], mediaAssets: [],
+    };
+    const renderRelease = (search: string) => {
+      const host = document.createElement("div");
+      host.innerHTML = renderToStaticMarkup(<ReleaseWorkspace {...props} initialSearch={search} />);
+      return host;
+    };
+    for (const section of ["overview", "details", "tracks"]) {
+      const host = renderRelease(`?section=${section}&returnTo=today`);
+      const manage = [...host.querySelectorAll("a")].find(link => link.textContent === "Manage tracks")!;
+      expect(manage.getAttribute("href")).toBe("/releases/release-1/tracks?returnTo=today");
+    }
+    const overview = renderRelease("?returnTo=today");
+    const details = renderRelease("?section=details&returnTo=today");
+    const evidence = [...details.querySelectorAll("a")].find(link => link.textContent?.includes("Evidence: Fixture track"))!;
+    const evidenceUrl = new URL(evidence.href);
+    expect(evidenceUrl.searchParams.get("returnTo")).toBe("today");
+    expect(evidenceUrl.searchParams.get("track")).toBe("track-1");
+    expect(evidenceUrl.searchParams.get("focus")).toBe("audio");
+    const trackLink = [...overview.querySelectorAll("a")].find(link => link.textContent?.includes("Fixture track"))!;
+    const editorUrl = new URL(trackLink.href);
+    expect(editorUrl.searchParams.get("track")).toBe("track-1");
+    expect(editorUrl.searchParams.get("returnTo")).toBe("today");
+    const editor = document.createElement("div");
+    editor.innerHTML = renderToStaticMarkup(<TrackEditorWorkspace release={props.release} tracks={props.tracks} works={[]} initialSearch={editorUrl.search} />);
+    const back = [...editor.querySelectorAll("a")].find(link => link.textContent?.includes("Back to release"))!;
+    const returned = renderRelease(new URL(back.href).search);
+    expect(returned.querySelector('a[href="/today"]')?.textContent).toBe("Back to Today");
+    expect(returned.querySelector("#release-readiness")).not.toBeNull();
+  });
   it("renders section deep links before hydration", () => {
     const html = renderToStaticMarkup(<ReleaseWorkspace
       initialSearch="?section=timeline&returnTo=today&focus=upc"

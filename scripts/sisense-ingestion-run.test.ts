@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { chromium } from "playwright";
 import { runSisenseIngestionRun, type SisenseAcquisition } from "./sisense-ingestion-run";
 
 let directory: string;
@@ -71,4 +72,23 @@ it("retains a legacy manifest's internal scope without provider filter metadata"
   const replay = await runSisenseIngestionRun({ args: ["--mode", "import", "--dir", directory] });
   expect(replay?.stats.rowsImported).toBe(1);
   expect(replay?.acquisition.files[0].scope).toEqual(acquisition.files[0].scope);
+});
+
+it("terminates a stalled owned browser and preserves the acquisition failure", async () => {
+  const close = vi.fn(() => new Promise<void>(() => {}));
+  const kill = vi.fn().mockResolvedValue(undefined);
+  const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  vi.spyOn(chromium, "launchServer").mockResolvedValue({
+    wsEndpoint: () => "ws://127.0.0.1/owned-browser", close, kill,
+  } as unknown as Awaited<ReturnType<typeof chromium.launchServer>>);
+  vi.spyOn(chromium, "connect").mockRejectedValue(new Error("Fixture browser connection failed"));
+  vi.stubEnv("SISENSE_WIDGETS_JSON", JSON.stringify([{ key: "apple-streams-source", title: "Apple Streams by Source" }]));
+  vi.stubEnv("SISENSE_PROVIDER_ARTIST_FILTER", "Fixture artist");
+  vi.stubEnv("SISENSE_PROVIDER_TRACK_FILTER", "Fixture track");
+
+  await expect(runSisenseIngestionRun({ args: ["--mode", "scrape", "--download-dir", directory] }))
+    .rejects.toThrow("Fixture browser connection failed");
+  expect(close).toHaveBeenCalledOnce();
+  expect(kill).toHaveBeenCalledOnce();
+  expect(warning).toHaveBeenCalledWith(expect.stringContaining("terminating the owned browser process"));
 });

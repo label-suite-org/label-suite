@@ -17,6 +17,6 @@ const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "me
 
 <AppLayout>
   {!release ? <p class="text-muted-foreground">Release not found.</p> : (
-    <TrackEditorWorkspace client:load release={release} tracks={trackRows} works={workRows} canMutate={canMutate} />
+    <TrackEditorWorkspace client:load release={release} tracks={trackRows} works={workRows} canMutate={canMutate} initialSearch={Astro.url.search} />
   )}
 </AppLayout>
