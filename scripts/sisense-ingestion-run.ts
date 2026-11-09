@@ -430,17 +430,19 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
     await mkdir(failureDir, { recursive: true });
 
     setScrapeFailureStage("browser_launch");
-    const browser = await chromium.launch({
+    const browserServer = await chromium.launchServer({
+      host: "127.0.0.1",
       headless: readBooleanEnv("SISENSE_HEADLESS", true),
     });
-    const context = await browser.newContext({
-      acceptDownloads: true,
-      viewport: { width: 1600, height: 1200 },
-    });
-    const page = await context.newPage();
-    page.setDefaultTimeout(actionTimeoutMs);
-
     try {
+      const browser = await chromium.connect(browserServer.wsEndpoint());
+      const context = await browser.newContext({
+        acceptDownloads: true,
+        viewport: { width: 1600, height: 1200 },
+      });
+      const page = await context.newPage();
+      page.setDefaultTimeout(actionTimeoutMs);
+
       setScrapeFailureStage("provider_navigation_authentication");
       await page.goto(dashboardUrl, { waitUntil: "domcontentloaded" });
       await maybeEnterPassword(page);
@@ -505,8 +507,21 @@ export async function runSisenseIngestionRun({ args = [], acquire }: {
       await writeRunManifest(runDir, files, requestedDateRange, requestedAggregation, providerFilterState, completeness);
       return { files, completeness, providerFilterState, providerFilterObservedAt, runDir };
     } finally {
-      await context.close();
-      await browser.close();
+      // Downloads and diagnostic artifacts are saved before shutdown. Chromium
+      // can stall here after all pages close; terminate only this run's browser.
+      let shutdownTimer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const closed = await Promise.race([
+          browserServer.close().then(() => true),
+          new Promise<false>((resolve) => { shutdownTimer = setTimeout(() => resolve(false), 2_000); }),
+        ]);
+        if (!closed) {
+          console.warn("Sisense browser shutdown exceeded 2000ms; terminating the owned browser process.");
+          await browserServer.kill();
+        }
+      } finally {
+        clearTimeout(shutdownTimer);
+      }
     }
   }
 
