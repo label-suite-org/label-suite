@@ -18,6 +18,25 @@ const initial: NonNullable<ComponentProps<typeof PitchEditor>["initial"]> = {
   recipient: "Recipient", recipient_email: "recipient@example.test", next_action: "", due_date: null, task_status: null, public_path: null,
 };
 
+it("selects an imported recording by filename and saves its exact file ID", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const imported = { ...options.files[0], id: "imported", trackId: null, trackTitle: null, syncStatus: "unmatched" };
+  const fetchMock = vi.fn().mockResolvedValue(Response.json({ pitch: initial }));
+  vi.stubGlobal("fetch", fetchMock);
+  const host = document.createElement("div"); document.body.append(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<PitchEditor initial={{ ...initial, recordings: [] }} options={{ ...options, files: [imported] }} replyEmail="reply@example.test"/>));
+    const checkbox = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(checkbox.closest("label")!.textContent).toBe(imported.fileName);
+    await act(async () => checkbox.click());
+    await act(async () => host.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/pitches");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ action: "save", input: { file_ids: ["imported"] } });
+    expect(host.textContent).toContain("Draft saved. The listening link has not been created.");
+  } finally { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); }
+});
+
 it("creates a link only on explicit action and does not record a send", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   const ready = { ...initial, version: 2, link_state: "ready", player_id: "player", public_path: `/listen/org/${initial.token}` };
