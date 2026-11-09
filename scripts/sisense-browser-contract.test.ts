@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import { chromium, type Browser } from "playwright";
+import { chromium, type BrowserServer } from "playwright";
 import { resolveNewPageDownloadAction } from "./sisense-action-boundary";
 import { previousCalendarDayInTimeZone, sisenseDateRangeSummary } from "./sisense-date-range";
 
@@ -1092,9 +1092,10 @@ describe("Sisense browser contract", () => {
 
   it("rejects a second page-level Download Data action that appears during stabilization", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, portalTracksMenuShape: "single" });
-    let browser: Browser | undefined;
+    let browserServer: BrowserServer | undefined;
     try {
-      browser = await chromium.launch({ headless: true });
+      browserServer = await chromium.launchServer({ headless: true, host: "127.0.0.1" });
+      const browser = await chromium.connect(browserServer.wsEndpoint());
       const page = await browser.newPage();
       await page.goto(fixture.url);
       await page.locator("#tracks-more").click();
@@ -1110,7 +1111,9 @@ describe("Sisense browser contract", () => {
       await expect(resolveNewPageDownloadAction(page, "Download Data", [])).rejects.toThrow("found 2");
       expect(poll).toHaveBeenCalledOnce();
     } finally {
-      await Promise.all([browser?.close(), fixture.close()]);
+      // No artifacts need flushing in this isolated action test. Await the
+      // owned process exiting instead of Chromium's potentially stalled close.
+      await Promise.all([browserServer?.kill(), fixture.close()]);
     }
   }, 30_000);
 
