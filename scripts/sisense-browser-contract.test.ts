@@ -1313,6 +1313,8 @@ describe("Sisense browser contract", () => {
     }
   }, 10_000);
 
+  // Two missing-export attempts each wait 3s scoped + 3s page-wide, in addition
+  // to browser startup, filter setup and bounded shutdown. The action budget stays 3s.
   it("clicks a menu that becomes actionable before the bounded action deadline", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, shazamState: "blank", shazamMenuState: "poll-window-ready" });
     const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-poll-window-menu-"));
@@ -1333,7 +1335,7 @@ describe("Sisense browser contract", () => {
       await fixture.close();
       await rm(directory, { recursive: true, force: true });
     }
-  }, 20_000);
+  }, 30_000);
 
   it("observes exact empty evidence rendered before the bounded action deadline", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, shazamState: "poll-window-empty", shazamMenuState: "poll-window-ready" });
