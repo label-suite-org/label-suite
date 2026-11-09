@@ -405,30 +405,42 @@ export function ReleaseWorkspace({
       ),
   );
 
-  const operationsBrief = useMemo(() => buildReleaseOperationsBrief({
-    today: timeline?.today ?? new Date().toISOString().slice(0, 10),
-    release: {
-      id: release.id,
-      title: release.title,
-      artistName: release.artist_name ?? null,
-      releaseDate: release.release_date ?? null,
-      format: release.format ?? null,
-      upcEan: release.upc_ean ?? null,
-      coverArtUrl: release.cover_art_url ?? null,
-      releaseReady: release.release_ready ?? null,
-      status: release.status ?? null,
-    },
-    tracks: tracks.map((track) => ({
-      id: track.id,
-      title: track.title,
-      ready: track.track_ready ?? null,
-      missing: track.track_missing ?? null,
-      workId: track.work_id ?? null,
-    })),
-    pitches: pitches.map((pitch) => ({ id: pitch.id, status: pitch.status ?? null })),
-    timeline,
-    hasScopedAnalytics,
-  }), [hasScopedAnalytics, pitches, release, timeline, tracks]);
+  const operationsBrief = useMemo(() => {
+    const brief = buildReleaseOperationsBrief({
+      today: timeline?.today ?? new Date().toISOString().slice(0, 10),
+      release: {
+        id: release.id,
+        title: release.title,
+        artistName: release.artist_name ?? null,
+        releaseDate: release.release_date ?? null,
+        format: release.format ?? null,
+        upcEan: release.upc_ean ?? null,
+        coverArtUrl: release.cover_art_url ?? null,
+        releaseReady: release.release_ready ?? null,
+        status: release.status ?? null,
+      },
+      tracks: tracks.map((track) => ({
+        id: track.id,
+        title: track.title,
+        ready: track.track_ready ?? null,
+        missing: track.track_missing ?? null,
+        workId: track.work_id ?? null,
+      })),
+      pitches: pitches.map((pitch) => ({ id: pitch.id, status: pitch.status ?? null })),
+      timeline,
+      hasScopedAnalytics,
+    });
+    if (fromToday) {
+      for (const item of brief.items) {
+        const url = new URL(item.evidence.href, "https://label-suite.invalid");
+        if (url.pathname === `/releases/${release.id}` || url.pathname === `/releases/${release.id}/tracks`) {
+          url.searchParams.set("returnTo", "today");
+          item.evidence.href = `${url.pathname}${url.search}${url.hash}`;
+        }
+      }
+    }
+    return brief;
+  }, [fromToday, hasScopedAnalytics, pitches, release, timeline, tracks]);
   const handleFixSelect = (key: FixKey) => {
     if (key === "pitch") {
       if (selectSection("budget")) setPitchOpen(true);
@@ -534,7 +546,7 @@ export function ReleaseWorkspace({
             </div>
           )}
           {!readiness && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/60 px-4 py-3"><p className="text-sm text-muted-foreground">Required checks are unavailable.</p><Button variant="outline" type="button" onClick={() => selectSection("details")}>View details</Button></div>}
-          <ReleaseTracklist releaseId={release.id} tracks={tracks} />
+          <ReleaseTracklist releaseId={release.id} tracks={tracks} fromToday={fromToday} />
         </section>
       )}
 
@@ -551,7 +563,7 @@ export function ReleaseWorkspace({
         <div className="flex flex-wrap gap-2">
           {(["cover", "upc", "date", "format"] as const).map(key => <Button id={`release-correct-${key}`} key={key} type="button" variant="outline" onClick={() => selectSection("details", key)}>{canManage ? "Correct" : "Inspect"} {key === "upc" ? "UPC/EAN" : key === "cover" ? "cover art" : key}</Button>)}
           <Button type="button" variant="outline" onClick={() => selectSection("tracks")}>Review track evidence</Button>
-          <a href={`/releases/${release.id}/tracks`} className={buttonVariants({ variant: "ghost" })}>Manage tracks</a>
+          <a href={`/releases/${release.id}/tracks${fromToday ? "?returnTo=today" : ""}`} className={buttonVariants({ variant: "ghost" })}>Manage tracks</a>
           {fromToday && <a className="self-center underline" href="/today">Back to Today</a>}
         </div>
       </section>}
@@ -576,7 +588,7 @@ export function ReleaseWorkspace({
 
         {activeSection === "tracks" && <div id="release-tracks" className="scroll-mt-16"><Panel
           title="Tracklist"
-          action={<a href={`/releases/${release.id}/tracks`} className="text-xs font-medium text-muted-foreground hover:text-foreground">Manage tracks</a>}
+          action={<a href={`/releases/${release.id}/tracks${fromToday ? "?returnTo=today" : ""}`} className="text-xs font-medium text-muted-foreground hover:text-foreground">Manage tracks</a>}
         >
           <div className="space-y-3">
             <Accordion><AccordionItem value="audio-review" className="border-y border-border"><AccordionTrigger>Audio review & Samply setup</AccordionTrigger><AccordionContent>            <SamplyReviewPanel
@@ -1112,17 +1124,17 @@ export function ReleaseSectionNavigation({ releaseId, routeSearch, activeSection
 }
 
 /** The release overview's linked track rows, including its empty state. */
-export function ReleaseTracklist({ releaseId, tracks }: { releaseId: string; tracks: TrackRow[] }) {
+export function ReleaseTracklist({ releaseId, tracks, fromToday = false }: { releaseId: string; tracks: TrackRow[]; fromToday?: boolean }) {
   return <div className="space-y-4">
     <div className="flex flex-wrap items-end justify-between gap-3">
       <h2 className="text-lg font-semibold tracking-tight">Tracks <span className="ml-1 text-sm font-normal text-muted-foreground">{tracks.length}</span></h2>
-      <a href={`/releases/${releaseId}/tracks`} className={buttonVariants({ variant: "ghost", className: "text-sm" })}>Manage tracks</a>
+      <a href={`/releases/${releaseId}/tracks${fromToday ? "?returnTo=today" : ""}`} className={buttonVariants({ variant: "ghost", className: "text-sm" })}>Manage tracks</a>
     </div>
     {tracks.length ? (
       <ol className="divide-y divide-border border-y border-border">
         {tracks.map((track, index) => (
           <li key={track.id}>
-            <a href={`/releases/${releaseId}/tracks?track=${encodeURIComponent(track.id)}`} className="group flex min-h-14 items-center gap-4 px-2 py-2 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <a href={`/releases/${releaseId}/tracks?track=${encodeURIComponent(track.id)}${fromToday ? "&returnTo=today" : ""}`} className="group flex min-h-14 items-center gap-4 px-2 py-2 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <span className="w-6 shrink-0 text-right text-sm tabular-nums text-muted-foreground">{track.position ?? index + 1}</span>
               <span className="min-w-0 flex-1 break-words text-sm font-medium text-foreground">{track.title}</span>
               <Badge variant={track.track_ready ? "success" : "warning"}>{track.track_ready ? "Ready" : "Needs work"}</Badge>
