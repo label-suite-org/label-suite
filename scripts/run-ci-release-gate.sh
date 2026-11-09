@@ -184,3 +184,7 @@ E2E_BASE_URL="$PUBLIC_SITE_URL" ARTIST_PORTAL_BROWSER_TEST=1 \
 npm run release-gate:seed
 E2E_BASE_URL="$PUBLIC_SITE_URL" \
   npx playwright test tests/release-gate/release-correction.spec.ts
+
+# Catalog creation uses only the disposable fixture and verifies browser return state.
+E2E_BASE_URL="$PUBLIC_SITE_URL" \
+  npx playwright test tests/release-gate/catalog-journey.spec.ts

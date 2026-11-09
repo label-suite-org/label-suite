@@ -1,5 +1,8 @@
+/* @vitest-environment jsdom */
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { describe, expect, it, vi } from "vitest";
 import BudgetLineTable from "./BudgetLineTable";
 
 const line = {
@@ -38,6 +41,42 @@ const request = {
 };
 
 describe("BudgetLineTable variance decisions", () => {
+  it("keeps an inline edit after a failed save so it can be retried", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    try {
+      await act(async () => root.render(<BudgetLineTable lines={[line]} />));
+      const edit = host.querySelector('[aria-label="Edit planned amount for Recording"]') as HTMLButtonElement;
+      await act(async () => edit.click());
+      const input = host.querySelector('input[type="number"]') as HTMLInputElement;
+      await act(async () => {
+        const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+        setValue.call(input, "125");
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.blur();
+      });
+      expect((host.querySelector('input[type="number"]') as HTMLInputElement).value).toBe("125");
+      expect(host.textContent).toContain("Could not save this change.");
+      await act(async () => { const retryInput = host.querySelector('input[type="number"]') as HTMLInputElement; retryInput.focus(); retryInput.blur(); });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls.map(([, request]) => JSON.parse(String((request as RequestInit).body)))).toEqual([
+        { id: "line-1", planned_amount: 125 },
+        { id: "line-1", planned_amount: 125 },
+      ]);
+      expect(host.querySelector('input[type="number"]')).toBeNull();
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("renders uncategorized lines instead of dropping them from every section", () => {
     const html = renderToStaticMarkup(<BudgetLineTable lines={[{ ...line, id: "uncategorized-1", name: "Tour transport", category_name: null, category_type: null }]} />);
 

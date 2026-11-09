@@ -10,6 +10,8 @@ const database = vi.hoisted(() => ({
 }));
 const service = vi.hoisted(() => ({
   getSyncDeal: vi.fn(),
+  getNativeSyncDeal: vi.fn(),
+  listSyncDealsPage: vi.fn(),
   listSyncDeals: vi.fn(),
   syncOptions: vi.fn(),
   saveSyncDeal: vi.fn(),
@@ -90,6 +92,9 @@ describe("sync access boundaries", () => {
       workspace: { org: { id: "org" }, role: "member" },
     });
     expect((await nativePOST(context)).status).toBe(403);
+    expect((await nativeGET(context)).status).toBe(403);
+    expect(service.getNativeSyncDeal).not.toHaveBeenCalled();
+    expect(service.listSyncDealsPage).not.toHaveBeenCalled();
     expect(service.saveSyncDeal).not.toHaveBeenCalled();
     expect(service.listSyncDeals).not.toHaveBeenCalled();
   });
@@ -110,5 +115,45 @@ describe("sync access boundaries", () => {
       "user",
       expect.objectContaining({ id: input.id }),
     );
+  });
+  it("passes native read pagination and filters only after resolving the owner workspace", async () => {
+    actor.resolveNativeActor.mockResolvedValue({
+      userId: "user",
+      workspace: { org: { id: "org" }, role: "owner" },
+    });
+    service.listSyncDealsPage.mockResolvedValue({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+    });
+    const url = new URL(
+      "https://example.test/api/native/sync?limit=10&cursor=page&artist=artist&release=release",
+    );
+    const response = await nativeGET({
+      request: new Request(url),
+      url,
+    } as never);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      items: [],
+      next_cursor: null,
+      has_more: false,
+    });
+    expect(service.listSyncDealsPage).toHaveBeenCalledWith("org", {
+      limit: 10,
+      cursor: "page",
+      artist: "artist",
+      release: "release",
+    });
+    url.search = `?id=${input.id}&receipts_cursor=receipts&revisions_cursor=revisions`;
+    service.getNativeSyncDeal.mockResolvedValue({ deal: { id: input.id } });
+    const detail = await nativeGET({ request: new Request(url), url } as never);
+    expect(await detail.json()).toEqual({ record: { deal: { id: input.id } } });
+    expect(service.getNativeSyncDeal).toHaveBeenCalledWith("org", input.id, {
+      limit: 25,
+      receipts_cursor: "receipts",
+      revisions_cursor: "revisions",
+    });
+    expect(service.syncOptions).not.toHaveBeenCalled();
   });
 });

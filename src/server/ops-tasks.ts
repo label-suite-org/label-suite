@@ -75,6 +75,7 @@ export const createOpsTaskSchema = z.object({
 
 export const updateOpsTaskSchema = z.object({
   id: idSchema,
+  expected_revision: z.number().int().nonnegative(),
   ...opsTaskUpdateSchema,
 });
 
@@ -134,6 +135,7 @@ export async function listOpsTasks(orgId: string) {
   return db
     .select({
       id: ops_tasks.id,
+      revision: ops_tasks.revision,
       today: sql<string>`${workspaceToday(orgId)}::text`,
       task_name: ops_tasks.task_name,
       status: sql<string>`lower(coalesce(${ops_tasks.status}, 'todo'))`,
@@ -305,9 +307,9 @@ async function updateOpsTaskInTransaction(db: TaskTransaction, orgId: string, in
   const effectiveDueDate = (hasOwn(updates, "due_date") ? updates.due_date : existing.due_date) as string | Date | null | undefined;
   updates.is_overdue = computeIsOverdue(effectiveStatus, effectiveDueDate);
 
-  await mutateOpsTaskInTransaction(db, orgId, { taskId: input.id, changes: updates });
+  const { updated } = await mutateOpsTaskInTransaction(db, orgId, { taskId: input.id, expectedRevision: input.expected_revision, changes: updates });
 
-  return { ok: true };
+  return { ok: true, revision: updated.revision };
 }
 
 export async function deleteOpsTask(orgId: string, input: DeleteOpsTaskInput) {

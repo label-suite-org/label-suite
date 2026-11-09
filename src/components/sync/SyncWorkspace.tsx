@@ -156,16 +156,13 @@ export function SyncList({
   items,
   artistId,
   releaseId,
+  nextPageHref,
 }: {
   items: Item[];
   artistId?: string;
   releaseId?: string;
+  nextPageHref?: string;
 }) {
-  const visible = items.filter(
-    ({ deal }) =>
-      (!artistId || deal.artist_id === artistId) &&
-      (!releaseId || deal.release_id === releaseId),
-  );
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -185,13 +182,13 @@ export function SyncList({
           New deal
         </Button>
       </div>
-      {!visible.length ? (
+      {!items.length ? (
         <p className="rounded-xl border p-8 text-muted-foreground">
           No sync deals here yet. Add the production and recording to start.
         </p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
-          {visible.map(
+          {items.map(
             ({ deal, next_action, owner, due_date, task_status }) => (
               <a
                 key={deal.id}
@@ -222,6 +219,7 @@ export function SyncList({
           )}
         </div>
       )}
+      {nextPageHref && <a href={nextPageHref} className="text-sm underline">Next page</a>}
     </div>
   );
 }
@@ -721,7 +719,7 @@ export function SyncEditor({
           {record.revisions.map((r) => (
             <details key={r.id} className="border-t py-3">
               <summary className="cursor-pointer">
-                Revision {r.version} · {new Date(r.created_at).toLocaleString()}{" "}
+                Revision {r.version} · {new Date(r.created_at).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC")}{" "}
                 · {syncLabel(r.snapshot.details.contract_status)}
               </summary>
               <p className="mt-2 text-sm">

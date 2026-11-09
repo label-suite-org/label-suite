@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => {
   const inserted: Array<Record<string, unknown>> = [];
   const updated: Array<Record<string, unknown>> = [];
   const existingRows: Array<Record<string, unknown>> = [];
-  const updateRows: Array<Record<string, unknown>> = [];
+  const updateRows: Array<Array<Record<string, unknown>>> = [];
   const db = {
     transaction: vi.fn(async (callback: (tx: unknown) => unknown) => callback(db)),
     execute: vi.fn(async () => []),
@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("../lib/db", () => ({ db: mocks.db }));
 
-import { createOpsTask, createOpsTaskSchema, updateOpsTask } from "./ops-tasks";
+import { createOpsTask, createOpsTaskSchema, updateOpsTask, updateOpsTaskSchema } from "./ops-tasks";
 
 describe("release-linked ops tasks", () => {
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe("release-linked ops tasks", () => {
     mocks.selectRows.push([]);
     await expect(createOpsTask("org-1", { task_name: "Local task", [field]: "foreign-record" })).rejects.toThrow("not found in active workspace");
     mocks.selectRows.push([{ id: "task-1", revision: 0 }], []);
-    await expect(updateOpsTask("org-1", { id: "task-1", [field]: "foreign-record" })).rejects.toThrow("not found in active workspace");
+    await expect(updateOpsTask("org-1", { expected_revision: 0, id: "task-1", [field]: "foreign-record" })).rejects.toThrow("not found in active workspace");
     expect(mocks.inserted).toHaveLength(0);
     expect(mocks.updated).toHaveLength(0);
   });
@@ -54,11 +54,11 @@ describe("release-linked ops tasks", () => {
     await createOpsTask("org-1", { task_name: "Linked task", ...links });
     expect(mocks.inserted[0]).toMatchObject(links);
     mocks.selectRows.push([{ id: "task-1", revision: 0 }], ...Object.values(links).map((id) => [{ id }]), [{ id: "task-1", revision: 0 }]);
-    await updateOpsTask("org-1", { id: "task-1", ...links });
+    await updateOpsTask("org-1", { expected_revision: 0, id: "task-1", ...links });
     expect(mocks.updated.at(-1)).toMatchObject(links);
     const cleared = Object.fromEntries(Object.keys(links).map((key) => [key, null]));
     mocks.selectRows.push([{ id: "task-1", revision: 0 }], [{ id: "task-1", revision: 0 }]);
-    await updateOpsTask("org-1", { id: "task-1", ...cleared });
+    await updateOpsTask("org-1", { expected_revision: 0, id: "task-1", ...cleared });
     expect(mocks.updated.at(-1)).toMatchObject(cleared);
   });
 
@@ -90,7 +90,7 @@ describe("release-linked ops tasks", () => {
 
   test("updates an event link after validating the task and target event", async () => {
     mocks.selectRows.push([{ id: "task-1", status: "todo", due_date: null, linked_release_id: null, release_milestone_id: null }], [{ id: "event-1" }], [{ id: "task-1", event_id: null, revision: 0 }]);
-    await updateOpsTask("org-1", { id: "task-1", event_id: "event-1" });
+    await updateOpsTask("org-1", { expected_revision: 0, id: "task-1", event_id: "event-1" });
     expect(mocks.updated[0]).toMatchObject({ event_id: "event-1" });
   });
 
@@ -101,7 +101,7 @@ describe("release-linked ops tasks", () => {
 
 test("changing a deadline from the Tasks page converts it to a fixed date", async () => {
   mocks.selectRows.push([{ id: "relative", status: "todo", due_date: "2026-09-01", release_offset_days: -28, linked_release_id: "release-1", release_milestone_id: null }], [{ id: "relative", due_date: "2026-09-01", revision: 0 }]);
-  await updateOpsTask("org-1", { id: "relative", due_date: "2026-09-02" });
+  await updateOpsTask("org-1", { expected_revision: 0, id: "relative", due_date: "2026-09-02" });
   expect(mocks.updated.at(-1)).toMatchObject({ due_date: "2026-09-02", release_offset_days: null });
 });
 
@@ -121,9 +121,34 @@ describe("task planning validation", () => {
   });
   test("rejects a dependency cycle and keeps valid member, label and dependency selections", async () => {
     mocks.selectRows.push([{ id: "a" }], [{ id: "a", dependencies: [] }, { id: "b", dependencies: ["a"] }]);
-    await expect(updateOpsTask("org-1", { id: "a", dependency_ids: ["b"] })).rejects.toThrow("depend on itself");
+    await expect(updateOpsTask("org-1", { expected_revision: 0, id: "a", dependency_ids: ["b"] })).rejects.toThrow("depend on itself");
     mocks.selectRows.push([{ id: "maya", role: "operator" }, { id: "malthe", role: "owner" }], [{ id: "master", dependencies: [] }]);
     await createOpsTask("org-1", { id: "upload", task_name: "Upload", assignee_ids: ["maya", "malthe"], labels: ["Audio"], dependency_ids: ["master"] });
     expect(mocks.inserted[0]).toMatchObject({ assignee_ids: ["maya", "malthe"], labels: ["Audio"], dependency_ids: ["master"] });
   });
+});
+
+
+test("rejects a stale web form after a native completion without overwriting the task", async () => {
+  mocks.selectRows.length = 0;
+  mocks.updated.length = 0;
+  const current = { id: "handoff", revision: 2, status: "done", due_date: "2026-11-02", assignee_ids: ["current-owner"] };
+  mocks.selectRows.push([current], [current]);
+  const staleForm = updateOpsTaskSchema.parse({ id: "handoff", expected_revision: 1, task_name: "Old title", status: "todo", due_date: "2026-11-01", notes: "Unsaved draft" });
+  await expect(updateOpsTask("org-1", staleForm)).rejects.toMatchObject({ status: 409 });
+  expect(mocks.updated).toHaveLength(0);
+});
+
+
+test("requires the observed revision for every web update", () => {
+  expect(updateOpsTaskSchema.safeParse({ id: "task", status: "done" }).success).toBe(false);
+  expect(updateOpsTaskSchema.safeParse({ id: "task", expected_revision: 0, status: "done" }).success).toBe(true);
+});
+
+test("returns the saved revision so a second quick action can use it", async () => {
+  mocks.selectRows.length = 0; mocks.updateRows.length = 0;
+  const current = { id: "quick", revision: 4, status: "todo" };
+  mocks.selectRows.push([current], [current]);
+  mocks.updateRows.push([{ ...current, revision: 5, status: "done" }]);
+  await expect(updateOpsTask("org-1", { id: "quick", expected_revision: 4, status: "done" })).resolves.toEqual({ ok: true, revision: 5 });
 });

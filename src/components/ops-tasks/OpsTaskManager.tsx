@@ -60,6 +60,7 @@ export function OpsTaskManager({
   const [labelFilter, setLabelFilter] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [conflict, setConflict] = useState(false);
   const assignees = (task: OpsTask & { owner_contact_name?: string | null }) => task.assignee_ids?.length ? task.assignee_ids.map((id) => planningOptions.members.find((member) => member.id === id)?.name ?? "Former member").join(", ") : task.owner_contact_name || task.owner;
   const waiting = (task: OpsTask) => tasks.filter((entry) => task.dependency_ids?.includes(entry.id) && openStatus(entry.status));
   const boardStatus = (task: OpsTask) => openStatus(task.status) ? waiting(task).length || task.status === "blocked" ? "blocked" : task.status === "in_progress" ? "in_progress" : "todo" : "done";
@@ -75,12 +76,13 @@ export function OpsTaskManager({
   const [editingId, setEditingId] = useState<string | null>(initialTaskId);
 
   async function mutateTask(taskId: string, method: "PUT" | "DELETE", status?: string) {
-    if (busy) return;
+    if (busy || conflict) return;
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/ops-tasks", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: taskId, ...(status ? { status } : {}) }) });
-      if (!response.ok) { const body = await response.json(); throw new Error(body.error || "Could not save task"); }
-      setTasks((previous) => method === "DELETE" ? previous.filter((task) => task.id !== taskId) : previous.map((task) => task.id === taskId ? { ...task, status } : task));
+      const response = await fetch("/api/ops-tasks", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: taskId, ...(status ? { status, expected_revision: tasks.find((task) => task.id === taskId)?.revision } : {}) }) });
+      const body = await response.json();
+      if (!response.ok) { if (response.status === 409) setConflict(true); throw new Error(body.error || "Could not save task"); }
+      setTasks((previous) => method === "DELETE" ? previous.filter((task) => task.id !== taskId) : previous.map((task) => task.id === taskId ? { ...task, status, revision: body.revision } : task));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save task"); }
     finally { setBusy(false); }
   }
@@ -91,7 +93,8 @@ export function OpsTaskManager({
 
   return (
     <div className="space-y-4">
-      {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+      {conflict && <div role="alert" className="space-y-2 text-sm"><p>This task changed elsewhere. Reload the latest tasks before making more changes.</p><Button type="button" variant="outline" onClick={() => { if (confirm("Reload the latest tasks and discard any unsaved edits?")) window.location.reload(); }}>Reload latest tasks</Button></div>}
+      {error && !conflict && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
       {!canMutate && <p className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">Read-only access</p>}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{filteredTasks.length} tasks</p>
@@ -120,7 +123,7 @@ export function OpsTaskManager({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setEditingId(null)}>
           <div className="bg-card rounded-2xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-xl font-bold mb-4">Edit Task</h2>
-            <OpsTaskForm initial={editing} artists={artists} releases={releases} campaigns={campaigns} contacts={contacts} projects={projects} events={events} planningOptions={{ ...planningOptions, tasks: tasks.map((task) => ({ id: task.id, title: task.task_name ?? "Task", status: task.status ?? "todo", dueDate: task.due_date ?? null, dependencyIds: task.dependency_ids ?? [], labels: task.labels ?? [] })) }} onClose={() => setEditingId(null)} />
+            <OpsTaskForm key={editing.id} initial={editing} artists={artists} releases={releases} campaigns={campaigns} contacts={contacts} projects={projects} events={events} planningOptions={{ ...planningOptions, tasks: tasks.map((task) => ({ id: task.id, title: task.task_name ?? "Task", status: task.status ?? "todo", dueDate: task.due_date ?? null, dependencyIds: task.dependency_ids ?? [], labels: task.labels ?? [] })) }} onClose={() => setEditingId(null)} />
           </div>
         </div>
       )}
@@ -173,7 +176,7 @@ export function OpsTaskManager({
                       )}
                       {canMutate && <div className="flex gap-1 pt-1">
                         {STATUS_COLUMNS.filter((s) => s.key !== col.key).map((s) => (
-                          <Button disabled={busy} key={s.key} onClick={() => quickStatus(t.id!, s.key)}
+                          <Button disabled={busy || conflict} key={s.key} onClick={() => quickStatus(t.id!, s.key)}
                             className="text-xs px-2 py-0.5 rounded bg-neutral-100 hover:bg-neutral-200 text-neutral-700">
                             → {s.label}
                           </Button>
@@ -182,7 +185,7 @@ export function OpsTaskManager({
                       {canMutate && <div className="flex gap-1 border-t border-border/40 pt-1">
                         <Button onClick={() => setEditingId(t.id!)}
                           className="text-xs px-2 py-1 rounded bg-neutral-100 hover:bg-neutral-200 text-foreground flex-1">Edit</Button>
-                        <Button onClick={() => deleteTask(t.id!)}
+                        <Button disabled={busy || conflict} onClick={() => deleteTask(t.id!)}
                           className="text-xs px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 flex-1">Delete</Button>
                       </div>}
                     </div>

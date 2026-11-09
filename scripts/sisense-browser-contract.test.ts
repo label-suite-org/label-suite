@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import { chromium, type Browser } from "playwright";
+import { chromium, type BrowserServer } from "playwright";
 import { resolveNewPageDownloadAction } from "./sisense-action-boundary";
 import { previousCalendarDayInTimeZone, sisenseDateRangeSummary } from "./sisense-date-range";
 
@@ -1048,7 +1048,7 @@ describe("Sisense browser contract", () => {
         downloadDir: directory,
         widgets: [{ key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" }],
       });
-      expect(result.status).toBe(0);
+      expect(result.status, result.output).toBe(0);
       expect(result.output).toContain("Skipped tracks-by-growth-rate: No uniquely observable export action was available after opening the scoped widget menu.");
       expect(result.output).not.toContain("Downloaded tracks-by-growth-rate");
       const { runDir, manifest } = await readScrapeRun(directory);
@@ -1074,7 +1074,7 @@ describe("Sisense browser contract", () => {
         downloadDir: directory,
         widgets: [{ key: "tracks-by-growth-rate", title: "Tracks by Growth Rate" }],
       });
-      expect(result.status).toBe(0);
+      expect(result.status, result.output).toBe(0);
       expect(result.output).toContain("Skipped tracks-by-growth-rate: No uniquely observable export action was available after opening the scoped widget menu.");
       expect(result.output).not.toContain("Downloaded tracks-by-growth-rate");
       const { runDir, manifest } = await readScrapeRun(directory);
@@ -1092,9 +1092,10 @@ describe("Sisense browser contract", () => {
 
   it("rejects a second page-level Download Data action that appears during stabilization", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, portalTracksMenuShape: "single" });
-    let browser: Browser | undefined;
+    let browserServer: BrowserServer | undefined;
     try {
-      browser = await chromium.launch({ headless: true });
+      browserServer = await chromium.launchServer({ headless: true, host: "127.0.0.1" });
+      const browser = await chromium.connect(browserServer.wsEndpoint());
       const page = await browser.newPage();
       await page.goto(fixture.url);
       await page.locator("#tracks-more").click();
@@ -1110,7 +1111,9 @@ describe("Sisense browser contract", () => {
       await expect(resolveNewPageDownloadAction(page, "Download Data", [])).rejects.toThrow("found 2");
       expect(poll).toHaveBeenCalledOnce();
     } finally {
-      await Promise.all([browser?.close(), fixture.close()]);
+      // No artifacts need flushing in this isolated action test. Await the
+      // owned process exiting instead of Chromium's potentially stalled close.
+      await Promise.all([browserServer?.kill(), fixture.close()]);
     }
   }, 30_000);
 
@@ -1310,6 +1313,8 @@ describe("Sisense browser contract", () => {
     }
   }, 10_000);
 
+  // Two missing-export attempts each wait 3s scoped + 3s page-wide, in addition
+  // to browser startup, filter setup and bounded shutdown. The action budget stays 3s.
   it("clicks a menu that becomes actionable before the bounded action deadline", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, shazamState: "blank", shazamMenuState: "poll-window-ready" });
     const directory = await mkdtemp(path.join(os.tmpdir(), "label-suite-sisense-poll-window-menu-"));
@@ -1330,7 +1335,7 @@ describe("Sisense browser contract", () => {
       await fixture.close();
       await rm(directory, { recursive: true, force: true });
     }
-  }, 20_000);
+  }, 30_000);
 
   it("observes exact empty evidence rendered before the bounded action deadline", async () => {
     const fixture = await startDashboardFixture({ activateRequestedRange: true, shazamState: "poll-window-empty", shazamMenuState: "poll-window-ready" });

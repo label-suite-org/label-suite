@@ -4,6 +4,12 @@ This is the design target for the signed-in suite. It records the established
 layout rules; it does not certify that every existing screen already follows them.
 See [the rollout checklist](docs/ui-continuity.md) for implementation status.
 
+For the current website expressed as a reusable design language, start with
+[the living reference](docs/design-language.md) and **Library / Patterns /
+Foundations** in Storybook. The reference records the deployed baseline and
+distinguishes observed conventions from adoption rules. Extend these existing
+tokens and components when adding screens; keep the website as the reference.
+
 ## Character
 
 A calm, light artist administration workspace, with the clarity of a music

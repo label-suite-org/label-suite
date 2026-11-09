@@ -1,9 +1,26 @@
 ---
 import type { NativeMusicCatalogue } from "../../server/native-music-import";
 import { nativeCatalogueTotal } from "../../server/native-music-snapshot";
+import NativeMusicHistory from "./NativeMusicHistory";
 interface Props { catalogues: NativeMusicCatalogue[] }
 const { catalogues } = Astro.props;
 const format = (value: number | null) => value === null ? "Unknown" : value.toLocaleString("en-US");
+const hasAllTime = catalogues.some(catalogue => catalogue.periodKind === "all_time");
+const selectedPeriod = hasAllTime && Astro.url.searchParams.get("capturePeriod") !== "period" ? "all_time" : "period";
+const visible = catalogues.filter(catalogue => (catalogue.periodKind ?? "period") === selectedPeriod);
+const artistIds = [...new Set(visible.map(catalogue => catalogue.artistId))];
+const combined = artistIds.flatMap(artistId => {
+  const providers = visible.filter(catalogue => catalogue.artistId === artistId);
+  if (selectedPeriod !== "all_time" || providers.length !== 2 || new Set(providers.map(item => item.provider)).size !== 2) return [];
+  const totals = providers.map(item => nativeCatalogueTotal(item.rows));
+  const sum = totals.every(value => value !== null) ? totals.reduce<number>((sum, value) => sum + value!, 0) : null;
+  return [{ artistName: providers[0].artistName, total: sum !== null && Number.isSafeInteger(sum) ? sum : null }];
+});
+function periodHref(period: string) {
+  const params = new URLSearchParams(Astro.url.searchParams);
+  params.set("capturePeriod", period);
+  return `${Astro.url.pathname}?${params}#native-music-heading`;
+}
 ---
 {catalogues.length > 0 && (
   <section class="space-y-6" aria-labelledby="native-music-heading">
@@ -11,12 +28,23 @@ const format = (value: number | null) => value === null ? "Unknown" : value.toLo
       <h2 id="native-music-heading" class="text-2xl font-semibold">Direct from your artist dashboards</h2>
       <p class="text-sm text-muted-foreground">Saved artist-dashboard captures. Each provider has its own reporting cutoff. Reloading this page does not fetch new provider data.</p>
     </div>
-    {catalogues.map((catalogue) => (
+    {hasAllTime && <nav aria-label="Song totals" class="flex gap-4">
+      <a class="underline" href={periodHref("all_time")} aria-current={selectedPeriod === "all_time" ? "page" : undefined}>All time</a>
+      <a class="underline" href={periodHref("period")} aria-current={selectedPeriod === "period" ? "page" : undefined}>Recent capture</a>
+    </nav>}
+    {visible.length === 0 && <p>No saved capture for this period.</p>}
+    {combined.map(item => <div class="rounded-lg border p-5">
+      <h3 class="font-medium">{item.artistName} · Spotify + Apple</h3>
+      <p class="text-3xl font-semibold tabular-nums">{format(item.total)}</p>
+      <p class="text-sm text-muted-foreground">Combined captured all-time song totals. Each platform’s reporting cutoff is shown below and may differ or be unknown. This is a sum of plays, not unique listeners.</p>
+    </div>)}
+    {visible.map((catalogue) => (
       <article class="space-y-3 rounded-lg border border-[var(--border)] p-5">
         <h3 class="text-lg font-semibold">{catalogue.artistName} · {catalogue.provider === "spotify_for_artists" ? "Spotify for Artists" : "Apple Music for Artists"}</h3>
-        <p>Reporting window: {catalogue.dateFrom}–{catalogue.dateThrough} · Worldwide · {catalogue.metric === "audio_streams" ? "Audio streams" : "Plays"}</p>
+        {catalogue.periodKind === "all_time" && <p class="font-medium">All time · {catalogue.dateThrough ? `through ${catalogue.dateThrough}` : "reporting cutoff not stated"}</p>}
+        <p>{catalogue.dateFrom && catalogue.dateThrough ? `Reporting window: ${catalogue.dateFrom}–${catalogue.dateThrough} · ` : ""}Worldwide · {catalogue.metric === "audio_streams" ? "Audio streams" : "Plays"}</p>
         <p class="text-3xl font-semibold tabular-nums">{format(nativeCatalogueTotal(catalogue.rows))}</p>
-        <p class="text-sm text-muted-foreground">Selected-period song sum across {catalogue.rows.length} native song entries.</p>
+        <p class="text-sm text-muted-foreground">{catalogue.periodKind === "all_time" ? "Provider-reported all-time song sum" : "Selected-period song sum"} across {catalogue.rows.length} native song entries.</p>
         <p class="text-sm text-muted-foreground">Captured: <time datetime={catalogue.capturedAt}>{new Date(catalogue.capturedAt).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC")}</time>. This is when the dashboard was observed, not when the file was imported.</p>
         {catalogue.artistTotal !== null && <p class="text-sm">Native artist rollup: {format(catalogue.artistTotal)} plays.
           {nativeCatalogueTotal(catalogue.rows) !== null && catalogue.artistTotal !== nativeCatalogueTotal(catalogue.rows) &&
@@ -41,5 +69,6 @@ const format = (value: number | null) => value === null ? "Unknown" : value.toLo
         </details>
       </article>
     ))}
+    <NativeMusicHistory client:load captures={catalogues} />
   </section>
 )}

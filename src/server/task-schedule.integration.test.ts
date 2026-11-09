@@ -33,16 +33,16 @@ describe.skipIf(!enabled)("task dependency graph on disposable PostgreSQL", () =
     await tasks.createOpsTask(org, { id: a, task_name: "Master", labels: ["Audio"], due_date: "2026-09-25" });
     await tasks.createOpsTask(org, { id: b, task_name: "Deliver", labels: ["Distribution"] });
     const results = await Promise.allSettled([
-      tasks.updateOpsTask(org, { id: a, dependency_ids: [b] }),
-      tasks.updateOpsTask(org, { id: b, dependency_ids: [a] }),
+      tasks.updateOpsTask(org, { id: a, expected_revision: 0, dependency_ids: [b] }),
+      tasks.updateOpsTask(org, { id: b, expected_revision: 0, dependency_ids: [a] }),
     ]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
-    const rows = await sql`select id, dependency_ids, labels, due_date::text as due_date from label_suite.ops_tasks where org_id = ${org}`;
+    const rows = await sql`select id, revision, dependency_ids, labels, due_date::text as due_date from label_suite.ops_tasks where org_id = ${org}`;
     const dependent = rows.find((row) => row.dependency_ids.length)!;
     await expect(tasks.deleteOpsTask(org, { id: dependent.dependency_ids[0] })).rejects.toThrow("Other tasks depend");
-    await expect(tasks.updateOpsTask("other-org", { id: a, labels: ["Foreign"] })).rejects.toThrow("Task not found");
+    await expect(tasks.updateOpsTask("other-org", { id: a, expected_revision: 0, labels: ["Foreign"] })).rejects.toThrow("Task not found");
     expect(rows.find((row) => row.id === a)).toMatchObject({ labels: ["Audio"], due_date: "2026-09-25" });
-    await tasks.updateOpsTask(org, { id: dependent.id, dependency_ids: [] });
+    await tasks.updateOpsTask(org, { id: dependent.id, expected_revision: dependent.revision, dependency_ids: [] });
     await tasks.deleteOpsTask(org, { id: dependent.dependency_ids[0] });
   });
 });
