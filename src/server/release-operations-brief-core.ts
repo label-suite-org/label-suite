@@ -97,6 +97,7 @@ export function buildReleaseOperationsBrief(input: ReleaseOperationsBriefInput):
         "Review tracks",
         buildTrackBlockerEvidence({
           releaseHref,
+          releaseId: release.id,
           track: representative,
           missing: representative.missing || "",
         }),
@@ -179,31 +180,33 @@ function item(
   return { id, severity, title, detail, actionKey, actionLabel, evidence, priority };
 }
 
-function buildTrackBlockerEvidence({ releaseHref, track, missing }: {
+function buildTrackBlockerEvidence({ releaseHref, releaseId, track, missing }: {
+  releaseId: string;
   releaseHref: string;
   track: ReleaseOperationsBriefInput["tracks"][number];
   missing: string;
 }): ReleaseBriefItem["evidence"] {
   const trackFocus = firstMissingTrackFocus(missing);
+  const returnContext = `&release=${encodeURIComponent(releaseId)}&track=${encodeURIComponent(track.id)}`;
 
   if ((trackFocus.kind === "scope") && track.workId) {
     return {
       label: humanizeScope(trackFocus.scope),
-      href: `/works/${track.workId}?scope=${trackFocus.scope}&focus=${trackFocus.scope}`,
+      href: `/works/${track.workId}?scope=${trackFocus.scope}&focus=${trackFocus.scope}${returnContext}`,
     };
   }
 
   if (trackFocus.kind === "work-clearance" && track.workId) {
     return {
       label: "Work clearance",
-      href: `/works/${track.workId}?scope=publishing&focus=publishing`,
+      href: `/works/${track.workId}?scope=publishing&focus=publishing${returnContext}`,
     };
   }
 
   if (track.workId && trackFocus.kind === "credit") {
     return {
       label: "Credited persons",
-      href: `/works/${track.workId}?scope=credits&focus=credits`,
+      href: `/works/${track.workId}?scope=credits&focus=credits${returnContext}`,
     };
   }
 

@@ -433,7 +433,7 @@ export function ReleaseWorkspace({
     if (fromToday) {
       for (const item of brief.items) {
         const url = new URL(item.evidence.href, "https://label-suite.invalid");
-        if (url.pathname === `/releases/${release.id}` || url.pathname === `/releases/${release.id}/tracks`) {
+        if (url.pathname === `/releases/${release.id}` || url.pathname === `/releases/${release.id}/tracks` || (url.pathname.startsWith("/works/") && url.searchParams.get("release") === release.id)) {
           url.searchParams.set("returnTo", "today");
           item.evidence.href = `${url.pathname}${url.search}${url.hash}`;
         }

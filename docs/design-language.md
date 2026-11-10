@@ -146,7 +146,7 @@ time; the language provides a shared reference throughout that work.
 The release-to-track-editor journey preserves `returnTo=today` through track
 rows, Manage tracks and release/track evidence links. Back to release returns
 those visits to the readiness checks with Back to Today available. Ordinary
-catalog visits keep their existing return destination.
+catalog visits keep their existing return destination. Work and rights corrections retain the selected release and track, with a Back to track link before returning to release readiness. Unsaved rights rows warn before departure. Track audio accepts files up to 100 MB; the linked work must be saved before opening its rights editor.
 
 ## Website-to-Storybook workflow
 

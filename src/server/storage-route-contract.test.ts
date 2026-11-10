@@ -175,12 +175,12 @@ describe("storage route compatibility contract", () => {
     expect(denied.status).toBe(403);
   });
 
-  it("accepts a 52 MB media file while retaining the document ceiling", async () => {
+  it.each([["media-asset", "media-assets"], ["track-audio", "releases/release-1/audio"]])("accepts a 52 MB %s file while retaining the document ceiling", async (kind, folder) => {
     const { POST } = await import("../pages/api/storage/upload");
     const form = new FormData();
-    form.set("key", "media-assets/instrumental.wav");
+    form.set("key", `${folder}/instrumental.wav`);
     form.set("file", new File([new Uint8Array(52_000_000)], "instrumental.wav", { type: "audio/wav" }));
-    const request = new Request("https://labels.example/api/storage/upload?kind=media-asset", {
+    const request = new Request(`https://labels.example/api/storage/upload?kind=${kind}`, {
       method: "POST", headers: { origin: "https://labels.example" }, body: form,
     });
     const response = await POST({ request, locals: { orgId: "org-1", membershipRole: "operator" } } as never);
@@ -191,9 +191,9 @@ describe("storage route compatibility contract", () => {
     expect(storage.uploadStorageObject).toHaveBeenCalledTimes(1);
   });
 
-  it("rejects unauthorized, oversized or misrouted media uploads", async () => {
+  it.each([["media-asset", "media-assets"], ["track-audio", "releases/release-1/audio"]])("rejects unauthorized, oversized or misrouted %s uploads", async (kind, folder) => {
     const { POST } = await import("../pages/api/storage/upload");
-    const url = "https://labels.example/api/storage/upload?kind=media-asset";
+    const url = `https://labels.example/api/storage/upload?kind=${kind}`;
     const deniedRequest = new Request(url, { method: "POST", headers: { origin: "https://labels.example" }, body: "untrusted" });
     const denied = await POST({ request: deniedRequest, locals: { orgId: "org-1", membershipRole: "fundraiser" } } as never);
     expect(denied.status).toBe(403);
@@ -202,7 +202,7 @@ describe("storage route compatibility contract", () => {
     expect((await POST({ request: oversized, locals: { orgId: "org-1", membershipRole: "operator" } } as never)).status).toBe(413);
     for (const context of [false, true]) {
       const form = new FormData();
-      form.set("key", context ? "media-assets/file.pdf" : "documents/file.pdf");
+      form.set("key", context ? `${folder}/file.pdf` : "documents/file.pdf");
       if (context) form.set("context", JSON.stringify({ type: "grant_application", id: "app-1" }));
       form.set("file", new File(["test"], "file.pdf"));
       const request = new Request(url, { method: "POST", headers: { origin: "https://labels.example" }, body: form });

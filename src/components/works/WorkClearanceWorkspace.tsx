@@ -115,12 +115,14 @@ export function WorkClearanceWorkspace({
   contacts,
   tracks,
   canMutate = true,
+  initialSearch = "",
 }: {
   work: Work;
   roles: RoleRow[];
   contacts: ContactRow[];
   tracks: TrackRow[];
   canMutate?: boolean;
+  initialSearch?: string;
 }) {
   const [activeScope, setActiveScope] = useState<WorkClearanceFocus | "recordings" | "activity">("publishing");
   const [roleRows, setRoleRows] = useState<RoleRow[]>(roles);
@@ -132,6 +134,21 @@ export function WorkClearanceWorkspace({
   const [requestSentIds, setRequestSentIds] = useState<Set<string>>(new Set());
   const [activity, setActivity] = useState<ActivityItem[]>(() => buildInitialActivity(roles, tracks));
   const [pendingWorkFocus, setPendingWorkFocus] = useState<WorkClearanceFocus | null>(null);
+
+  const returnParams = new URLSearchParams(initialSearch);
+  const returnTrack = tracks.find(track => Boolean(track.release_id) && track.id === returnParams.get("track") && track.release_id === returnParams.get("release"));
+  const backHref = returnTrack
+    ? `/releases/${encodeURIComponent(returnTrack.release_id!)}/tracks?track=${encodeURIComponent(returnTrack.id)}&focus=work${returnParams.get("returnTo") === "today" ? "&returnTo=today" : ""}`
+    : "/works";
+  const hasUnsavedChanges = dirtyIds.size > 0 || savingId !== null;
+
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) { event.preventDefault(); event.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsavedChanges]);
 
   const publishing = useMemo(() => summarizeScope("Publishing", ["Publishing", "Mechanical"], roleRows), [roleRows]);
   const master = useMemo(() => summarizeScope("Master", ["Master"], roleRows), [roleRows]);
@@ -355,11 +372,11 @@ export function WorkClearanceWorkspace({
       <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <a
-            href="/works"
+            href={backHref}
             className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Back to Works
+            {returnTrack ? "Back to track" : "Back to Works"}
           </a>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="break-words text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">

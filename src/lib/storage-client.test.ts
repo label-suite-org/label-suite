@@ -36,12 +36,25 @@ describe("storage client", () => {
     expect(fetchMock.mock.calls[1]?.[0]).toBe("/api/storage/optimize-image");
   });
 
+  it("uploads track audio larger than 25 MB directly through the bounded audio path", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(Response.json({ key: "org/releases/release-1/audio/master.wav" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const file = new File(["fixture"], "master.wav", { type: "audio/wav" });
+    Object.defineProperty(file, "size", { value: 31_752_044 });
+    await uploadFileToStorage(file, "releases/release-1/audio");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/storage/upload?kind=track-audio");
+    expect((fetchMock.mock.calls[0][1].body as FormData).get("key")).toMatch(/^releases\/release-1\/audio\/.*-master.wav$/);
+    await expect(uploadFileToStorage(file, "releases/release-1/audio", { type: "budget_line", id: "line-1" })).rejects.toThrow("25 MB");
+  });
+
   it("rejects oversized media and document files before sending bytes", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const file = new File(["fixture"], "master.wav", { type: "audio/wav" });
     Object.defineProperty(file, "size", { value: 101 * 1024 * 1024, configurable: true });
     await expect(uploadFileToStorage(file, "media-assets")).rejects.toThrow("100 MB");
+    await expect(uploadFileToStorage(file, "releases/release-1/audio")).rejects.toThrow("100 MB");
     Object.defineProperty(file, "size", { value: 26 * 1024 * 1024 });
     await expect(uploadFileToStorage(file, "documents")).rejects.toThrow("25 MB");
     expect(fetchMock).not.toHaveBeenCalled();

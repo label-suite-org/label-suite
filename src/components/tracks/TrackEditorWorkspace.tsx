@@ -258,7 +258,7 @@ export function TrackEditorWorkspace({ release, tracks, works, canMutate = true,
 
         <aside aria-label="Selected track editor" className="min-w-0 border-t border-border pt-6 lg:sticky lg:top-4 lg:self-start lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
           {selectedTrack && canMutate ? (
-            <TrackInspector key={selectedTrack.id} track={selectedTrack} releaseId={release.id} works={works} onDirtyChange={onDirtyChange} />
+            <TrackInspector key={selectedTrack.id} track={selectedTrack} releaseId={release.id} works={works} fromToday={fromToday} onDirtyChange={onDirtyChange} />
           ) : selectedTrack ? (
             <div className="rounded-lg border border-border p-6 text-sm text-muted-foreground">Track details are read-only for fundraiser.</div>
           ) : (
@@ -325,11 +325,13 @@ function TrackInspector({
   releaseId,
   works,
   onDirtyChange,
+  fromToday,
 }: {
   track: TrackRow;
   releaseId: string;
   works: Array<{ id: string; title: string; isrc: string | null }>;
   onDirtyChange: (dirty: boolean) => void;
+  fromToday: boolean;
 }) {
   const [title, setTitle] = useState(track.title);
   const [position, setPosition] = useState(track.position?.toString() || "");
@@ -390,6 +392,9 @@ function TrackInspector({
         throw new Error(data.error || "Track update failed");
       }
       onDirtyChange(false);
+      const url = new URL(window.location.href);
+      url.searchParams.set("track", track.id);
+      window.history.replaceState(null, "", url);
       window.location.reload();
     } catch (err: any) {
       setError(err.message || "Track update failed");
@@ -470,6 +475,7 @@ function TrackInspector({
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">Audio files up to 100 MB.</p>
         </Field>
 
         <Field label="Linked work">
@@ -483,6 +489,13 @@ function TrackInspector({
             {works.map((work) => <option key={work.id} value={work.id}>{work.title}{work.isrc ? ` (${work.isrc})` : ""}</option>)}
           </NativeSelect>
         </Field>
+
+        {workId && workId === track.work_id ? (
+          <a
+            href={`/works/${encodeURIComponent(workId)}?release=${encodeURIComponent(releaseId)}&track=${encodeURIComponent(track.id)}${fromToday ? "&returnTo=today" : ""}`}
+            className="inline-flex text-sm font-medium underline underline-offset-4"
+          >Edit work and rights</a>
+        ) : <p className="text-xs text-muted-foreground">Select a work and save this track to edit its rights.</p>}
 
         {error && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       </div>
