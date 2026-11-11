@@ -95,11 +95,14 @@ export async function savePitchFollowup(org: string, raw: unknown) {
       const task = { task_name: input.next_action, due_date: input.due_date, linked_release_id: pitch.release_id, linked_campaign_id: pitch.campaign_id, linked_contact_id: pitch.contact_id, updated_at: new Date() };
       if (pitch.task_id) {
         const [previous] = await tx.select().from(ops_tasks).where(and(eq(ops_tasks.id, taskId), eq(ops_tasks.org_id, org)));
-        await tx.update(ops_tasks).set({ ...task, status: previous.task_name === input.next_action && previous.due_date === input.due_date ? previous.status : "todo" }).where(and(eq(ops_tasks.id, taskId), eq(ops_tasks.org_id, org)));
+        const status = input.status === "closed" ? "done"
+          : pitch.status !== "closed" && previous.task_name === input.next_action && previous.due_date === input.due_date ? previous.status : "todo";
+        await tx.update(ops_tasks).set({ ...task, status }).where(and(eq(ops_tasks.id, taskId), eq(ops_tasks.org_id, org)));
       }
-      else await tx.insert(ops_tasks).values({ id: taskId, org_id: org, ...task, notes: `Pitch: /pitches/${pitch.id}` });
+      else await tx.insert(ops_tasks).values({ id: taskId, org_id: org, ...task, status: input.status === "closed" ? "done" : "todo", notes: `Pitch: /pitches/${pitch.id}` });
     } else if (taskId) {
       await tx.update(ops_tasks).set({ status: "done", updated_at: new Date() }).where(and(eq(ops_tasks.id, taskId), eq(ops_tasks.org_id, org)));
+      taskId = null;
     }
     await tx.update(pitches).set({ status: input.status, sent_date: input.sent_date, response_note: input.response_note, task_id: taskId, version: pitch.version + 1, updated_at: new Date() }).where(wherePitch(org, input.id));
     return getPitch(org, input.id);

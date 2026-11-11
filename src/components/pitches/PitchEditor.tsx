@@ -9,7 +9,7 @@ import type { getPitch, pitchOptions } from "../../server/pitches";
 type Pitch = Awaited<ReturnType<typeof getPitch>>;
 type Options = Awaited<ReturnType<typeof pitchOptions>>;
 
-export function PitchEditor({ initial, options: initialOptions, replyEmail }: { initial: Pitch | null; options: Options; replyEmail: string }) {
+export function PitchEditor({ initial, options: initialOptions, replyEmail, returnToToday = false }: { initial: Pitch | null; options: Options; replyEmail: string; returnToToday?: boolean }) {
   const [pitch, setPitch] = useState(initial);
   const [options, setOptions] = useState(initialOptions);
   const [form, setForm] = useState<PitchDraft>(() => ({
@@ -93,7 +93,9 @@ export function PitchEditor({ initial, options: initialOptions, replyEmail }: { 
       const next = await request("/api/pitches", { action: "followup", input: { ...followup, id: pitch.id, expected_version: pitch.version, sent_date: followup.sent_date || null, due_date: followup.due_date || null } });
       accept(next);
       setFollowup({ status: next.status, sent_date: next.sent_date ?? "", response_note: next.response_note, next_action: next.next_action, due_date: next.due_date ?? "" });
-      setNotice("Follow-up saved. Next actions are also available in Tasks.");
+      setNotice(next.status === "closed" ? "Pitch closed. Its follow-up is complete."
+        : !next.task_id ? "Follow-up saved. No next action is scheduled."
+        : "Follow-up saved. Next actions are also available in Today and Tasks.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save follow-up"); }
     finally { setBusy(false); }
   }
@@ -136,7 +138,8 @@ export function PitchEditor({ initial, options: initialOptions, replyEmail }: { 
         {dirty && <p className="text-sm">Save your draft changes first.</p>}
       </>}
     </section>}
-    {pitch && <form onSubmit={saveFollowup} className="space-y-4 border-t pt-6"><h2 className="text-lg font-semibold">Recipient and follow-up · internal only</h2><p>{pitch.recipient}{pitch.recipient_email ? ` · ${pitch.recipient_email}` : ""}</p>
+    {pitch && <form id="pitch-followup" onSubmit={saveFollowup} className="space-y-4 border-t pt-6"><h2 className="text-lg font-semibold">Recipient and follow-up · internal only</h2><p>{pitch.recipient}{pitch.recipient_email ? ` · ${pitch.recipient_email}` : ""}</p>
+      {returnToToday && <a href="/today#today-tasks" className="inline-block text-sm underline">← Back to Today</a>}
       <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-1"><span>Status</span><NativeSelect aria-label="Status" value={followup.status} onChange={event => setFollowup({ ...followup, status: event.target.value })}>{["draft", "sent", "replied", "closed"].map(status => <option key={status} value={status}>{status}</option>)}</NativeSelect></label>
         <label className="space-y-1"><span>Date actually sent</span><Input type="date" value={followup.sent_date} onChange={event => setFollowup({ ...followup, sent_date: event.target.value })}/></label>
@@ -144,7 +147,8 @@ export function PitchEditor({ initial, options: initialOptions, replyEmail }: { 
         <label className="space-y-1"><span>Next action</span><Input maxLength={500} value={followup.next_action} onChange={event => setFollowup({ ...followup, next_action: event.target.value })}/></label>
         <label className="space-y-1"><span>Follow-up date</span><Input type="date" value={followup.due_date} onChange={event => setFollowup({ ...followup, due_date: event.target.value })}/></label>
       </fieldset><Button type="submit" disabled={busy}>Save follow-up</Button>
-      {pitch.task_id && <p className="text-sm"><a href="/tasks" className="underline">Manage the follow-up in Tasks</a>{pitch.task_status ? ` · ${pitch.task_status}` : ""}</p>}
+      {followup.status === "closed" && <p className="text-sm text-muted-foreground">Saving a closed pitch completes its follow-up task. The listening link keeps its current access setting.</p>}
+      {pitch.task_id && <p className="text-sm"><a href={`/ops-tasks?task=${encodeURIComponent(pitch.task_id)}`} className="underline">Manage the follow-up in Tasks</a>{pitch.task_status ? ` · ${pitch.task_status}` : ""}</p>}
     </form>}
   </div>;
 }

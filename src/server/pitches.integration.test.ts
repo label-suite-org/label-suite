@@ -92,6 +92,34 @@ describe.skipIf(!enabled)("pitch lifecycle with tenant RLS and a mocked Samply p
     await service.changePitchLink(org, "", saved.id, "revoke", ready.version);
   });
 
+  it("keeps Today follow-ups linked to the pitch and completes them when it closes", async () => {
+    const saved = await asOrg(org, () => service.savePitch(org, draft()));
+    const input = { id: saved.id, expected_version: saved.version, status: "draft", sent_date: null, response_note: "", next_action: "Review recipient selection", due_date: "2026-01-01" };
+    const scheduled = await asOrg(org, () => service.savePitchFollowup(org, input));
+    const { getTodayHubData } = await import("./today");
+    const today = await asOrg(org, () => getTodayHubData(org));
+    expect(today.taskRows.find(task => task.id === scheduled.task_id)).toMatchObject({ pitch_id: saved.id });
+    expect((await asOrg(other, () => getTodayHubData(other))).taskRows.some(task => task.id === scheduled.task_id)).toBe(false);
+    const closed = await asOrg(org, () => service.savePitchFollowup(org, { ...input, expected_version: scheduled.version, status: "closed" }));
+    expect(closed.task_status).toBe("done");
+    expect((await asOrg(org, () => getTodayHubData(org))).taskRows.some(task => task.id === scheduled.task_id)).toBe(false);
+    const reopened = await asOrg(org, () => service.savePitchFollowup(org, { ...input, expected_version: closed.version }));
+    expect(reopened.task_status).toBe("todo");
+    await admin.query("update label_suite.ops_tasks set status='done' where id=$1", [reopened.task_id]);
+    const noted = await asOrg(org, () => service.savePitchFollowup(org, { ...input, expected_version: reopened.version, response_note: "Internal note only" }));
+    expect(noted.task_status).toBe("done");
+  });
+
+  it("clears a follow-up without restoring its old action or deleting task history", async () => {
+    const saved = await asOrg(org, () => service.savePitch(org, draft()));
+    const input = { id: saved.id, expected_version: saved.version, status: "draft", sent_date: null, response_note: "", next_action: "Review pitch", due_date: "2026-01-01" };
+    const scheduled = await asOrg(org, () => service.savePitchFollowup(org, input));
+    const cleared = await asOrg(org, () => service.savePitchFollowup(org, { ...input, expected_version: scheduled.version, next_action: "", due_date: null }));
+    expect(cleared).toMatchObject({ task_id: null, next_action: "", due_date: null });
+    expect((await admin.query("select status,task_name from label_suite.ops_tasks where id=$1", [scheduled.task_id])).rows[0]).toEqual({ status: "done", task_name: input.next_action });
+    expect(await asOrg(org, () => service.getPitch(org, saved.id))).toMatchObject({ next_action: "", due_date: null });
+  });
+
   it("pitches an imported file without a catalogue mapping while excluding missing files", async () => {
     const fileId = `${org}-unmapped`, missingId = `${org}-missing`;
     await admin.query("insert into label_suite.samply_files(id,org_id,samply_project_id,remote_box_id,file_name,sync_status) values($1,$2,$2,$1,'Demo v1.wav','unmatched'),($3,$2,$2,$3,'Missing.wav','missing_remote')", [fileId, org, missingId]);

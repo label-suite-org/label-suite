@@ -150,6 +150,14 @@ catalog visits keep their existing return destination. Work and rights correctio
 
 ## Website-to-Storybook workflow
 
+Pitch follow-up tasks in Today open the pitch's internal follow-up form and retain
+a Back to Today link. Closing a pitch completes its task; reopening it restores
+the retained next action. Clearing the next action and date removes the scheduled
+follow-up while preserving the completed task history. Editing notes alone does
+not reopen a task completed in Tasks. Closing a pitch does not revoke its
+listening link. The Pitches / Follow-up story covers the return path and retained
+edits after a save failure; the integrated browser check covers the Today loop.
+
 Start from the existing website and its source. Display the same component in
 Storybook. When a useful part is inline in a page, extract that markup without
 changing its appearance and make the page call it too. Do not maintain a copied

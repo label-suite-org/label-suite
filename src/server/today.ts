@@ -8,6 +8,7 @@ import {
   campaigns,
   contacts,
   ops_tasks,
+  pitches,
   release_reporting,
   releases,
   reporting_weeks,
@@ -52,6 +53,7 @@ async function loadTodayHubData(orgId: string) {
         owner: ops_tasks.owner,
         due_date: ops_tasks.due_date,
         next_action: ops_tasks.next_action,
+        pitch_id: pitches.id,
         is_overdue: overdue,
         artist_name: artists.name,
         release_title: releases.title,
@@ -61,6 +63,7 @@ async function loadTodayHubData(orgId: string) {
         project_name: budget_projects.name,
       })
       .from(ops_tasks)
+      .leftJoin(pitches, and(eq(pitches.task_id, ops_tasks.id), eq(pitches.org_id, orgId)))
       .leftJoin(artists, and(eq(ops_tasks.linked_artist_id, artists.id), eq(artists.org_id, orgId)))
       .leftJoin(releases, and(eq(ops_tasks.linked_release_id, releases.id), eq(releases.org_id, orgId)))
       .leftJoin(campaigns, and(eq(ops_tasks.linked_campaign_id, campaigns.id), eq(campaigns.org_id, orgId)))
