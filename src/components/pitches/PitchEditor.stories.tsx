@@ -32,7 +32,7 @@ type Story = StoryObj<typeof meta>;
 
 export const ReturnFromToday: Story = {
   play: async ({ canvas }) => {
-    await expect(canvas.getByRole("link", { name: "Back to Today" })).toHaveAttribute("href", "/today#today-tasks");
+    await expect(canvas.getByRole("link", { name: /Back to Today/ })).toHaveAttribute("href", "/today#today-tasks");
     await expect(canvas.getByRole("link", { name: "Manage the follow-up in Tasks" })).toHaveAttribute("href", "/ops-tasks?task=story-task");
     await userEvent.selectOptions(canvas.getByRole("combobox", { name: "Status" }), "closed");
     await expect(canvas.getByText(/Saving a closed pitch completes its follow-up task/)).toBeVisible();
