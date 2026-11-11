@@ -151,3 +151,27 @@ it("keeps release task edits on conflict and offers an explicit reload with disc
   expect(title.value).toBe("Draft artwork request");
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+
+it("opens the task selected from Today and provides a return to its task list", async () => {
+  await render();
+  await act(async () => root.render(<ReleaseTimeline key="from-today" releaseId="release" canManage timeline={timeline} initialTaskId="unphased" returnToToday />));
+  expect((container.querySelector('form input') as HTMLInputElement)?.value).toBe("Find artwork");
+  expect(container.querySelector('a[href="/today#today-tasks"]')?.textContent).toContain("Back to Today");
+});
+
+it("retains an unsaved deadline when cancelling or switching tasks is declined", async () => {
+  const confirm = vi.fn().mockReturnValue(false);
+  vi.stubGlobal("confirm", confirm);
+  await render();
+  await act(async () => (container.querySelector('[aria-label="Edit Find artwork"]') as HTMLButtonElement).click());
+  const deadline = container.querySelector('form input[type="date"]') as HTMLInputElement;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(deadline, "2026-10-20");
+    deadline.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Cancel")!.click());
+  expect((container.querySelector('form input[type="date"]') as HTMLInputElement)?.value).toBe("2026-10-20");
+  await act(async () => (container.querySelector('[aria-label="Edit Approve master"]') as HTMLButtonElement).click());
+  expect((container.querySelector('form input') as HTMLInputElement)?.value).toBe("Find artwork");
+  expect(confirm).toHaveBeenCalledTimes(2);
+});

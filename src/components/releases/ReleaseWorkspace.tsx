@@ -227,10 +227,12 @@ export function ReleaseWorkspace({
   const [routeSearch, setRouteSearch] = useState(initialSearch);
   const [fromToday, setFromToday] = useState(() => new URLSearchParams(initialSearch).get("returnTo") === "today");
   const correctionDirty = useRef(false);
+  const scheduleDirty = useRef(false);
   const correctionTrigger = useRef<HTMLElement | null>(null);
   const currentLocation = useRef("");
   const onCorrectionDirty = useCallback((dirty: boolean) => { correctionDirty.current = dirty; }, []);
-  const confirmDeparture = () => !correctionDirty.current || window.confirm("Leave this correction? Unsaved input will be discarded; an in-flight save may still complete.");
+  const onScheduleDirty = useCallback((dirty: boolean) => { scheduleDirty.current = dirty; }, []);
+  const confirmDeparture = () => scheduleDirty.current ? window.confirm("Leave the schedule? Unsaved edits will be discarded; an in-flight save may still complete.") : !correctionDirty.current || window.confirm("Leave this correction? Unsaved input will be discarded; an in-flight save may still complete.");
   const acceptReadiness = (snapshot: ReleaseReadinessSnapshot) => {
     setReadiness(snapshot);
     setRelease(current => ({ ...current, ...snapshot.release, release_ready: snapshot.readiness.isReady }));
@@ -583,7 +585,7 @@ export function ReleaseWorkspace({
         {activeSection === "details" && <div className="flex justify-end"><ReleaseDeleteButton release={release} /></div>}
 
         {activeSection === "timeline" && <div id="release-timeline" className="scroll-mt-4">
-          <ReleaseTimeline releaseId={release.id} canManage={canManage} timeline={timeline} />
+          <ReleaseTimeline releaseId={release.id} canManage={canManage} timeline={timeline} initialTaskId={new URLSearchParams(routeSearch).get("task")} returnToToday={fromToday} onDirtyChange={onScheduleDirty} />
         </div>}
 
         {activeSection === "tracks" && <div id="release-tracks" className="scroll-mt-16"><Panel

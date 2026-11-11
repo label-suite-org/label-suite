@@ -183,7 +183,7 @@ E2E_BASE_URL="$PUBLIC_SITE_URL" ARTIST_PORTAL_BROWSER_TEST=1 \
 # Correction saves invalidate reviewed campaign snapshots; use a fresh fixture phase.
 npm run release-gate:seed
 E2E_BASE_URL="$PUBLIC_SITE_URL" \
-  npx playwright test tests/release-gate/release-correction.spec.ts tests/release-gate/pitch-followup.spec.ts
+  npx playwright test tests/release-gate/release-correction.spec.ts tests/release-gate/pitch-followup.spec.ts tests/release-gate/release-scheduling.spec.ts
 
 # Catalog creation uses only the disposable fixture and verifies browser return state.
 E2E_BASE_URL="$PUBLIC_SITE_URL" \

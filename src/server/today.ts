@@ -54,6 +54,7 @@ async function loadTodayHubData(orgId: string) {
         due_date: ops_tasks.due_date,
         next_action: ops_tasks.next_action,
         pitch_id: pitches.id,
+        release_id: releases.id,
         is_overdue: overdue,
         artist_name: artists.name,
         release_title: releases.title,
