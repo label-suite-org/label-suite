@@ -43,6 +43,7 @@ it("selects a track for editing and keeps its full checks available on demand", 
     await act(async () => second.click());
     expect(second.getAttribute("aria-pressed")).toBe("true");
     expect(host.querySelector("aside h2")?.textContent).toBe("Second song");
+    expect(host.querySelector("aside a")?.getAttribute("href")).toBe("/works/work-2?release=release-1&track=track-2");
     expect(host.querySelector<HTMLInputElement>("#track-isrc")?.value).toBe("DKABC2600002");
     const checks = [...host.querySelectorAll<HTMLButtonElement>("aside button")].find(button => button.textContent?.includes("Readiness checks"))!;
     expect(checks.getAttribute("aria-expanded")).toBe("false");

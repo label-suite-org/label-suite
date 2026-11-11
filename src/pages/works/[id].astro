@@ -14,6 +14,6 @@ const canMutate = serializeClientCapabilities(Astro.locals.membershipRole ?? "me
 
 <AppLayout>
   {!work ? <p class="text-muted-foreground">Work not found.</p> : (
-    <WorkClearanceWorkspace client:load work={work} roles={roleRows} contacts={contactRows} tracks={trackRows} canMutate={canMutate} />
+    <WorkClearanceWorkspace client:load work={work} roles={roleRows} contacts={contactRows} tracks={trackRows} canMutate={canMutate} initialSearch={Astro.url.search} />
   )}
 </AppLayout>

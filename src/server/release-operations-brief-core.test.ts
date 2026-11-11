@@ -71,7 +71,7 @@ describe("buildReleaseOperationsBrief", () => {
 
     expect(withPublishingClearance.items[0]?.evidence).toMatchObject({
       label: "Publishing clearance",
-      href: "/works/work-pub?scope=publishing&focus=publishing",
+      href: "/works/work-pub?scope=publishing&focus=publishing&release=release-1&track=track-1",
     });
     expect(withAudioMissing.items[0]?.evidence).toMatchObject({
       label: "Audio track track",
@@ -79,7 +79,7 @@ describe("buildReleaseOperationsBrief", () => {
     });
     expect(withCreditMissing.items[0]?.evidence).toMatchObject({
       label: "Credited persons",
-      href: "/works/work-credit?scope=credits&focus=credits",
+      href: "/works/work-credit?scope=credits&focus=credits&release=release-1&track=track-3",
     });
 
     const withMasterClearance = buildReleaseOperationsBrief({
@@ -89,7 +89,7 @@ describe("buildReleaseOperationsBrief", () => {
     });
     expect(withMasterClearance.items[0]?.evidence).toMatchObject({
       label: "Master clearance",
-      href: "/works/work-master?scope=master&focus=master",
+      href: "/works/work-master?scope=master&focus=master&release=release-1&track=track-4",
     });
   });
 
@@ -108,7 +108,7 @@ describe("buildReleaseOperationsBrief", () => {
 
     expect(brief.items[0]?.evidence).toMatchObject({
       label: "Work clearance",
-      href: "/works/work-no-rights?scope=publishing&focus=publishing",
+      href: "/works/work-no-rights?scope=publishing&focus=publishing&release=release-1&track=track-no-rights",
     });
   });
 

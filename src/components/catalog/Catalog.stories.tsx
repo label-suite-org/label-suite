@@ -6,6 +6,8 @@ import { ReleaseRoster } from "../releases/ReleaseRoster";
 import { WorksList } from "../works/WorksList";
 import { ReleaseCreateDialog } from "../releases/ReleaseCreateDialog";
 import { ReleaseForm } from "../releases/ReleaseForm";
+import { TrackEditorWorkspace } from "../tracks/TrackEditorWorkspace";
+import { WorkClearanceWorkspace } from "../works/WorkClearanceWorkspace";
 import { WorkForm } from "../works/WorkForm";
 import { WorkCreateDialog } from "../works/WorkActionButtons";
 import type { ArtistRosterRow } from "../../server/artists";
@@ -246,5 +248,32 @@ export const ReleaseSaveFailure: Story = {
     await expect(await body.findByRole("alert")).toHaveTextContent("Your draft is still here.");
     await expect(title).toHaveValue("Draft release");
     await expect(body.getByRole("button", { name: "Create Release" })).toBeEnabled();
+  },
+};
+
+
+export const TrackCorrections: Story = {
+  render: () => <TrackEditorWorkspace
+    release={{ id: "story-release", title: "Low Tide" }}
+    tracks={[{ id: "story-track", release_id: "story-release", title: "Low Tide", work_id: "story-work", track_ready: false, track_missing: "Audio file, Publishing clearance 25%" }]}
+    works={[{ id: "story-work", title: "Low Tide", isrc: null }]}
+  />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByText("Audio files up to 100 MB.")).toBeVisible();
+    await expect(canvas.getByRole("link", { name: "Edit work and rights" })).toHaveAttribute("href", "/works/story-work?release=story-release&track=story-track");
+  },
+};
+
+export const RightsCorrectionReturn: Story = {
+  render: () => <WorkClearanceWorkspace
+    work={{ id: "story-work", title: "Low Tide" }}
+    roles={[{ id: "story-role", role: "Writer", ownership_type: "Rights", scope: "Publishing", percent_share: 100, clearance_status: "Pending" }]}
+    contacts={[]}
+    tracks={[{ id: "story-track", release_id: "story-release", title: "Low Tide" }]}
+    initialSearch="?release=story-release&track=story-track&returnTo=today"
+  />,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByRole("link", { name: "Back to track" })).toHaveAttribute("href", "/releases/story-release/tracks?track=story-track&focus=work&returnTo=today");
+    await expect(canvas.getByRole("combobox", { name: "Clearance status" })).toHaveValue("Pending");
   },
 };

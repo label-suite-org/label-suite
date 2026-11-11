@@ -28,8 +28,9 @@ let pendingUrlRequests: PendingUrlRequest[] = [];
 let flushScheduled = false;
 
 export async function uploadFileToStorage(file: File, folder: string, context?: StorageAttachmentContext) {
-  const mediaUpload = !context && folder === "media-assets";
-  const maxMegabytes = mediaUpload ? 100 : 25;
+  const uploadKind = context ? undefined : folder === "media-assets" ? "media-asset"
+    : /^releases\/[^/]+\/audio$/.test(folder) ? "track-audio" : undefined;
+  const maxMegabytes = uploadKind ? 100 : 25;
   if (file.size > maxMegabytes * 1024 * 1024) {
     throw new Error(`File is too large. Maximum upload size is ${maxMegabytes} MB.`);
   }
@@ -37,7 +38,7 @@ export async function uploadFileToStorage(file: File, folder: string, context?: 
   const key = `${folder}/${Date.now()}-${safeName}`;
 
   if (context) return uploadFileThroughServer(file, key, context);
-  if (mediaUpload) return uploadFileThroughServer(file, key, undefined, true);
+  if (uploadKind) return uploadFileThroughServer(file, key, undefined, uploadKind);
 
   const signedUploadRes = await fetch("/api/storage/upload-url", {
     method: "POST",
@@ -79,13 +80,13 @@ export async function uploadFileToStorage(file: File, folder: string, context?: 
   return uploadFileThroughServer(file, key);
 }
 
-async function uploadFileThroughServer(file: File, key: string, context?: StorageAttachmentContext, mediaUpload = false) {
+async function uploadFileThroughServer(file: File, key: string, context?: StorageAttachmentContext, uploadKind?: "media-asset" | "track-audio") {
   const form = new FormData();
   if (context) form.set("context", JSON.stringify(context));
   else form.set("key", key);
   form.set("file", file);
 
-  const uploadRes = await fetch(mediaUpload ? "/api/storage/upload?kind=media-asset" : "/api/storage/upload", {
+  const uploadRes = await fetch(uploadKind ? `/api/storage/upload?kind=${uploadKind}` : "/api/storage/upload", {
     method: "POST",
     body: form,
   });

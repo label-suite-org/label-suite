@@ -33,9 +33,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
   try {
     requireSameOrigin(request);
     const capabilityOrgId = requireCapability(locals, "grant_documents.mutate");
-    const mediaUpload = new URL(request.url).searchParams.get("kind") === "media-asset";
-    if (mediaUpload) requireCapability(locals, "operations.mutate");
-    const maxFileBytes = mediaUpload ? MAX_MEDIA_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
+    const kind = new URL(request.url).searchParams.get("kind");
+    const mediaUpload = kind === "media-asset";
+    const trackAudioUpload = kind === "track-audio";
+    const largeUpload = mediaUpload || trackAudioUpload;
+    if (largeUpload) requireCapability(locals, "operations.mutate");
+    const maxFileBytes = largeUpload ? MAX_MEDIA_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
     const form = await (await boundedMultipartRequest(request, maxFileBytes + 1024 * 1024)).formData();
     const contextValue = form.get("context");
     const fileValue = form.get("file");
@@ -44,12 +47,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
       throw new HttpError("File is required", 400);
     }
     if (fileValue.size > maxFileBytes) {
-      throw new HttpError(`File is too large. Maximum upload size is ${mediaUpload ? 100 : 25} MB.`, 413);
+      throw new HttpError(`File is too large. Maximum upload size is ${largeUpload ? 100 : 25} MB.`, 413);
     }
 
     const keyValue = form.get("key");
     if (mediaUpload && (contextValue !== null || typeof keyValue !== "string" || !keyValue.startsWith("media-assets/"))) {
       throw new HttpError("Media uploads require a media-assets storage key and no document context", 400);
+    }
+    if (trackAudioUpload && (contextValue !== null || typeof keyValue !== "string" || !/^releases\/[^/]+\/audio\/[^/]+$/.test(keyValue))) {
+      throw new HttpError("Track audio uploads require a release audio storage key and no document context", 400);
     }
     if (typeof contextValue !== "string" || !contextValue.trim()) {
       if (typeof keyValue !== "string" || !keyValue.trim()) throw new HttpError("Storage key is required", 400);
