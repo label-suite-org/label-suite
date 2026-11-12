@@ -1022,7 +1022,7 @@ function validateWorkflow(workflow, source) {
   const job = workflow.jobs?.["plane-sync"];
   assert.ok(job, "workflow must contain the plane-sync verification job");
   assertExactKeys(job, ["runs-on", "timeout-minutes", "steps"], "plane-sync job");
-  assert.equal(job["runs-on"], "ubuntu-24.04", "plane-sync must use the exact hosted runner");
+  assert.equal(job["runs-on"], "blacksmith-2vcpu-ubuntu-2404", "plane-sync must use the exact managed Blacksmith runner");
   assert.equal(job["timeout-minutes"], 30, "plane-sync timeout must remain bounded at 30 minutes");
   assert.equal(/(?:deploy|dokploy|production)/i.test(JSON.stringify(job)), false, "plane-sync workflow must have no deployment authority");
   assert.equal(job.steps?.length, 3, "plane-sync must contain only checkout, setup-node, and verification steps");
