@@ -533,7 +533,7 @@ export function ReleaseWorkspace({
   };
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className={cn("min-w-0 space-y-6", reviewSelection && "pb-44 md:pb-24")}>
       <ReleaseHeader release={release} coverActive={activeFix === "cover"}
         onOpenCover={() => selectSection("overview", "cover")} canManage={canManage}
         artists={artists} parentReleases={parentReleases} />

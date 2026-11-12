@@ -71,3 +71,25 @@ export const PlayAndSwitch: Story = {
     await expect(canvasElement.querySelector("audio")).toBeNull();
   },
 };
+
+export const LongTracklist: Story = {
+  args: {
+    tracks: Array.from({ length: 6 }, (_, index) => ({
+      ...meta.args.tracks[0], id: `story-track-${index}`, position: index + 1,
+      title: index === 0 ? "Low Tide" : `Session track ${index + 1}`,
+    })),
+  },
+  play: async ({ canvas }) => {
+    await userEvent.click(canvas.getByRole("button", { name: "Review Low Tide" }));
+    const recordings = canvas.getByRole("button", { name: "Samply recordings (3)" });
+    recordings.scrollIntoView({ block: "center" });
+    await waitFor(() => {
+      const rect = recordings.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      expect(hit?.closest("button")).toBe(recordings);
+    });
+    await userEvent.click(recordings);
+    await expect(canvas.getByRole("button", { name: "Play Unmapped demo.wav" })).toBeVisible();
+    await userEvent.click(canvas.getAllByRole("button", { name: "Close reviewer" })[0]);
+  },
+};
