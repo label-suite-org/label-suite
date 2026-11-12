@@ -296,3 +296,51 @@ describe("ReleaseWorkspace", () => {
     }
   });
 });
+
+
+describe("Samply streaming", () => {
+  it("plays the selected catalogue recording, switches versions, and auditions unmapped recordings without fetching a full waveform", async () => {
+    vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
+    const fetchMock = vi.fn(async (_url: RequestInfo | URL) => Response.json({ comments: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const previousUrl = window.location.href;
+    window.history.replaceState(null, "", "/releases/release-1?section=tracks");
+    const host = document.createElement("div"); document.body.append(host);
+    const root = createRoot(host);
+    const inventory = ["first", "second", "demo"].map((id, index) => ({
+      id, trackId: null, trackTitle: null, position: null, version: `v${index + 1}`,
+      remoteBoxId: id, remoteStackId: index < 2 ? "stack" : null,
+      fileName: `${id}.wav`, duration: null, audioUrl: `/api/releases/release-1/samply/files/${id}/download`,
+      syncStatus: "unmatched", lastSyncedAt: null,
+    }));
+    try {
+      await act(async () => root.render(<ReleaseWorkspace
+        release={{ id: "release-1", title: "Fixture" }}
+        tracks={[{ id: "track", title: "Chosen recording", release_id: "release-1", work_id: "work", audio_url: inventory[0].audioUrl }]}
+        budgetItems={[]} pitches={[]} works={[]} artists={[]} cockpit={null} canManage={false} timeline={null} parentReleases={[]} campaigns={[]} documents={[]} mediaAssets={[]}
+        samplyReview={{ project: { id: "project", remoteProjectId: "remote", remoteProjectName: "Demos", uploadEnabled: false, primaryPlayerId: null }, player: null, fileCount: 3, lastSyncedAt: null, artworkUrl: null, inventory }}
+      />));
+      await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Review Chosen recording"]')!.click());
+      expect(host.querySelector("audio")?.getAttribute("src")).toBe(inventory[0].audioUrl);
+      await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "v2")!.click());
+      expect(host.querySelector("audio")?.getAttribute("src")).toBe(inventory[1].audioUrl);
+      await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent?.includes("Samply recordings (3)"))!.click());
+      await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Play demo.wav"]')!.click());
+      expect(host.querySelector("audio")?.getAttribute("src")).toBe(inventory[2].audioUrl);
+      expect(host.querySelector("[data-review-dock]")?.textContent).toContain("demo.wav");
+      expect(play).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls.every(([url]) => String(url).endsWith("/comments"))).toBe(true);
+      await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Close reviewer"]')!.click());
+      expect(pause).toHaveBeenCalledOnce();
+      expect(host.querySelector("audio")).toBeNull();
+    } finally {
+      await act(async () => root.unmount()); host.remove();
+      window.history.replaceState(null, "", previousUrl);
+      vi.restoreAllMocks(); vi.unstubAllGlobals();
+    }
+  });
+});

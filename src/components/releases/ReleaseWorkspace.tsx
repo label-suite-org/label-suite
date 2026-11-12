@@ -172,7 +172,7 @@ type ParsedReleaseRoute = {
 };
 
 interface ReviewSelection {
-  track: TrackRow;
+  track: TrackRow | null;
   version: SamplyReviewState["inventory"][number];
 }
 
@@ -247,6 +247,7 @@ export function ReleaseWorkspace({
   const [reviewCommentsLoading, setReviewCommentsLoading] = useState(false);
   const [reviewCommentsError, setReviewCommentsError] = useState("");
   const [reviewAudioError, setReviewAudioError] = useState("");
+  const [reviewWaveformRequested, setReviewWaveformRequested] = useState(false);
   const [reviewWaveformPeaks, setReviewWaveformPeaks] = useState<number[]>([]);
   const [reviewWaveformLoading, setReviewWaveformLoading] = useState(false);
   const [reviewWaveformError, setReviewWaveformError] = useState("");
@@ -334,7 +335,7 @@ export function ReleaseWorkspace({
 
   useEffect(() => {
     const audioUrl = reviewSelection?.version.audioUrl;
-    if (!audioUrl) {
+    if (!audioUrl || !reviewWaveformRequested) {
       setReviewWaveformPeaks([]);
       setReviewWaveformLoading(false);
       setReviewWaveformError("");
@@ -377,7 +378,7 @@ export function ReleaseWorkspace({
       controller.abort();
       void audioContext?.close().catch(() => {});
     };
-  }, [reviewSelection?.version.audioUrl]);
+  }, [reviewSelection?.version.audioUrl, reviewWaveformRequested]);
 
   useEffect(() => {
     if (!reviewPlaying) return;
@@ -495,8 +496,9 @@ export function ReleaseWorkspace({
     }
     handleFixSelect(key);
   };
-  const handleReviewSelect = (track: TrackRow, version: SamplyReviewState["inventory"][number]) => {
+  const handleReviewSelect = (track: TrackRow | null, version: SamplyReviewState["inventory"][number]) => {
     setReviewAudioError("");
+    setReviewWaveformRequested(false);
     setReviewSelection({ track, version });
     setReviewAutoplay(true);
   };
@@ -607,6 +609,28 @@ export function ReleaseWorkspace({
               activeRemoteBoxId={reviewSelection?.version.remoteBoxId ?? null}
               onReviewSelect={handleReviewSelect}
             />
+            {Boolean(samplyReview?.inventory.length) && (
+              <Accordion><AccordionItem value="samply-recordings" className="border-y border-border">
+                <AccordionTrigger>Samply recordings ({samplyReview!.inventory.length})</AccordionTrigger>
+                <AccordionContent>
+                  <p className="mb-3 text-sm text-muted-foreground">Listen to any version before choosing recordings for the catalogue.</p>
+                  <div className="max-h-96 divide-y divide-border overflow-y-auto">
+                    {samplyReview!.inventory.map((version) => (
+                      <div key={version.remoteBoxId} className="flex items-center gap-3 py-2">
+                        <Button variant="outline" size="icon" aria-label={`Play ${version.fileName}`} disabled={!version.audioUrl}
+                          onClick={() => handleReviewSelect(tracks.find(track => track.id === version.trackId || track.audio_url === version.audioUrl) ?? null, version)}>
+                          <Play className="size-4" />
+                        </Button>
+                        <div className="min-w-0">
+                          <p className="break-words text-sm font-medium">{version.fileName}</p>
+                          <p className="text-xs text-muted-foreground">{version.trackTitle ?? "Samply recording"}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem></Accordion>
+            )}
           </div>
         </Panel></div>}
 
@@ -652,6 +676,8 @@ export function ReleaseWorkspace({
           waveformPeaks={reviewWaveformPeaks}
           waveformLoading={reviewWaveformLoading}
           waveformError={reviewWaveformError}
+          waveformRequested={reviewWaveformRequested}
+          onLoadWaveform={() => setReviewWaveformRequested(true)}
           audioRef={reviewAudioRef}
           playing={reviewPlaying}
           currentTime={reviewCurrentTime}
@@ -1244,14 +1270,6 @@ function TrackTable({
     );
   }
 
-  const versionsByTrack = new Map<string, SamplyReviewState["inventory"]>();
-  for (const item of samplyInventory) {
-    if (!item.trackId) continue;
-    const versions = versionsByTrack.get(item.trackId) ?? [];
-    versions.push(item);
-    versionsByTrack.set(item.trackId, versions);
-  }
-
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <div className="grid grid-cols-[44px_minmax(180px,1fr)_120px_134px_100px_120px] bg-muted/35 px-3 py-2 text-xs font-medium uppercase tracking-normal text-muted-foreground max-xl:hidden">
@@ -1265,7 +1283,9 @@ function TrackTable({
       <div className="divide-y divide-border">
         {tracks.map((track) => {
           const clearance = Math.round((track.clearance_progress ?? 0) * 100);
-          const versions = versionsByTrack.get(track.id) ?? [];
+          const selectedVersion = samplyInventory.find(version => version.audioUrl === track.audio_url);
+          const versions = samplyInventory.filter(version => version.trackId === track.id || version === selectedVersion
+            || (selectedVersion?.remoteStackId && version.remoteStackId === selectedVersion.remoteStackId));
           const primaryVersion = versions.find((version) => version.audioUrl === track.audio_url) ?? versions.at(-1) ?? null;
           const activeOnTrack = versions.some((version) => activeRemoteBoxId === version.remoteBoxId);
           return (
@@ -1347,6 +1367,8 @@ function ReviewPlaybackDock({
   waveformPeaks,
   waveformLoading,
   waveformError,
+  waveformRequested,
+  onLoadWaveform,
   audioRef,
   playing,
   currentTime,
@@ -1367,6 +1389,8 @@ function ReviewPlaybackDock({
   waveformPeaks: number[];
   waveformLoading: boolean;
   waveformError: string;
+  waveformRequested: boolean;
+  onLoadWaveform: () => void;
   audioRef: RefObject<HTMLAudioElement | null>;
   playing: boolean;
   currentTime: number;
@@ -1398,6 +1422,7 @@ function ReviewPlaybackDock({
     <aside data-review-dock className="fixed inset-x-0 bottom-16 z-40 border-t border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[0_-12px_36px_rgba(0,0,0,0.08)] md:bottom-0">
       <audio
         ref={audioRef}
+        preload="metadata"
         src={selection.version.audioUrl ?? undefined}
         onLoadedMetadata={(event) => {
           onDurationChange(event.currentTarget.duration || 0);
@@ -1436,10 +1461,11 @@ function ReviewPlaybackDock({
         <div className="flex min-w-0 flex-1 flex-col px-3 py-2 md:px-4">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-[13px] font-medium leading-tight">{selection.track.title}</p>
+              <p className="truncate text-[13px] font-medium leading-tight">{selection.track?.title ?? selection.version.fileName}</p>
               <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{versionLabel} · {selection.version.fileName}</p>
             </div>
             <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums text-sidebar-foreground/60">
+              {!waveformRequested && <Button variant="ghost" size="sm" onClick={onLoadWaveform} title="Downloads the full recording to draw its waveform">Load waveform</Button>}
               <span data-review-current-time>{formatDuration(currentTime)}</span>
               <span>/</span>
               <span>{displayDuration ? formatDuration(displayDuration) : "--:--"}</span>
@@ -1459,7 +1485,7 @@ function ReviewPlaybackDock({
               return (
                 <div
                   key={comment.id}
-                  className="group/comment absolute inset-y-0 -translate-x-1/2"
+                  className="group/comment absolute inset-y-0 z-10 -translate-x-1/2"
                   style={{ left: `${left}%` }}
                 >
                   <Button
