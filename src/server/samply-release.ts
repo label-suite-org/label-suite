@@ -171,7 +171,6 @@ export async function getReleaseSamplyReview(
       remoteStackId: samply_files.remote_stack_id,
       fileName: samply_files.file_name,
       duration: tracks.duration,
-      audioUrl: tracks.audio_url,
       syncStatus: samply_files.sync_status,
       lastSyncedAt: samply_files.last_synced_at,
     })
@@ -230,7 +229,7 @@ export async function getReleaseSamplyReview(
       remoteStackId: row.remoteStackId ?? null,
       fileName: row.fileName,
       duration: row.duration ?? null,
-      audioUrl: row.audioUrl ?? null,
+      audioUrl: buildReleaseSamplyAudioUrl(releaseId, row.remoteBoxId),
       syncStatus: row.syncStatus,
       lastSyncedAt: row.lastSyncedAt ? row.lastSyncedAt.toISOString() : null,
     })),
