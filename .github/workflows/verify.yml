@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   plane-sync:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -33,7 +33,7 @@ jobs:
           npm run plane-sync:delivery-contract
 
   verify:
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     services:
       database:
@@ -89,7 +89,9 @@ jobs:
         run: |
           # The Azure mirror can trickle packages without triggering APT failover.
           # Keep the runner's official Ubuntu archive/security fallbacks.
-          sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends postgresql-client curl
       - name: Set the checked-out revision artifact

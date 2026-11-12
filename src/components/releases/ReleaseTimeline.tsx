@@ -1,7 +1,7 @@
 import { ReleaseCalendar } from "./ReleaseCalendar";
 import { TaskLabels, emptyPlanningOptions } from "../ops-tasks/TaskPlanningFields";
 import { Check, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { openStatus, type ReleaseTimeline as ReleaseTimelineData, type ReleaseTimelineMilestone, type ReleaseTimelineTask } from "../../server/release-timeline-core";
 import { daysBetween, reschedulePreview, workBucket } from "../../server/release-workback-core";
 import { ReleaseWorkbackBuilder } from "./ReleaseWorkbackBuilder";
@@ -9,13 +9,13 @@ import { ReleaseWorkItemForm } from "./ReleaseWorkItemForm";
 
 import { NativeSelect } from "@/components/ui/native-select";
 import { Button } from "@/components/ui/button";
-type Props = { releaseId: string; canManage: boolean; timeline: ReleaseTimelineData | null };
+type Props = { releaseId: string; canManage: boolean; timeline: ReleaseTimelineData | null; initialTaskId?: string | null; returnToToday?: boolean; onDirtyChange?: (dirty: boolean) => void };
 type WorkItem = (ReleaseTimelineMilestone & { kind: "milestone" }) | (ReleaseTimelineTask & { kind: "task" });
 const buckets = ["Overdue", "Next 7 days", "Upcoming", "Unscheduled", "Done"] as const;
 const money = (amount: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(amount);
 const healthLabel = { blocked: "Blocked", attention: "Needs attention", complete: "Complete", on_track: "On track", not_started: "No work planned" };
 
-export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimeline }: Props) {
+export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimeline, initialTaskId, returnToToday = false, onDirtyChange }: Props) {
   const [timeline, setTimeline] = useState(initialTimeline);
   const [view, setView] = useState("Schedule");
   const [label, setLabel] = useState("");
@@ -29,6 +29,9 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [taskConflict, setTaskConflict] = useState(false);
+  const editorDirty = useRef(false);
+  const onEditorDirty = useCallback((dirty: boolean) => { editorDirty.current = dirty; onDirtyChange?.(dirty); }, [onDirtyChange]);
+  const confirmDeparture = () => !editorDirty.current || window.confirm("Discard unsaved schedule edits?");
 
   const [refreshing, setRefreshing] = useState(true);
   const [refreshError, setRefreshError] = useState("");
@@ -41,7 +44,14 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
         const response = await fetch(`/api/release-milestones?release_id=${encodeURIComponent(releaseId)}`, { cache: "no-store", signal: controller.signal });
         if (!response.ok) throw new Error("Could not refresh the release schedule. Try again before making changes.");
         const current = await response.json();
-        if (!controller.signal.aborted) setTimeline(current);
+        if (!controller.signal.aborted) {
+          setTimeline(current);
+          if (initialTaskId) {
+            const selected = [...current.phases.flatMap((entry: ReleaseTimelineData["phases"][number]) => entry.tasks), ...(current.unphasedTasks ?? [])].find((task: ReleaseTimelineTask) => task.id === initialTaskId);
+            if (selected && canManage) setEditor({ kind: "task", item: { ...selected, kind: "task" } });
+            else setNotice(selected ? `Selected task: ${selected.title}. You have read-only access.` : "This task is no longer linked to this release. Review the current schedule or return to Today.");
+          }
+        }
       } catch (cause) {
         if (!controller.signal.aborted) setRefreshError(cause instanceof Error ? cause.message : "Could not refresh the release schedule.");
       } finally {
@@ -49,7 +59,7 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
       }
     })();
     return () => controller.abort();
-  }, [releaseId, refreshAttempt]);
+  }, [releaseId, refreshAttempt, initialTaskId, canManage]);
 
   if (refreshing || refreshError || !timeline) return <section className="border border-border p-3" aria-label="Release schedule"><h2 className="text-sm font-semibold">Release schedule</h2><p role={refreshError ? "alert" : "status"} className="mt-1 text-sm text-muted-foreground">{refreshing ? "Refreshing release schedule…" : refreshError || "Schedule data is unavailable."}</p>{!refreshing && <Button type="button" onClick={() => setRefreshAttempt((attempt) => attempt + 1)}>Retry</Button>}</section>;
 
@@ -92,8 +102,8 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not save your change."); return false; }
     finally { setBusy(false); }
   };
-  const edit = (kind: "task" | "milestone", item?: WorkItem) => { setEditor({ kind, item }); setBuilder(false); setError(""); };
-  const closeEditor = () => setEditor(null);
+  const edit = (kind: "task" | "milestone", item?: WorkItem) => { if (!confirmDeparture()) return; setEditor({ kind, item }); setBuilder(false); setError(""); };
+  const closeEditor = (saved = false) => { if (saved || confirmDeparture()) { setEditor(null); onEditorDirty(false); } };
   const renderItem = (item: WorkItem) => {
           const done = !openStatus(item.status);
           const parent = item.kind === "task" ? milestones.find((entry) => entry.id === item.milestoneId) : null;
@@ -114,9 +124,10 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
           </li>;
   };
   return <section className="space-y-4 border border-border bg-background p-3 sm:p-4" aria-label="Release schedule">
+    {returnToToday && <a className="inline-block text-sm underline" href="/today#today-tasks">← Back to Today</a>}
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="font-semibold">Release schedule</h2><p className="mt-1 text-sm text-muted-foreground">{timeline.releaseDate ? `${timeline.releaseDate} · ${daysBetween(timeline.today, timeline.releaseDate) >= 0 ? `${daysBetween(timeline.today, timeline.releaseDate)} days to release` : `${-daysBetween(timeline.today, timeline.releaseDate)} days since release`}` : "Set a release date to plan backwards."}</p></div>
-      <div className="flex flex-wrap gap-2"><a className="min-h-9 border border-border px-3 py-2 text-xs" href="/ops-tasks">All tasks</a>{canManage && <Button disabled={busy || taskConflict || !timeline.releaseDate} className="min-h-9 bg-primary px-3 text-xs text-primary-foreground disabled:opacity-50" type="button" onClick={() => { setBuilder(!builder); setEditor(null); }}>Add suggested tasks</Button>}</div>
+      <div className="flex flex-wrap gap-2"><a className="min-h-9 border border-border px-3 py-2 text-xs" href="/ops-tasks">All tasks</a>{canManage && <Button disabled={busy || taskConflict || !timeline.releaseDate} className="min-h-9 bg-primary px-3 text-xs text-primary-foreground disabled:opacity-50" type="button" onClick={() => { if (!confirmDeparture()) return; setBuilder(!builder); setEditor(null); }}>Add suggested tasks</Button>}</div>
     </header>
     <ReleaseCalendar releaseId={releaseId} canManage={canManage} />
     <section aria-label="Release dates and milestones" className="overflow-x-auto border border-border">
@@ -153,7 +164,7 @@ export function ReleaseTimeline({ releaseId, canManage, timeline: initialTimelin
       <label className="text-xs">Assignee<NativeSelect className="ml-2 min-h-9 max-w-48 border border-input bg-background px-2" value={owner} onChange={(event) => setOwner(event.target.value)}><option value="">Everyone</option><option value="unassigned">Unassigned</option>{options.members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}{Array.from(new Set(items.map((item) => item.owner).filter((value): value is string => !!value?.trim()))).sort().map((value) => <option key={value}>{value}</option>)}</NativeSelect></label><label className="text-xs">Label<NativeSelect className="ml-2 min-h-9 border border-input bg-background px-2" value={label} onChange={(event) => setLabel(event.target.value)}><option value="">All labels</option>{Array.from(new Set(tasks.flatMap((task) => task.labels ?? []))).sort().map((value) => <option key={value}>{value}</option>)}</NativeSelect></label></div>
       {canManage && <div className="flex gap-2"><Button disabled={busy || taskConflict} type="button" onClick={() => edit("milestone")} className="min-h-8 px-2 text-xs font-medium"><Plus className="mr-1 inline size-4" />Milestone</Button><Button disabled={busy || taskConflict} type="button" onClick={() => edit("task")} className="min-h-8 px-2 text-xs font-medium"><Plus className="mr-1 inline size-4" />Task</Button></div>}
     </div>
-    {editor && <ReleaseWorkItemForm key={`${editor.kind}-${editor.item?.id ?? "new"}`} kind={editor.kind} item={editor.item} phase={phaseDetail?.key ?? ""} releaseDate={timeline.releaseDate} milestones={milestones} planningOptions={{ ...options, tasks: knownTasks }} busy={busy || taskConflict} onClose={closeEditor} onSave={(payload) => mutate(editor.kind === "task" ? "/api/ops-tasks" : "/api/release-milestones", editor.item ? "PUT" : "POST", { ...payload, ...(editor.item ? { id: editor.item.id, ...(editor.item.kind === "task" ? { expected_revision: editor.item.revision } : {}) } : editor.kind === "task" ? { linked_release_id: releaseId } : { release_id: releaseId }) })} />}
+    {editor && <ReleaseWorkItemForm key={`${editor.kind}-${editor.item?.id ?? "new"}`} kind={editor.kind} item={editor.item} phase={phaseDetail?.key ?? ""} releaseDate={timeline.releaseDate} milestones={milestones} planningOptions={{ ...options, tasks: knownTasks }} busy={busy || taskConflict} onDirtyChange={onEditorDirty} onClose={closeEditor} onSave={(payload) => mutate(editor.kind === "task" ? "/api/ops-tasks" : "/api/release-milestones", editor.item ? "PUT" : "POST", { ...payload, ...(editor.item ? { id: editor.item.id, ...(editor.item.kind === "task" ? { expected_revision: editor.item.revision } : {}) } : editor.kind === "task" ? { linked_release_id: releaseId } : { release_id: releaseId }) })} />}
     {!visible.length && <p className="py-5 text-sm text-muted-foreground">{items.length ? "No work matches these filters." : "No work planned yet. Add a task or add suggested tasks to get started."}</p>}
     {view === "Board" ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">{[{ key: "todo", title: "To do" }, { key: "in_progress", title: "In progress" }, { key: "blocked", title: "Blocked" }, { key: "done", title: "Done" }].map((column) => {
       const rows = visible.filter((item) => item.kind === "task" && boardStatus(item) === column.key);
