@@ -1485,7 +1485,7 @@ function ReviewPlaybackDock({
               return (
                 <div
                   key={comment.id}
-                  className="group/comment absolute inset-y-0 -translate-x-1/2"
+                  className="group/comment absolute inset-y-0 z-10 -translate-x-1/2"
                   style={{ left: `${left}%` }}
                 >
                   <Button
