@@ -40,6 +40,8 @@ export async function reviewRoyaltyStatement(orgId: string, statementId: string,
             where current_split_role.org_id = ${orgId} and current_split_role.work_id = earning.work_id
               and current_split_role.scope = 'Master' and current_split_role.ownership_type = 'Rights') = 100
           and earning.currency = ${statement.currency}
+          and upper(trim(coalesce(earning.usage_type, ''))) <> 'MPAY'
+          and lower(trim(coalesce(earning.revenue_stream, ''))) <> 'mechanical'
           and earning.updated_at <= line.created_at, false))
         and ${statement.opening_balance}::numeric = 0
         and ${statement.adjustments_amount}::numeric = 0 and ${statement.payout_amount}::numeric = 0
@@ -67,8 +69,8 @@ export async function reviewRoyaltyStatement(orgId: string, statementId: string,
       const runId = /^Calculation run (royalty_calculation_[a-f0-9]{24})$/.exec(statement.notes ?? "")?.[1];
       if (!runId) throw new ConflictError("Statement calculation evidence is missing");
       // The notes field is editable; prove its run id against current calculation inputs.
-      const earnings = await tx.execute<{ id: string; work_id: string | null; report_period: string; currency: string; net_amount: string }>(sql`
-        select id, work_id, report_period, currency, net_amount from label_suite.royalty_earnings
+      const earnings = await tx.execute<{ id: string; work_id: string | null; report_period: string; currency: string; net_amount: string; usage_type: string | null; revenue_stream: string | null }>(sql`
+        select id, work_id, report_period, currency, net_amount, usage_type, revenue_stream from label_suite.royalty_earnings
         where org_id = ${orgId} and currency = ${statement.currency}
           and report_period >= ${statement.period_start.slice(0, 7)} and report_period <= ${statement.period_end.slice(0, 7)}
         order by id for update`);
@@ -81,7 +83,7 @@ export async function reviewRoyaltyStatement(orgId: string, statementId: string,
               and report_period >= ${statement.period_start.slice(0, 7)} and report_period <= ${statement.period_end.slice(0, 7)})
         order by role.id for share of role`);
       const signature = JSON.stringify({
-        earnings: earnings.rows.map(row => [row.id, row.work_id, row.report_period, row.currency, row.net_amount]).sort(),
+        earnings: earnings.rows.map(row => [row.id, row.work_id, row.report_period, row.currency, row.net_amount, row.usage_type, row.revenue_stream]).sort(),
         roles: roles.rows.map(row => [row.id, row.work_id, row.contact_id, row.percent_share, row.payee_name])
           .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
       });

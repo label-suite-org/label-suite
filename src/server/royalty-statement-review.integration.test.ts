@@ -29,6 +29,7 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
       await sql`insert into label_suite.works (id,org_id,title) values (${id},${org},'Synthetic work')`;
       await sql`insert into label_suite.roles (id,org_id,contact_id,work_id,scope,ownership_type,percent_share) values (${id},${org},${id},${id},'Master','Rights',100)`;
       await sql`insert into label_suite.royalty_earnings (id,org_id,source,source_row_id,work_id,report_period,currency,net_amount) values (${id},${org},'fixture',${id},${id},'2026-08','USD',1)`;
+      await sql`insert into label_suite.royalty_earnings (id,org_id,source,source_row_id,work_id,report_period,currency,net_amount,usage_type,revenue_stream) values (${id+'-mechanical'},${org},'fixture',${id+'-mechanical'},${id},'2026-08','USD',0.25,'MPAY','download')`;
     }
   });
   // Issued records are append-only; retain synthetic rows in the disposable database.
@@ -36,6 +37,10 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
   it("verifies provenance, posts concurrent statements once, and rejects overlapping allocation", async () => {
     const input = { period_start: '2026-08-01', period_end: '2026-08-31', currency: 'USD' };
     const prepared = await prepare(org,input);
+    expect(prepared.sourceTotal).toBe('2.50000000');
+    expect(prepared.allocatedTotal).toBe('2.00000000');
+    expect(prepared.blockers).toHaveLength(2);
+    expect(prepared.blockers).toEqual(expect.arrayContaining(['a','b'].map(suffix => expect.objectContaining({ earningId: org+suffix+'-mechanical', reason: 'mechanical_income' }))));
     const { royalty_statements } = await import('../db/schema');
     const { eq } = await import('drizzle-orm');
     const read = async (id: string) => (await database.db.select().from(royalty_statements).where(eq(royalty_statements.id,id)))[0]!;
@@ -103,7 +108,7 @@ describe.skipIf(process.env.CI !== "true")("statement issuance on disposable Pos
     await sql`insert into label_suite.royalty_ledger_transactions (id,org_id,idempotency_key,effective_date) values (${org+'draft'},${org},${org+'draft'},'2026-09-02')`;
     await sql`insert into label_suite.royalty_ledger_entries (id,org_id,transaction_id,contact_id,entry_type,amount,currency,effective_date) values (${org+'draft'},${org},${org+'draft'},${issued[0].contact_id},'adjustment',99,'USD','2026-09-02')`;
     const summary = await readScoped(() => getRoyaltyPipelineSummary(org));
-    expect(summary.earningTotals).toEqual([{currency:'EUR',amount:'3.00000000'},{currency:'USD',amount:'2.00000000'}]);
+    expect(summary.earningTotals).toEqual([{currency:'EUR',amount:'3.00000000'},{currency:'USD',amount:'2.50000000'}]);
     expect(summary.postedTotals).toEqual([{currency:'USD',amount:'1.60000000'}]);
     const { getPayeePortalData } = await import('./payee-portal');
     const payeeEmail = `${issued[0].contact_id}@example.test`;

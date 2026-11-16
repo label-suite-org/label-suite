@@ -66,6 +66,8 @@ export async function prepareRoyaltyStatements(orgId: string, input: PrepareRoya
         netAmount: royalty_earnings.net_amount,
         title: royalty_earnings.track_title,
         platform: royalty_earnings.platform,
+        usageType: royalty_earnings.usage_type,
+        revenueStream: royalty_earnings.revenue_stream,
       })
       .from(royalty_earnings)
       .where(and(
@@ -101,7 +103,7 @@ export async function prepareRoyaltyStatements(orgId: string, input: PrepareRoya
       .map((row) => [row.id, row.workId, row.contactId, row.sharePercent, row.payeeName])
       .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
     const sourceSignature = JSON.stringify({
-      earnings: earningRows.map((row) => [row.id, row.workId, row.reportPeriod, row.currency, row.netAmount]).sort(),
+      earnings: earningRows.map((row) => [row.id, row.workId, row.reportPeriod, row.currency, row.netAmount, row.usageType, row.revenueStream]).sort(),
       roles: roleSignature,
     });
     const calculationRunId = buildCalculationRunId(orgId, input.period_start, input.period_end, input.currency, sourceSignature);
@@ -164,6 +166,8 @@ export async function prepareRoyaltyStatements(orgId: string, input: PrepareRoya
         netAmount: String(row.netAmount),
         title: row.title,
         platform: row.platform,
+        usageType: row.usageType,
+        revenueStream: row.revenueStream,
       })),
       splitsByWork,
     });
