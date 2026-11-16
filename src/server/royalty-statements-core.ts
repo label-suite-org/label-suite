@@ -12,6 +12,8 @@ export interface StatementEarningInput {
   netAmount: string;
   title: string | null;
   platform: string | null;
+  usageType: string | null;
+  revenueStream: string | null;
 }
 
 export interface StatementSplitInput {
@@ -45,7 +47,7 @@ export interface StatementPlan {
 
 export interface StatementBlocker {
   earningId: string;
-  reason: "missing_work" | "missing_master_splits" | "unbalanced_master_splits" | "missing_payee";
+  reason: "missing_work" | "missing_master_splits" | "unbalanced_master_splits" | "missing_payee" | "mechanical_income";
   detail: string;
 }
 
@@ -88,6 +90,10 @@ export function prepareStatementPlans(input: PrepareStatementPlansInput): Statem
 
     const sourceAmount = money(earning.netAmount);
     sourceTotal = sourceTotal.plus(sourceAmount);
+    if (earning.usageType?.trim().toUpperCase() === "MPAY" || earning.revenueStream?.trim().toLowerCase() === "mechanical") {
+      blockers.push({ earningId: earning.earningId, reason: "mechanical_income", detail: `Mechanical income (${formatMoney(sourceAmount)} ${earning.currency}) is excluded from Master statements` });
+      continue;
+    }
     const workId = earning.workId;
     if (!workId) {
       blockers.push({ earningId: earning.earningId, reason: "missing_work", detail: "Earning has no canonical work match" });

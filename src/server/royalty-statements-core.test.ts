@@ -10,6 +10,8 @@ function earning(overrides: Partial<Parameters<typeof prepareStatementPlans>[0][
     netAmount: "1.01000000",
     title: "Track One",
     platform: "Spotify",
+    usageType: "EPAY",
+    revenueStream: "streaming",
     ...overrides,
   };
 }
@@ -19,6 +21,28 @@ function split(splitLineId: string, contactId: string, sharePercent: string | nu
 }
 
 describe("royalty statement preparation", () => {
+  it.each([
+    { usageType: "MPAY", revenueStream: "download" },
+    { usageType: null, revenueStream: "mechanical" },
+  ])("keeps mechanical source evidence out of Master allocations: %j", (classification) => {
+    const result = prepareStatementPlans({
+      orgId: "org-a",
+      periodStart: "2026-01-01",
+      periodEnd: "2026-01-31",
+      earnings: [earning(), earning({ earningId: "mechanical-1", netAmount: "0.25000000", ...classification })],
+      splitsByWork: new Map([["work-1", [split("split-a", "contact-a", "100")]]]),
+    });
+
+    expect(result.sourceTotal).toBe("1.26000000");
+    expect(result.allocatedTotal).toBe("1.01000000");
+    expect(result.plans[0]?.lines.map((line) => line.earningId)).toEqual(["earning-1"]);
+    expect(result.blockers).toEqual([{
+      earningId: "mechanical-1",
+      reason: "mechanical_income",
+      detail: "Mechanical income (0.25000000 USD) is excluded from Master statements",
+    }]);
+  });
+
   it("allocates exact source totals across payee statement lines", () => {
     const result = prepareStatementPlans({
       orgId: "org-a",
