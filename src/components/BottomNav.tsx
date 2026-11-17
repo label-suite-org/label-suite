@@ -21,6 +21,9 @@ import {
   HandCoins,
   PlugZap,
   CircleHelp,
+  Settings,
+  FolderKanban,
+  ShieldCheck,
 } from "lucide-react";
 import {
   APP_NAV_ITEMS,
@@ -65,6 +68,9 @@ const navIcons = {
   budget: DollarSign,
   integrations: PlugZap,
   help: CircleHelp,
+  sync: Music,
+  projects: FolderKanban,
+  "data-quality": ShieldCheck,
 } as const;
 
 const PRIMARY = APP_NAV_PRIMARY_ITEMS as readonly AppNavItem[];
@@ -109,7 +115,7 @@ export function BottomNav() {
       items.findIndex((candidate) => candidate.id === item.id) === index,
   );
 
-  const moreActive = topLevelMoreItems.some((item) =>
+  const moreActive = isActive("/settings") || topLevelMoreItems.some((item) =>
     isMenuActive(currentUrl, item, MORE),
   );
 
@@ -122,7 +128,8 @@ export function BottomNav() {
     <>
       {/* Bottom tab bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-end border-t border-border bg-background md:hidden"
+        aria-label="Main navigation"
+        className="fixed bottom-0 left-0 right-0 z-50 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-end border-t border-border bg-card md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {PRIMARY.map((item) => {
@@ -138,9 +145,9 @@ export function BottomNav() {
                   : undefined
               }
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                "flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-none px-0 py-2 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                 active
-                  ? "text-foreground"
+                  ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -161,9 +168,9 @@ export function BottomNav() {
                 variant="ghost"
                 aria-expanded={open}
                 className={cn(
-                  "flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors",
+                  "flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-none px-0 py-2 text-[10px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                   moreActive
-                    ? "text-foreground"
+                    ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -203,6 +210,16 @@ export function BottomNav() {
                   <span>Search</span>
                 </Button>
 
+                <Button
+                  variant="ghost"
+                  className={cn("min-h-11 w-full justify-start gap-2 px-4", isActive("/settings") && "bg-accent text-accent-foreground")}
+                  nativeButton={false}
+                  render={<a href="/settings" aria-current={isCurrentNavPage(currentUrl, "/settings") ? "page" : undefined} onClick={() => setOpen(false)} />}
+                >
+                  <Settings className="size-4" aria-hidden="true" />
+                  Settings
+                </Button>
+
                 {topLevelMoreItems.map((item) => {
                   const active = isMenuActive(currentUrl, item, MORE);
                   const children = MORE.filter(
@@ -214,7 +231,7 @@ export function BottomNav() {
                   return (
                     <div
                       key={item.id}
-                      className="rounded-xl border border-border/70 bg-background/60 p-2"
+                      className="border-b border-border/70 pb-2"
                     >
                       <a
                         href={navItemHref(item, currentUrl)}
@@ -228,9 +245,9 @@ export function BottomNav() {
                             : undefined
                         }
                         className={cn(
-                          "mb-2 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-semibold transition-colors",
+                          "flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           active
-                            ? "bg-accent text-foreground"
+                            ? "bg-accent text-accent-foreground"
                             : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                         )}
                       >
@@ -243,7 +260,7 @@ export function BottomNav() {
                       </a>
 
                       {isParent ? (
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="mt-2 grid grid-cols-2 gap-2">
                           {children.map((child) => {
                             const childHref = navItemHref(child, currentUrl);
                             const childActive = isCurrentNavPage(
@@ -262,7 +279,7 @@ export function BottomNav() {
                                 className={cn(
                                   "flex flex-col items-center gap-1 rounded-lg px-1 py-2.5 text-center text-[11px] font-medium transition-colors active:scale-95",
                                   childActive
-                                    ? "bg-accent text-foreground"
+                                    ? "bg-accent text-accent-foreground"
                                     : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                                 )}
                               >

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ArrowUpRight, SlidersHorizontal } from "lucide-react";
 import type {
   DashboardPreferences,
   DashboardSectionId,
@@ -172,11 +173,11 @@ export function PersonalDashboard({
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
-        <div><p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Workspace</p><h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1><p className="mt-2 text-sm text-muted-foreground">{model.setup ? "Your artists, releases, and next steps — together." : "What needs your attention, and what comes next."}</p></div>
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div><h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1><p className="mt-2 text-sm text-muted-foreground">{model.setup ? "Your artists, releases, and next steps — together." : "What needs your attention, and what comes next."}</p></div>
         <Sheet open={open} onOpenChange={setEditorOpen}>
-          <SheetTrigger render={<Button variant="ghost" type="button" className="min-h-11 px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />}>Edit dashboard</SheetTrigger>
+          <SheetTrigger render={<Button variant="outline" type="button" className="min-h-11 gap-2 bg-card px-3" />}><SlidersHorizontal className="size-4" aria-hidden="true" />Edit dashboard</SheetTrigger>
           <SheetContent className="w-full sm:max-w-md">
             <SheetHeader>
               <SheetTitle>Edit dashboard</SheetTitle>
@@ -288,49 +289,44 @@ export function PersonalDashboard({
       </header>
 
       {model.setup ? (
-        <section aria-labelledby="setup-title" className="grid gap-8 border-b border-border py-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-16 lg:py-10">
+        <section aria-labelledby="setup-title" className="grid gap-6 rounded-xl border border-border bg-card p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Getting started</p>
-            <h2 id="setup-title" className="mt-4 max-w-sm text-3xl font-semibold leading-tight tracking-tight">{model.setup.hasArtists ? "Give your first release a home." : "Start with your artists."}</h2>
+            <p className="text-xs font-medium text-muted-foreground">Getting started</p>
+            <h2 id="setup-title" className="mt-2 max-w-sm text-xl font-semibold leading-tight tracking-tight">{model.setup.hasArtists ? "Give your first release a home." : "Start with your artists."}</h2>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">{canMutate ? "Add an artist, bring in a release, then plan the work around it. You can fill in the details as you go." : "Your workspace is ready for its first records. An owner or operator can add artists, releases, and tasks."}</p>
-            <a href={model.setup.hasArtists ? "/releases" : "/artists"} className="mt-6 inline-flex min-h-11 items-center gap-6 bg-foreground px-5 py-3 text-sm font-medium text-background hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">{canMutate ? model.setup.hasArtists ? "Create your first release" : "Add your first artist" : "Explore the roster"}<span aria-hidden="true">→</span></a>
+            <a href={model.setup.hasArtists ? "/releases" : "/artists"} className="mt-4 inline-flex min-h-11 items-center gap-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">{canMutate ? model.setup.hasArtists ? "Create your first release" : "Add your first artist" : "Explore the roster"}<span aria-hidden="true">→</span></a>
           </div>
           <ol className="divide-y divide-border border-t border-border">
-            <li><a href="/artists" className="flex gap-4 py-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="pt-1 text-xs tabular-nums text-muted-foreground">01</span><div><h3 className="font-semibold">{model.setup.hasArtists ? "Your roster has started" : "Add an artist"}</h3><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{model.setup.hasArtists ? "Keep building your roster, or move on to a release." : "A name is enough to begin. Add a photo and profile details when ready."}</p></div><span aria-hidden="true" className="ml-auto">↗</span></a></li>
-            <li><a href="/releases" className="flex gap-4 py-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="pt-1 text-xs tabular-nums text-muted-foreground">02</span><div><h3 className="font-semibold">Create a release</h3><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Bring the music, artwork, and release details together.</p></div><span aria-hidden="true" className="ml-auto">↗</span></a></li>
-            <li><a href="/ops-tasks" className="flex gap-4 py-5 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="pt-1 text-xs tabular-nums text-muted-foreground">03</span><div><h3 className="font-semibold">Plan the next task</h3><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Choose what needs doing next and give it a deadline.</p></div><span aria-hidden="true" className="ml-auto">↗</span></a></li>
+            <li><a href="/artists" className="flex gap-3 py-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs tabular-nums text-accent-foreground">01</span><div><h3 className="font-semibold">{model.setup.hasArtists ? "Your roster has started" : "Add an artist"}</h3><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{model.setup.hasArtists ? "Keep building your roster, or move on to a release." : "A name is enough to begin. Add a photo and profile details when ready."}</p></div><span aria-hidden="true" className="ml-auto">↗</span></a></li>
+            <li><a href="/releases" className="flex gap-3 py-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs tabular-nums text-accent-foreground">02</span><div><h3 className="font-semibold">Create a release</h3><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Bring the music, artwork, and release details together.</p></div><span aria-hidden="true" className="ml-auto">↗</span></a></li>
+            <li><a href="/ops-tasks" className="flex gap-3 py-4 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs tabular-nums text-accent-foreground">03</span><div><h3 className="font-semibold">Plan the next task</h3><p className="mt-1 text-sm leading-relaxed text-muted-foreground">Choose what needs doing next and give it a deadline.</p></div><span aria-hidden="true" className="ml-auto">↗</span></a></li>
           </ol>
           <p className="text-sm text-muted-foreground lg:col-span-2">Release readiness and priorities will appear here as your workspace takes shape. <a href="/analytics?section=data-health" className="underline underline-offset-4 hover:text-foreground">Import analytics when you’re ready.</a></p>
         </section>
       ) : <>
       <section aria-labelledby="attention-title" className="space-y-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Today
           </p>
-          <h2 id="attention-title" className="mt-1 text-xl font-semibold">
+          <h2 id="attention-title" className="mt-1 text-base font-semibold">
             Needs attention
           </h2>
         </div>
         {model.attention.length ? (
-          <div className="space-y-2">
+          <div className="divide-y divide-border rounded-xl border border-border bg-card">
             {model.attention.map((item) => {
               const badge =
                 urgencyBadge[item.urgency as keyof typeof urgencyBadge] ??
                 urgencyBadge.normal;
               return (
-                <Card
+                <div
                   key={item.id}
-                  className={
-                    item.urgency === "critical"
-                      ? "border-destructive/30 bg-destructive/5"
-                      : undefined
-                  }
+                  className={item.urgency === "critical" ? "rounded-xl bg-destructive/5" : undefined}
                 >
-                  <CardContent>
                     <a
                       href={item.href}
-                      className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                      className="grid gap-2 rounded-lg p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
                     >
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -354,13 +350,12 @@ export function PersonalDashboard({
                         </span>
                       )}
                     </a>
-                  </CardContent>
-                </Card>
+                </div>
               );
             })}
           </div>
         ) : (
-          <p className="p-5 text-sm text-muted-foreground">
+          <p className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
             Nothing needs immediate attention.
           </p>
         )}
@@ -374,11 +369,11 @@ export function PersonalDashboard({
           {indicators.map((item) => (
             <Card
               key={item.id}
-              className="transition-colors hover:bg-accent/45"
+              className="gap-0 py-0 transition-colors hover:ring-primary/40"
             >
-              <CardContent>
-                <a href={item.href} className="block">
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
+              <CardContent className="p-0">
+                <a href={item.href} className="block rounded-xl p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                  <p className="flex items-center justify-between gap-3 text-xs text-muted-foreground">{item.label}<ArrowUpRight className="size-4 shrink-0 text-primary" aria-hidden="true" /></p>
                   <p className="mt-2 text-2xl font-semibold tabular-nums">
                     {item.value}
                   </p>
@@ -394,7 +389,7 @@ export function PersonalDashboard({
 
       <div className="grid gap-6 xl:grid-cols-2">
         {sections.map((section) => (
-          <Card key={section.id}>
+          <Card key={section.id} role="region" aria-labelledby={`section-${section.id}`} className="gap-0 py-0">
             <div className="flex items-start justify-between gap-3 p-4">
               <div>
                 <h2 id={`section-${section.id}`} className="font-semibold">
@@ -406,9 +401,9 @@ export function PersonalDashboard({
               </div>
               <a
                 href={section.href}
-                className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                View all
+                View all <ArrowUpRight className="size-3" aria-hidden="true" />
               </a>
             </div>
             <CardContent className="border-t border-border/60 p-0">
@@ -418,13 +413,13 @@ export function PersonalDashboard({
                     <a
                       key={row.id}
                       href={row.href}
-                      className="grid gap-1 px-4 py-3 transition-colors hover:bg-accent/45 sm:grid-cols-[minmax(0,1fr)_auto]"
+                      className="grid gap-1 px-4 py-3 transition-colors hover:bg-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1fr)_auto]"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
+                        <p className="break-words text-sm font-medium">
                           {row.title}
                         </p>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                        <p className="mt-1 break-words text-xs text-muted-foreground">
                           {row.detail}
                         </p>
                       </div>

@@ -95,6 +95,11 @@ describe("app navigation manifest", () => {
   });
 });
 
+it("keeps context-required pitches out of global navigation and commands", () => {
+  expect(NAV_ITEMS.some((item) => item.url === "/pitches")).toBe(false);
+  expect(STATIC_COMMANDS.some((item) => item.href === "/pitches")).toBe(false);
+});
+
 describe("safeInternalPath", () => {
   it.each([
     ["/invite/continue", "/invite/continue"],

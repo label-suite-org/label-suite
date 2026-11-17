@@ -42,6 +42,8 @@ import {
   PlugZap,
   CircleHelp,
   ChevronDown,
+  FolderKanban,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { APP_NAV_ITEMS, APP_NAV_SECTIONS, isActiveNavRoute, isCurrentNavPage, navItemHref, type AppNavItem } from "@/lib/navigation";
@@ -70,6 +72,9 @@ const navIcons: Record<string, LucideIcon> = {
   grants: HandCoins,
   integrations: PlugZap,
   help: CircleHelp,
+  projects: FolderKanban,
+  "data-quality": ShieldCheck,
+  catalog: Disc3,
 };
 
 const NAV_ITEMS = APP_NAV_ITEMS as readonly AppNavItem[];
@@ -125,9 +130,9 @@ export function AppSidebar({
               className="flex min-w-0 flex-col gap-0.5 group-data-[collapsible=icon]:hidden"
             >
               <span className="truncate text-sm font-semibold leading-tight tracking-tight">
-                {orgName}
+                Label Suite
               </span>
-              <span className="truncate text-xs text-sidebar-foreground">Workspace</span>
+              <span className="truncate text-xs text-muted-foreground" title={orgName}>{orgName}</span>
             </span>
           </TooltipTrigger>
           <TooltipContent side="right" align="center">
@@ -136,7 +141,7 @@ export function AppSidebar({
         </Tooltip>
         <SidebarTrigger className="absolute right-2 top-4 transition-[background-color,color,transform] duration-200 ease-out hover:scale-105 group-data-[collapsible=icon]:left-1/2 group-data-[collapsible=icon]:bottom-2 group-data-[collapsible=icon]:top-auto group-data-[collapsible=icon]:-translate-x-1/2" />
       </SidebarHeader>
-      <SidebarContent className="px-1 py-2 group-data-[collapsible=icon]:px-0">
+      <SidebarContent className="px-2 py-3 group-data-[collapsible=icon]:px-0">
         {APP_NAV_SECTIONS.map((section) => {
           const sectionItems = NAV_ITEMS.filter((item) => item.section === section.id);
           const childrenByParent = NAV_ITEMS.reduce<Map<string, AppNavItem[]>>((buckets, item) => {
@@ -183,7 +188,7 @@ export function AppSidebar({
                           tooltip={item.title}
                           isActive={isActive}
                           data-sidebar-hover="button"
-                          className="h-8 gap-2.5 px-2 text-[13px] transition-colors group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!"
+                          className="h-9 gap-3 rounded-md px-3 text-[13px] transition-colors data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0!"
                         >
                           <Icon className="size-4" />
                           <span data-sidebar-hover="label" className="group-data-[collapsible=icon]:hidden">
@@ -230,7 +235,7 @@ export function AppSidebar({
         })}
       </SidebarContent>
       <SidebarFooter className="mt-auto border-t border-sidebar-border/70 p-2 group-data-[collapsible=icon]:p-1">
-        <div className="rounded-lg border border-sidebar-border/80 bg-sidebar-accent/40 p-1 transition-[border-color,background-color,padding] duration-200 ease-out group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0">
+        <div className="p-1 group-data-[collapsible=icon]:p-0">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
