@@ -9,7 +9,7 @@ const meta = {
   component: AppSidebar,
   args: { orgName: "Example Label", dark: false, onToggleTheme: () => {} },
   parameters: { layout: "fullscreen" },
-  decorators: [(Story) => <SidebarProvider style={{ "--sidebar-width": "12.5rem" } as CSSProperties}><TooltipProvider><Story /><main className="flex-1 p-6 text-sm text-muted-foreground">Browse the workspace. Secondary destinations stay available through their groups and search.</main></TooltipProvider></SidebarProvider>],
+  decorators: [(Story) => <SidebarProvider style={{ "--sidebar-width": "14.375rem" } as CSSProperties}><TooltipProvider><Story /><main className="flex-1 bg-background p-6 text-sm text-muted-foreground">Browse the workspace. Secondary destinations stay available through their groups and search.</main></TooltipProvider></SidebarProvider>],
 } satisfies Meta<typeof AppSidebar>;
 
 export default meta;
